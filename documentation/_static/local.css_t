@@ -1,0 +1,13 @@
+th.field-name {
+	font-weight: normal;
+	background: inherit;
+	font-variant: small-caps;
+	font-size: small;
+}
+
+td.field-body ul li strong {
+	font-weight: normal;
+	border-bottom-width: 1px;
+	border-bottom-style: dashed;
+	border-bottom-color: darkgreen;
+}
