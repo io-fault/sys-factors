@@ -51,7 +51,7 @@ def build(
 		path = os.path.join(docdir, target)
 	abspath = os.path.realpath(path)
 
-	sphinx_conf = os.path.join(docdir, 'sphinx.py')
+	sphinx_conf = os.path.join(docdir, 'conf.py')
 	if os.path.exists(sphinx_conf):
 		confdir = docdir
 	else:
