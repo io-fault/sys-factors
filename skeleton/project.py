@@ -3,6 +3,7 @@
 #: Project name.
 name = 'skeleton'
 abstract = 'single sentence description of project'
+icon = None
 
 #: IRI based project identity. (project homepage)
 identity = 'URL uniquely identifying the project.'

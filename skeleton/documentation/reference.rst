@@ -13,3 +13,10 @@ information.
 .. automodule:: skeleton
     :show-inheritance:
     :members:
+
+:mod:`skeleton.lib`
+===================
+
+.. automodule:: skeleton.lib
+    :show-inheritance:
+    :members:
