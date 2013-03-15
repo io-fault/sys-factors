@@ -3,6 +3,11 @@
 ##
 from .. import libtest
 
+def test_context(test):
+	from .. import test as test_pkg
+	test/'some_var' >> dir(test_pkg)
+	test/test_pkg.some_var == 'context!'
+
 def test_Test_init(test):
 	f = lambda x: False
 	t = libtest.Test(f)
@@ -99,34 +104,6 @@ def test_Test_fir_raised(test):
 	fate = libtest.seal(t)
 	test.fail_if_not_instance(fate, libtest.Pass)
 	# XXX: check more details
-
-def test_Test_fi_empty(test):
-	# test failing
-	def t(test):
-		test.fail_if_empty(('foo',))
-	t = libtest.Test(t)
-	fate = libtest.seal(t)
-	test.fail_if_not_instance(fate, libtest.Pass)
-	# test passing
-	def t(test):
-		test.fail_if_empty(())
-	t = libtest.Test(t)
-	fate = libtest.seal(t)
-	test.fail_if_not_instance(fate, libtest.Fail)
-
-def test_Test_fin_empty(test):
-	# test failing
-	def t(test):
-		test.fail_if_not_empty(('foo',))
-	t = libtest.Test(t)
-	fate = libtest.seal(t)
-	test.fail_if_not_instance(fate, libtest.Fail)
-	# test passing
-	def t(test):
-		test.fail_if_not_empty(())
-	t = libtest.Test(t)
-	fate = libtest.seal(t)
-	test.fail_if_not_instance(fate, libtest.Pass)
 
 def test_Test_skip(test):
 	def t(test):

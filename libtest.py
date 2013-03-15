@@ -98,6 +98,17 @@ class Fate(BaseException):
 	def __str__(self):
 		return self.test.identity
 
+class Sum(Fate):
+	"""
+	Fate of a collection of tests.
+	"""
+	name = 'sum'
+
+	def __str__(self):
+		return sum([
+			k * v for (k, v) in self.content.items()
+		])
+
 class Pass(Fate):
 	'the test explicitly passed'
 	impact = 1
@@ -502,8 +513,52 @@ class Test(object):
 		except StopIteration:
 			pass
 
-def _execmodule(module = None):
+def _runtests(module):
 	import pdb, traceback
+	tests = gather(module.__dict__)
+
+	args = sys.argv[1:]
+	if args:
+		test_progress = [tests[k] for k in args]
+	else:
+		test_progress = tests.values()
+
+	for x in test_progress:
+		sys.stderr.write(x.identity + ': ')
+		sys.stderr.flush()
+		before = time.time()
+		pid = os.fork()
+		if pid == 0:
+			fate = seal(x)
+			duration = time.time() - before
+			sys.stderr.write('[' + str(duration) + ' seconds] ')
+			sys.stderr.write(fate.__class__.__name__ + '\n')
+
+			if not isinstance(fate, Pass):
+				tb = traceback.format_exception(
+					fate.__class__, fate,
+					fate.__traceback__
+				)
+				sys.stderr.write(''.join(tb))
+				if isinstance(fate, Error):
+					# error cases chain the exception
+					pdb.post_mortem(fate.__cause__.__traceback__)
+				else:
+					pdb.post_mortem(fate.__traceback__)
+				break
+			os._exit(0)
+		else:
+			pid, status = os.waitpid(pid, 0)
+			if os.WCOREDUMP(status):
+				import subprocess
+				import shutil
+				corefile = os.path.join('/cores', 'core') + '.' + str(pid)
+				p = subprocess.Popen((shutil.which('gdb'), '--core=' + corefile, sys.executable))
+				print(p.pid)
+				p.wait()
+				os.remove(corefile)
+
+def _execmodule(module = None):
 	import faulthandler
 	faulthandler.enable()
 
@@ -518,13 +573,15 @@ def _execmodule(module = None):
 		sys.modules[name] = module
 		module.__name__ = name
 
-	# if it's __main__, refer to the package.
+	# if it's __main__, refer to the package; package/__main__.py
 	if module.__package__ + '.__main__' == module.__name__:
 		module = importlib.import_module(module.__package__)
 
 	if module.__name__ == module.__package__:
 		# package module; iterate over the "test" modules.
-		package, modules = listpackage(module)
+		package = module
+		packages, modules = listpackage(package)
+
 		modules = [
 			importlib.import_module(x)
 			for x in modules
@@ -532,49 +589,18 @@ def _execmodule(module = None):
 		]
 	else:
 		modules = [module]
+		package = importlib.import_module(module.__package__)
+		packages = None
 
-	for module in modules:
-		tests = gather(module.__dict__)
-
-		args = sys.argv[1:]
-		if args:
-			test_progress = [tests[k] for k in args]
-		else:
-			test_progress = tests.values()
-
-		for x in test_progress:
-			sys.stderr.write(x.identity + ': ')
-			sys.stderr.flush()
-			before = time.time()
-			pid = os.fork()
-			if pid == 0:
-				fate = seal(x)
-				duration = time.time() - before
-				sys.stderr.write('[' + str(duration) + ' seconds] ')
-				sys.stderr.write(fate.__class__.__name__ + '\n')
-
-				if not isinstance(fate, Pass):
-					tb = traceback.format_exception(
-						fate.__class__, fate,
-						fate.__traceback__
-					)
-					print(''.join(tb))
-					if isinstance(fate, Error):
-						pdb.post_mortem(fate.__cause__.__traceback__)
-					else:
-						pdb.post_mortem(fate.__traceback__)
-					break
-				os._exit(0)
-			else:
-				pid, status = os.waitpid(pid, 0)
-				if os.WCOREDUMP(status):
-					import subprocess
-					import shutil
-					corefile = os.path.join('/cores', 'core') + '.' + str(pid)
-					p = subprocess.Popen((shutil.which('gdb'), '--core=' + corefile, sys.executable))
-					print(p.pid)
-					p.wait()
-					os.remove(corefile)
+	if 'context' in dir(package):
+		with package.context() as test_context:
+			for x in modules:
+				_runtests(x)
+	else:
+		for x in modules:
+			_runtests(x)
 
 def execmodule(module = None):
-	sys.exit(_execmodule(module))
+	import c.lib
+	with c.lib.features('test'):
+		sys.exit(_execmodule(module))
