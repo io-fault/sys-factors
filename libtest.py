@@ -513,7 +513,7 @@ class Test(object):
 		except StopIteration:
 			pass
 
-def _runtests(module):
+def _runtests(module, corefile):
 	import pdb, traceback
 	tests = gather(module.__dict__)
 
@@ -548,17 +548,38 @@ def _runtests(module):
 				break
 			os._exit(0)
 		else:
-			pid, status = os.waitpid(pid, 0)
-			if os.WCOREDUMP(status):
-				import subprocess
-				import shutil
-				corefile = os.path.join('/cores', 'core') + '.' + str(pid)
-				p = subprocess.Popen((shutil.which('gdb'), '--core=' + corefile, sys.executable))
-				print(p.pid)
-				p.wait()
-				os.remove(corefile)
+			status = None
+			while status is None:
+				try:
+					# Interrupts can happen if a debugger is attached.
+					pid, status = os.waitpid(pid, 0)
+				except OSError:
+					pass
 
-def _execmodule(module = None):
+			if os.WCOREDUMP(status):
+				sys.stderr.write('\nCore\n')
+				if corefile is not None:
+					import subprocess
+					import shutil
+					import getpass
+					path = corefile(**{'pid': pid, 'user': getpass.getuser(), 'home': os.environ['HOME']})
+					if os.path.exists(path):
+						sys.stderr.write("CORE: Identified, {0!r}, loading debugger.\n".format(path))
+						p = subprocess.Popen((shutil.which('gdb'), '--quiet', '--core=' + path, sys.executable))
+						p.wait()
+						sys.stderr.write("CORE: Removed file.\n".format(path))
+						os.remove(path)
+					else:
+						sys.stderr.write('CORE: File does not exist: ' + repr(path) + '\n')
+			else:
+				# make sure it's dead dead
+				import signal
+				try:
+					os.kill(pid, signal.SIGKILL)
+				except OSError:
+					pass
+
+def _execmodule(module = None, corefile = None):
 	import faulthandler
 	faulthandler.enable()
 
@@ -595,12 +616,13 @@ def _execmodule(module = None):
 	if 'context' in dir(package):
 		with package.context() as test_context:
 			for x in modules:
-				_runtests(x)
+				_runtests(x, corefile)
 	else:
 		for x in modules:
 			_runtests(x)
 
 def execmodule(module = None):
 	import c.lib
-	with c.lib.features('test'):
-		sys.exit(_execmodule(module))
+	from . import libcore
+	with c.lib.features('test'), libcore.dumping() as corefile:
+		sys.exit(_execmodule(module, corefile = corefile))

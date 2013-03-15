@@ -9,15 +9,12 @@ system_abort(PyObject *self)
 	return(NULL);
 }
 
-/* METH_O, METH_VARARGS, METH_VARKEYWORDS, METH_NOARGS */
 METHODS() = {
 	{"abort", (PyCFunction) system_abort, METH_NOARGS, "Causes the process to abort, potentially, leaving a coredump."},
 	{NULL}
 };
 
-MODULE(NULL, 0);
-
-INIT()
+INIT("C-API Access to the System")
 {
 	return(PyModule_Create(&module));
 }
