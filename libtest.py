@@ -566,6 +566,7 @@ def _runtests(module, corefile):
 					if os.path.exists(path):
 						sys.stderr.write("CORE: Identified, {0!r}, loading debugger.\n".format(path))
 						p = subprocess.Popen((shutil.which('gdb'), '--quiet', '--core=' + path, sys.executable))
+						#p = subprocess.Popen((shutil.which('lldb'), '--core-file', path, sys.executable))
 						p.wait()
 						sys.stderr.write("CORE: Removed file.\n".format(path))
 						os.remove(path)
@@ -619,7 +620,7 @@ def _execmodule(module = None, corefile = None):
 				_runtests(x, corefile)
 	else:
 		for x in modules:
-			_runtests(x)
+			_runtests(x, corefile)
 
 def execmodule(module = None):
 	import c.lib
