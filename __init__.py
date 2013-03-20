@@ -54,5 +54,11 @@ layout from a `python -m dev.bin.init package` run::
 			index.rst
 			conf.py
 
+Documentation
+-------------
+
+:py:mod:`dev.libsphinx` provides a high-level build function for running a sphinx-build
+command for a project. Given a dev.skeleton conforming project, a sphinx configuration
+file is only useful for customization, which is rarely necessary for small projects.
 """
 __pkg_bottom__ = True
