@@ -57,6 +57,12 @@ def build(
 	else:
 		confdir = None
 
+	major, minor, *remainder = map(str, getattr(contextmod, 'version_info', (0, 0)))
+	forkname = getattr(contextmod, 'fork', '')
+	meaculpa = getattr(contextmod, 'meaculpa', '')
+
+	revision = meaculpa + '/' + forkname + ' v' + major + '.' + minor
+
 	config = dict(
 		project = package,
 		htmlhelp_basename = package,
@@ -65,8 +71,8 @@ def build(
 		rst_epilog = "",
 
 		source_suffix = '.rst',
-		version = getattr(contextmod, 'version', None),
-		release = getattr(contextmod, 'version', None),
+		version = revision,
+		release = revision,
 		today_fmt = '%B %d, %Y',
 		pygments_style = 'sphinx',
 		master_doc = 'index'

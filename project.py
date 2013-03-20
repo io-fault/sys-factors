@@ -14,6 +14,9 @@ meaculpa = 'fault.io'
 #: Contact point for the Responsible Party
 contact = 'mailto:critical@fault.io'
 
+#: Name of the project's fork; used to identify a distinct development line.
+fork = 'industry'
+
 #: Version tuple: (major, minor, bugfix)
 version_info = (0, 5, 0)
 
