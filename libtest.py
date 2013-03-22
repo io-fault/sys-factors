@@ -9,6 +9,7 @@ import pkgutil
 import itertools
 import importlib
 import os
+import contextlib
 
 def packages(directory):
 	"""
@@ -156,7 +157,8 @@ def seal(test):
 	tb = None
 
 	try:
-		r = test.focus(test)
+		with contextlib.ExitStack() as stack:
+			r = test.focus(test)
 		fate = Return(r)
 	except Fate as exc:
 		tb = exc.__traceback__ = exc.__traceback__.tb_next
@@ -274,6 +276,7 @@ class Subject(tuple):
 
 class Test(object):
 	__slots__ = ('focus', 'identity', 'module')
+
 	def __init__(self, focus, identity = None, module = None):
 		# allow explicit identity as the callable may be a wrapped function
 		self.focus = focus
@@ -303,38 +306,6 @@ class Test(object):
 		Signal that the test failed.
 		"""
 		raise Fail(cause)
-
-	def fail_if(self, x):
-		"""
-		Fail if the `x` argument is true. ``bool(x) is True``
-		"""
-		if x: raise Fail("found True object")
-
-	def fail_if_not(self, x):
-		"""
-		Fail if the `x` argument is false. ``bool(x) is False``
-		"""
-		if not x: raise Fail("found False object")
-
-	def fail_if_hasattr(self, x, y):
-		"""
-		Fail if the `x` argument has the `y` argument as an attribute.
-
-		>>> o=object()
-		>>> test.fail_if_hasattr(o, 'foo')
-		False
-		"""
-		if hasattr(x, y): raise Fail("object had attribute")
-
-	def fail_if_not_hasattr(self, x, y):
-		"""
-		Fail if the `x` argument does *not* have the `y` argument as an attribute.
-
-		>>> o=object()
-		>>> test.fail_if_not_hasattr(o, 'foo')
-		False
-		"""
-		if not hasattr(x, y): raise Fail("did not have attribute")
 
 	def fail_if_exact(self, x, y):
 		"""
@@ -439,16 +410,6 @@ class Test(object):
 		msg = "not subclass"
 		if not issubclass(x, y): raise Fail(msg)
 
-	def isinstance(self, x, y):
-		"""
-		Fail if the `x` argument is a instance of the `y` class.
-
-		>>> test.isinstance(ob, typ1)
-		False
-		"""
-		msg = "instance"
-		if isinstance(x, y): raise Fail(msg)
-
 	def fail_if_instance(self, x, y):
 		"""
 		Fail if the `x` argument is a instance of the `y` class.
@@ -503,16 +464,6 @@ class Test(object):
 		msg = "not contained"
 		if x not in y: raise Fail(msg)
 
-	def fail_if_iterating(self, x):
-		"""
-		Fail if the `x` argument is not at the bottom of the iterator.
-		"""
-		msg = "iterating"
-		try:
-			y = next(x); raise Fail(msg)
-		except StopIteration:
-			pass
-
 def _runtests(module, corefile):
 	import pdb, traceback
 	tests = gather(module.__dict__)
@@ -562,7 +513,7 @@ def _runtests(module, corefile):
 					import subprocess
 					import shutil
 					import getpass
-					path = corefile(**{'pid': pid, 'user': getpass.getuser(), 'home': os.environ['HOME']})
+					path = corefile(**{'pid': pid, 'uid': os.getuid(), 'user': getpass.getuser(), 'home': os.environ['HOME']})
 					if os.path.exists(path):
 						sys.stderr.write("CORE: Identified, {0!r}, loading debugger.\n".format(path))
 						p = subprocess.Popen((shutil.which('gdb'), '--quiet', '--core=' + path, sys.executable))
