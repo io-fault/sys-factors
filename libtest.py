@@ -464,13 +464,27 @@ class Test(object):
 		msg = "not contained"
 		if x not in y: raise Fail(msg)
 
-def _runtests(module, corefile):
-	import pdb, traceback
+def _print_tb(fate):
+	import traceback
+	try:
+		# dev.libtraceback por favor
+		from IPython.core import ultratb
+		x = ultratb.VerboseTB(ostream = sys.stderr)
+		# doesn't support chains yet, so fallback to cause traceback.
+		if fate.__cause__:
+			exc = fate.__cause__
+		x(exc.__class__, exc, exc.__traceback__)
+	except ImportError:
+		tb = traceback.format_exception(fate.__class__, fate, fate.__traceback__)
+		tb = ''.join(tb)
+		sys.stderr.write(tb)
+
+def _runtests(module, corefile, *tests):
+	import pdb
 	tests = gather(module.__dict__)
 
-	args = sys.argv[1:]
-	if args:
-		test_progress = [tests[k] for k in args]
+	if tests:
+		test_progress = [tests[k] for k in tests]
 	else:
 		test_progress = tests.values()
 
@@ -486,11 +500,7 @@ def _runtests(module, corefile):
 			sys.stderr.write(fate.__class__.__name__ + '\n')
 
 			if not isinstance(fate, Pass):
-				tb = traceback.format_exception(
-					fate.__class__, fate,
-					fate.__traceback__
-				)
-				sys.stderr.write(''.join(tb))
+				_print_tb(fate)
 				if isinstance(fate, Error):
 					# error cases chain the exception
 					pdb.post_mortem(fate.__cause__.__traceback__)
@@ -500,15 +510,23 @@ def _runtests(module, corefile):
 			os._exit(0)
 		else:
 			status = None
+			signalled = False
 			while status is None:
 				try:
 					# Interrupts can happen if a debugger is attached.
-					pid, status = os.waitpid(pid, 0)
+					rpid, status = os.waitpid(pid, 0)
 				except OSError:
 					pass
+				except KeyboardInterrupt:
+					import signal
+					try:
+						os.kill(pid, signal.SIGINT)
+						signalled = True
+					except OSError:
+						pass
 
 			if os.WCOREDUMP(status):
-				sys.stderr.write('\nCore\n')
+				sys.stderr.write('Core\n')
 				if corefile is not None:
 					import subprocess
 					import shutil
@@ -523,17 +541,38 @@ def _runtests(module, corefile):
 						os.remove(path)
 					else:
 						sys.stderr.write('CORE: File does not exist: ' + repr(path) + '\n')
-			else:
-				# make sure it's dead dead
+			elif not os.WIFEXITED(status):
 				import signal
 				try:
 					os.kill(pid, signal.SIGKILL)
 				except OSError:
 					pass
 
-def _execmodule(module = None, corefile = None):
-	import faulthandler
-	faulthandler.enable()
+def _execmodule(module = None, args = (), corefile = None):
+	if args:
+		modules = [
+			importlib.import_module(module.__package__ + '.' + args[0])
+		]
+	else:
+		# package module; iterate over the "test" modules.
+		packages, modules = listpackage(module)
+
+		modules = [
+			importlib.import_module(x)
+			for x in modules
+			if x.split('.')[-1].startswith('test_')
+		]
+
+	for x in modules:
+		_runtests(x, corefile, *args[1:])
+	return 0
+
+def execmodule(module = None):
+	import c.lib
+	from . import libcore
+	c.lib.role = 'test'
+
+	# resolve the package module
 
 	if module is None:
 		module = sys.modules['__main__']
@@ -550,31 +589,9 @@ def _execmodule(module = None, corefile = None):
 	if module.__package__ + '.__main__' == module.__name__:
 		module = importlib.import_module(module.__package__)
 
-	if module.__name__ == module.__package__:
-		# package module; iterate over the "test" modules.
-		package = module
-		packages, modules = listpackage(package)
+	with contextlib.ExitStack() as stack:
+		corefile = stack.enter_context(libcore.dumping())
+		if 'context' in dir(module):
+			stack.enter_context(module.context())
 
-		modules = [
-			importlib.import_module(x)
-			for x in modules
-			if x.split('.')[-1].startswith('test_')
-		]
-	else:
-		modules = [module]
-		package = importlib.import_module(module.__package__)
-		packages = None
-
-	if 'context' in dir(package):
-		with package.context() as test_context:
-			for x in modules:
-				_runtests(x, corefile)
-	else:
-		for x in modules:
-			_runtests(x, corefile)
-
-def execmodule(module = None):
-	import c.lib
-	from . import libcore
-	with c.lib.features('test'), libcore.dumping() as corefile:
-		sys.exit(_execmodule(module, corefile = corefile))
+		sys.exit(_execmodule(module, args = sys.argv[1:], corefile = corefile))
