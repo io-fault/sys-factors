@@ -473,6 +473,8 @@ def _print_tb(fate):
 		# doesn't support chains yet, so fallback to cause traceback.
 		if fate.__cause__:
 			exc = fate.__cause__
+		else:
+			exc = fate
 		x(exc.__class__, exc, exc.__traceback__)
 	except ImportError:
 		tb = traceback.format_exception(fate.__class__, fate, fate.__traceback__)
@@ -570,7 +572,9 @@ def _execmodule(module = None, args = (), corefile = None):
 def execmodule(module = None):
 	import c.lib
 	from . import libcore
-	c.lib.role = 'test'
+	# promote to test, but iff the role was unchanged.
+	if c.lib.role == 'debug':
+		c.lib.role = 'test'
 
 	# resolve the package module
 
