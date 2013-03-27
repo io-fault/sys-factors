@@ -573,7 +573,7 @@ def execmodule(module = None):
 	import c.lib
 	from . import libcore
 	# promote to test, but iff the role was unchanged.
-	if c.lib.role == 'debug':
+	if c.lib.role is None:
 		c.lib.role = 'test'
 
 	# resolve the package module
