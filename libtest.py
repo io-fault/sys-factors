@@ -481,12 +481,12 @@ def _print_tb(fate):
 		tb = ''.join(tb)
 		sys.stderr.write(tb)
 
-def _runtests(module, corefile, *tests):
+def _runtests(module, corefile, *xtests):
 	import pdb
 	tests = gather(module.__dict__)
 
-	if tests:
-		test_progress = [tests[k] for k in tests]
+	if xtests:
+		test_progress = [tests[k] for k in xtests]
 	else:
 		test_progress = tests.values()
 
@@ -496,20 +496,22 @@ def _runtests(module, corefile, *tests):
 		before = time.time()
 		pid = os.fork()
 		if pid == 0:
-			fate = seal(x)
-			duration = time.time() - before
-			sys.stderr.write('[' + str(duration) + ' seconds] ')
-			sys.stderr.write(fate.__class__.__name__ + '\n')
+			try:
+				fate = seal(x)
+				duration = time.time() - before
+				sys.stderr.write('[' + str(duration) + ' seconds] ')
+				sys.stderr.write(fate.__class__.__name__ + '\n')
 
-			if not isinstance(fate, Pass):
-				_print_tb(fate)
-				if isinstance(fate, Error):
-					# error cases chain the exception
-					pdb.post_mortem(fate.__cause__.__traceback__)
-				else:
-					pdb.post_mortem(fate.__traceback__)
-				break
-			os._exit(0)
+				if not isinstance(fate, Pass):
+					_print_tb(fate)
+					if isinstance(fate, Error):
+						# error cases chain the exception
+						pdb.post_mortem(fate.__cause__.__traceback__)
+					else:
+						pdb.post_mortem(fate.__traceback__)
+					break
+			finally:
+				os._exit(0)
 		else:
 			status = None
 			signalled = False
