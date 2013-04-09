@@ -16,7 +16,9 @@ METHODS() = {
 
 INIT("C-API Access to the System")
 {
-	return(PyModule_Create(&module));
+	PyObj mod = NULL;
+	CREATE_MODULE(&mod);
+	return(mod);
 }
 /*
  * vim: ts=3:sw=3:noet:
