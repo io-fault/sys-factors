@@ -251,6 +251,3 @@ def test_Dependency(test):
 	t = libtest.Test(None)
 	test.fail_if_not_raised(libtest.Dependency, t.depends, 'nosuchmoduleever.bar')
 	test.fail_if_not_equal(test.depends('dev.libtest'), libtest)
-
-if __name__ == '__main__':
-	from .. import libtest; libtest.execmodule()
