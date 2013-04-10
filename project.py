@@ -3,7 +3,7 @@
 #: Project name.
 name = 'dev'
 abstract = 'libraries and tools for Python development'
-icon = '🚧'
+icon = '⛔'
 
 #: IRI based project identity. (project homepage)
 identity = 'http://fault.io/case/python/dev'
@@ -18,7 +18,7 @@ contact = 'mailto:critical@fault.io'
 fork = 'industry'
 
 #: Version tuple: (major, minor, bugfix)
-version_info = (0, 5, 0)
+version_info = (0, 6, 0)
 
 #: The version string.
 version = '.'.join(map(str, version_info))
