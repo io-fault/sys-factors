@@ -497,10 +497,12 @@ def _runtests(module, corefile, *xtests):
 		pid = os.fork()
 		if pid == 0:
 			try:
-				fate = seal(x)
-				duration = time.time() - before
-				sys.stderr.write('[' + str(duration) + ' seconds] ')
+				from . import libtrace
+				T = libtrace.Trace('rhythm', module.__name__ + '.' + x.identity)
+				with T:
+					fate = seal(x)
 				sys.stderr.write(fate.__class__.__name__ + '\n')
+				T.aggregate()
 
 				if not isinstance(fate, Pass):
 					_print_tb(fate)
@@ -510,6 +512,8 @@ def _runtests(module, corefile, *xtests):
 					else:
 						pdb.post_mortem(fate.__traceback__)
 					break
+			except:
+				sys.excepthook(*sys.exc_info())
 			finally:
 				os._exit(0)
 		else:
