@@ -7,13 +7,13 @@ SKELETON description.
 Introduction
 ============
 
-Introduce the project.
+Longer introduction to the project.
 
 Structure
 =========
 
-Discuss the structure of the project; module locations and contents at a high
-level. Use `:py:mod:"Module"` to refer to the reference section.
+Discuss the structure of the project. Prevalent high-level concepts. Where such concepts
+are manifested.
 
 Requirements
 ============
