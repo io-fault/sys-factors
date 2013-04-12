@@ -2,13 +2,12 @@
 A testing library that minimizes the distance between the test runner, and
 the actual tests for the purpose of keeping the execution machinary as simple as possible.
 """
+import os
 import sys
 import collections
-import time
 import pkgutil
 import itertools
 import importlib
-import os
 import contextlib
 import operator
 import functools
@@ -282,7 +281,6 @@ def _runtests(package, module, corefile, *xtests, foreachtest = contextlib.ExitS
 	for x in test_progress:
 		sys.stderr.write(x.identity + ': ')
 		sys.stderr.flush()
-		before = time.time()
 		pid = os.fork()
 		if pid == 0:
 			try:
