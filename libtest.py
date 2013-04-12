@@ -10,21 +10,8 @@ import itertools
 import importlib
 import os
 import contextlib
-
-def packages(directory):
-	"""
-	Given a directory, yield all the package directories.
-
-	This simply looks for directories that have a ``__init__.py`` file and should only
-	be used in cases of initial discover where the directory may or may not be in
-	:py:obj:`sys.path`.
-	"""
-	for x in os.listdir(directory):
-		path = os.path.join(directory, x)
-		if os.path.isdir(path):
-			initfile = os.path.join(path, '__init__.py')
-			if os.path.exists(initfile):
-				yield (x, path)
+import operator
+import functools
 
 def get_test_index(tester):
 	"""
@@ -85,7 +72,7 @@ def listpackage(package):
 # and the completion state of a test. Fate is a Control exception (BaseException).
 class Fate(BaseException):
 	"""
-	The Fate of a test. Sealed by :py:func:`seal`.
+	The Fate of a test. Sealed by :py:meth:`Test.seal`.
 	"""
 	name = 'fate'
 	content = None
@@ -120,6 +107,11 @@ class Return(Pass):
 	impact = 1
 	name = 'return'
 
+class Implicit(Pass):
+	'the test cannot be implicitly invoked'
+	impact = 0
+	name = 'implicit'
+
 class Skip(Pass):
 	'the test was skipped by the focus'
 	impact = 0
@@ -147,132 +139,54 @@ class Expire(Fail):
 	'the test did not finish in the allowed time'
 	name = 'expire'
 
-def seal(test):
-	"""
-	Execute the given test, sealing its fate.
+# Exposes an assert like interface to testing.
+class Subject(object):
+	__slots__ = ('test', 'object', 'storage', 'inverse')
 
-	Tests are designed to be repeatable, so :py:class:`Fate` instances are returned.
-	"""
-	fate = None
-	tb = None
+	def __init__(self, test, object, inverse = False):
+		self.test = test
+		self.object = object
+		self.inverse = inverse
 
-	try:
-		with contextlib.ExitStack() as stack:
-			r = test.focus(test)
-		fate = Return(r)
-	except Fate as exc:
-		tb = exc.__traceback__ = exc.__traceback__.tb_next
-		fate = exc
-	except BaseException as err:
-		# place error out
-		tb = err.__traceback__ = err.__traceback__.tb_next
-		fate = Error('test raised exception')
-		fate.__cause__ = err
+	# Build operator methods based on operator.
+	_override = {
+		'__truediv__' : ('isinstance', isinstance),
+		'__sub__' : ('issubclass', issubclass),
+	}
+	for k, v in operator.__dict__.items():
+		if k.startswith('__get') or k.startswith('__set'):
+			continue
+		if k.strip('_') in operator.__dict__:
+			if k in _override:
+				cmpname, v = _override[k]
+			else:
+				cmpname = k
 
-	fate.test = test
-	if tb is not None:
-		fate.line = tb.tb_lineno
+			def check(self, ob, cmpname = cmpname, comparison = v):
+				test, x, y = self.test, self.object, ob
+				if self.inverse:
+					if comparison(x, y): test.fail(cmpname, x, y)
+				else:
+					if not comparison(x, y): test.fail(cmpname, x, y)
+			locals()[k] = check
 
-	return fate
+	##
+	# Special cases for context manager exception traps.
 
-# Test Subjects offer some convenience while creating some
-# opacity. Notably about __contains__ and issubclass/isinstance checks.
-class Subject(tuple):
-	"""
-	An object to be tested.
-	"""
-
-	@property
-	def test(self):
-		return self[0]
-
-	@property
-	def object(self):
-		return self[1]
-
-	def __iter__(self):
-		test, subject = self[0], self[1]
-		for x in subject:
-			yield self.__class__((test, x))
-
-	def __ne__(self, ob):
-		test, subject = self[0], self[1]
-		test.fail_if_equal(subject, ob)
-		return self
-
-	def __eq__(self, case):
-		test, subject = self[0], self[1]
-		test.fail_if_not_equal(subject, case)
-		return True
-
-	def __gt__(self, case):
-		test, subject = self[0], self[1]
-		test.fail_if_less_than_or_equal(subject, case)
-		return True
-
-	def __lt__(self, case):
-		test, subject = self[0], self[1]
-		test.fail_if_greater_than_or_equal(subject, case)
-		return True
-
-	def __ge__(self, case):
-		test, subject = self[0], self[1]
-		test.fail_if_less_than(subject, case)
-		return True
-
-	def __le__(self, case):
-		test, subject = self[0], self[1]
-		test.fail_if_greater_than(subject, case)
-		return True
-
-	def __contains__(self, case):
-		test, subject = self[0], self[1]
-		test.fail_if_in(case, subject)
-		return True
-
-	def __lshift__(self, case):
-		test, subject = self[0], self[1]
-		test.fail_if_not_in(case, subject)
-		return True
-
-	def __rlshift__(self, case):
-		return self.__rshift__(case)
-
-	def __rshift__(self, case):
-		test, subject = self[0], self[1]
-		test.fail_if_not_in(subject, case)
-		return True
-
-	def __rrshift__(self, case):
-		return self.__lshift__(case)
-
-	def __xor__(self, subject):
-		test, exception = self[0], self[1]
-		return test.fail_if_not_raised(exception, subject)
-	__rxor__ = __xor__
-
-	def __mul__(self, superclass):
-		test, subject = self[0], self[1]
-		test.fail_if_not_subclass(subject, superclass)
-		return True
-	__rmul__ = __mul__
-
-	def __mod__(self, superclass):
-		test, subject = self[0], self[1]
-		test.fail_if_not_instance(subject, superclass)
-		return True
-	__rmod__ = __mod__
-
-	def __enter__(self):
-		pass
+	def __enter__(self, partial = functools.partial):
+		return partial(getattr, self, 'storage', None)
 
 	def __exit__(self, typ, val, tb):
-		test, subject = self[0], self[1]
-		if val is None:
-			raise Fail("no exception raised")
-		if not isinstance(val, subject):
-			raise Fail("wrong exception raised") from val
-		return True
+		test, x = self.test, self.object
+		self.storage = val
+
+		if not isinstance(val, x): self.fail("isinstance", val, x)
+		return True # !!! Inhibiting raise.
+
+	def __xor__(self, subject):
+		with self:
+			subject()
+	__rxor__ = __xor__
 
 class Test(object):
 	__slots__ = ('focus', 'identity', 'module')
@@ -284,10 +198,45 @@ class Test(object):
 		self.module = module
 
 	def __truediv__(self, object):
-		return Subject((self, object))
+		return Subject(self, object)
 
 	def __rtruediv__(self, object):
-		return Subject((self, object))
+		return Subject(self, object)
+
+	def __floordiv__(self, object):
+		return Subject(self, object, True)
+
+	def __rfloordiv__(self, object):
+		return Subject(self, object, True)
+
+	def seal(self):
+		"""
+		Seal the fate of the Test.
+		"""
+		fate = None
+		tb = None
+
+		try:
+			with contextlib.ExitStack() as stack:
+				r = self.focus(self)
+			fate = Return(r)
+		except Fate as exc:
+			tb = exc.__traceback__ = exc.__traceback__.tb_next
+			fate = exc
+		except BaseException as err:
+			# place error out
+			tb = err.__traceback__ = err.__traceback__.tb_next
+			fate = Error('test raised exception')
+			fate.__cause__ = err
+
+		fate.test = self
+		if tb is not None:
+			fate.line = tb.tb_lineno
+
+		return fate
+
+	def explicit(self):
+		raise Implicit("must be explicitly invoked")
 
 	def skip(self, cause):
 		raise Skip(cause)
@@ -301,168 +250,8 @@ class Test(object):
 		except ImportError as exc:
 			raise Dependency(module_path) from exc
 
-	def fail(self, cause):
-		"""
-		Signal that the test failed.
-		"""
-		raise Fail(cause)
-
-	def fail_if_exact(self, x, y):
-		"""
-		Fail if the `x` argument is exactly the `y` argument. ``x is y``.
-
-		>>> x = b'a unique string'.decode('utf-8')
-		>>> y = b'a unique string'.decode('utf-8')
-		>>> test.fail_if_exact(x, y)
-		False
-		"""
-		msg = "found exact object"
-		if x is y: raise Fail(msg)
-
-	def fail_if_not_exact(self, x, y):
-		"""
-		Fail if the `x` argument is *not* exactly `y` argument. ``x is not y``.
-
-		>>> x = b'a unique string'.decode('utf-8')
-		>>> test.fail_if_not_exact(x, x)
-		False
-		"""
-		msg = "found inexact object"
-		if x is not y: raise Fail(msg)
-
-	def fail_if_equal(self, x, y):
-		"""
-		Fail if all of the given arguments or keywords are equal.
-
-		>>> test.fail_if_equal(1, 2, 3)
-		False
-		"""
-		msg = "equality"
-		if x == y: raise Fail(msg)
-
-	def fail_if_not_equal(self, x, y, f = lambda x: x):
-		"""
-		Fail if the `x` argument is *not* equal to the `y` argument.
-
-		>>> test.fail_if_equal(1, 2)
-		False
-		"""
-		msg = "inequality"
-		if f(x) != f(y): raise Fail(msg)
-
-	def fail_if_less_than(self, x, y):
-		"""
-		Fail if the `x` argument is less than the `y` argument.
-
-		>>> test.fail_if_less_than(2, 1)
-		False
-		"""
-		msg = "less than"
-		if x < y: raise Fail(msg)
-
-	def fail_if_greater_than(self, x, y):
-		"""
-		Fail if the `x` argument is greater than the `y` argument.
-
-		>>> test.fail_if_greater_than(1, 2)
-		False
-		"""
-		msg = "greater than"
-		if x > y: raise Fail(msg)
-
-	def fail_if_less_than_or_equal(self, x, y):
-		"""
-		Fail if the `x` argument is less than the `y` argument.
-
-		>>> test.fail_if_less_than(2, 1)
-		False
-		"""
-		msg = "less than or equal to"
-		if x <= y: raise Fail(msg)
-
-	def fail_if_greater_than_or_equal(self, x, y):
-		"""
-		Fail if the `x` argument is greater than the `y` argument.
-
-		>>> test.fail_if_greater_than(1, 2)
-		False
-		"""
-		msg = "greater than or equal to"
-		if x >= y: raise Fail(msg)
-
-	def fail_if_subclass(self, x, y):
-		"""
-		Fail if the `x` argument is a subclass of the `y` argument.
-
-		>>> test.fail_if_subclass(ob, typ1, typ2)
-		False
-		"""
-		msg = "subclass"
-		if issubclass(x, y): raise Fail(msg)
-
-	def fail_if_not_subclass(self, x, y):
-		"""
-		Fail if the `x` argument is NOT a subclass of the `y` argument.
-
-		>>> test.fail_if_not_subclass(ob, typ1, typ2)
-		False
-		"""
-		msg = "not subclass"
-		if not issubclass(x, y): raise Fail(msg)
-
-	def fail_if_instance(self, x, y):
-		"""
-		Fail if the `x` argument is a instance of the `y` class.
-
-		>>> test.isinstance(ob, typ1)
-		False
-		"""
-		msg = "instance"
-		if isinstance(x, y): raise Fail(msg)
-
-	def fail_if_not_instance(self, x, y):
-		"""
-		Fail if the `x` argument is not an instance of the `y` class.
-
-		>>> test.fail_if_not_instance(ob, typ1, typ2)
-		False
-		"""
-		msg = "not instance"
-		if not isinstance(x, y): raise Fail(msg)
-
-	def fail_if_raised(self, x, y, *args, **kw):
-		"""
-		Fail if the `x` argument is raised by the `y` argument callable.
-		"""
-		msg = "raised"
-		try:
-			z = y(*args, **kw)
-		except BaseException as z:
-			if isinstance(z, x): raise Fail(msg)
-			return z
-		else:
-			pass
-
-	def fail_if_not_raised(self, x, y, *args, **kw):
-		"""
-		Fail if the `x` argument is *not* raised by the `y` argument callable.
-		"""
-		msg = "not raised"
-		try:
-			z = y(*args, **kw)
-		except BaseException as z:
-			if not isinstance(z, x): raise Fail(msg)
-			return z
-		else:
-			raise Fail(msg)
-
-	def fail_if_in(self, x, y):
-		msg = "contained"
-		if x in y: raise Fail(msg)
-
-	def fail_if_not_in(self, x, y):
-		msg = "not contained"
-		if x not in y: raise Fail(msg)
+	def fail(self, cause, *args):
+		x, y, *other = args; raise Fail(cause)
 
 def _print_tb(fate):
 	import traceback
@@ -481,7 +270,7 @@ def _print_tb(fate):
 		tb = ''.join(tb)
 		sys.stderr.write(tb)
 
-def _runtests(module, corefile, *xtests):
+def _runtests(package, module, corefile, *xtests, foreachtest = contextlib.ExitStack):
 	import pdb
 	tests = gather(module.__dict__)
 
@@ -497,12 +286,9 @@ def _runtests(module, corefile, *xtests):
 		pid = os.fork()
 		if pid == 0:
 			try:
-				from . import libtrace
-				T = libtrace.Trace('rhythm', module.__name__ + '.' + x.identity)
-				with T:
-					fate = seal(x)
+				with foreachtest(module.__name__ + '.' + x.identity):
+					fate = x.seal()
 				sys.stderr.write(fate.__class__.__name__ + '\n')
-				T.aggregate()
 
 				if not isinstance(fate, Pass):
 					_print_tb(fate)
@@ -556,7 +342,9 @@ def _runtests(module, corefile, *xtests):
 				except OSError:
 					pass
 
-def _execmodule(module = None, args = (), corefile = None):
+def _execmodule(package, module = None,
+	args = (), corefile = None,
+):
 	if args:
 		modules = [
 			importlib.import_module(module.__package__ + '.' + args[0])
@@ -571,13 +359,24 @@ def _execmodule(module = None, args = (), corefile = None):
 			if x.split('.')[-1].startswith('test_')
 		]
 
+	from . import libtrace
+	from . import libmeta
+	libmeta.void_package(package)
+	@contextlib.contextmanager
+	def construct_trace(testname, package = package):
+		T = libtrace.Trace(package)
+		with T:
+			yield None
+		T.aggregate(testname)
+
 	for x in modules:
-		_runtests(x, corefile, *args[1:])
+		_runtests(package, x, corefile, *args[1:], foreachtest = construct_trace)
 	return 0
 
 def execmodule(module = None):
 	import c.lib
 	from . import libcore
+
 	# promote to test, but iff the role was unchanged.
 	if c.lib.role is None:
 		c.lib.role = 'test'
@@ -599,9 +398,13 @@ def execmodule(module = None):
 	if module.__package__ + '.__main__' == module.__name__:
 		module = importlib.import_module(module.__package__)
 
+	package = module.__name__.rsplit('.', 1)[0]
+
 	with contextlib.ExitStack() as stack:
+		# enable core dumps for c-exts
 		corefile = stack.enter_context(libcore.dumping())
+		# package module has context?
 		if 'context' in dir(module):
 			stack.enter_context(module.context())
 
-		sys.exit(_execmodule(module, args = sys.argv[1:], corefile = corefile))
+		sys.exit(_execmodule(package, module, args = sys.argv[1:], corefile = corefile))
