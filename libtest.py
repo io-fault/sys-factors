@@ -11,6 +11,9 @@ import importlib
 import contextlib
 import operator
 import functools
+import types
+
+import routes.lib
 
 def get_test_index(tester):
 	"""
@@ -37,34 +40,20 @@ def get_test_index(tester):
 	except AttributeError:
 		return None
 
+def test_order(kv):
+	return get_test_index(kv[1])
+
 def gather(container, prefix = 'test_'):
 	"""
 	:returns: Ordered dictionary of attribute names associated with a :py:class:`Test` instance.
 	:rtype: {k : Test(v, k) for k, v in container.items()}
 
-	Collect the objects in the container whose name starts with "test\_".
+	Collect the objects in the container whose name starts with "test_".
 	The ordered is defined by the :py:func:`get_test_index` function.
 	"""
-	return collections.OrderedDict((
-		(id, Test(f, id)) for (id, f) in
-		sorted([i for i in container.items() if i[0].startswith(prefix)],
-			key = lambda kv: get_test_index(kv[1]))
-	))
-
-def listpackage(package):
-	"""
-	Return a pair of lists containing the packages and modules in the given package module.
-	"""
-	packages = []
-	modules = []
-	prefix = package.__name__
-	for (importer, name, ispkg) in pkgutil.iter_modules(package.__path__):
-		path = '.'.join((prefix, name))
-		if ispkg:
-			packages.append(path)
-		else:
-			modules.append(path)
-	return packages, modules
+	tests = [(name, getattr(container, name)) for name in dir(container) if name.startswith(prefix)]
+	tests.sort(key = test_order)
+	return tests
 
 ##
 # Fate exceptions are used to manage the exception
@@ -76,14 +65,10 @@ class Fate(BaseException):
 	name = 'fate'
 	content = None
 	impact = None
-	test = None
 	line = None
 
 	def __init__(self, content):
 		self.content = content
-
-	def __str__(self):
-		return self.test.identity
 
 class Sum(Fate):
 	"""
@@ -106,13 +91,13 @@ class Return(Pass):
 	impact = 1
 	name = 'return'
 
-class Implicit(Pass):
+class Explicit(Pass):
 	'the test cannot be implicitly invoked'
 	impact = 0
-	name = 'implicit'
+	name = 'explicit'
 
 class Skip(Pass):
-	'the test was skipped by the focus'
+	'the test was skipped'
 	impact = 0
 	name = 'skip'
 
@@ -120,6 +105,17 @@ class Dependency(Skip):
 	'the test could not be ran because of a missing dependency'
 	impact = 0
 	name = 'dependency'
+
+class Fork(Fate):
+	'the test consisted of a set of tests'
+	@property
+	def impact(self):
+		return sum([x.impact for x in self.tests])
+	name = 'fork'
+
+	def __init__(self, container):
+		self.content = container
+		self.tests = []
 
 class Fail(Fate):
 	'the test failed'
@@ -188,13 +184,12 @@ class Subject(object):
 	__rxor__ = __xor__
 
 class Test(object):
-	__slots__ = ('focus', 'identity', 'module')
+	__slots__ = ('focus', 'identity', 'fate')
 
-	def __init__(self, focus, identity = None, module = None):
+	def __init__(self, identity, focus):
 		# allow explicit identity as the callable may be a wrapped function
-		self.focus = focus
 		self.identity = identity
-		self.module = module
+		self.focus = focus
 
 	def __truediv__(self, object):
 		return Subject(self, object)
@@ -210,35 +205,34 @@ class Test(object):
 
 	def seal(self):
 		"""
-		Seal the fate of the Test.
+		Seal the fate of the Test. This should only be called once.
 		"""
-		fate = None
 		tb = None
 
 		try:
-			with contextlib.ExitStack() as stack:
-				r = self.focus(self)
-			fate = Return(r)
+			r = self.focus(self)
+			self.fate = Return(r)
 		except Fate as exc:
 			tb = exc.__traceback__ = exc.__traceback__.tb_next
-			fate = exc
+			self.fate = exc
 		except BaseException as err:
 			# place error out
 			tb = err.__traceback__ = err.__traceback__.tb_next
-			fate = Error('test raised exception')
-			fate.__cause__ = err
+			self.fate = Error('test raised exception')
+			self.fate.__cause__ = err
 
-		fate.test = self
 		if tb is not None:
-			fate.line = tb.tb_lineno
+			self.fate.line = tb.tb_lineno
 
-		return fate
+	def fork(self, container):
+		raise Fork(container)
 
 	def explicit(self):
-		raise Implicit("must be explicitly invoked")
+		raise Explicit("must be explicitly invoked")
 
-	def skip(self, cause):
-		raise Skip(cause)
+	def skip(self, condition):
+		if condition:
+			raise Skip()
 
 	def depends(self, module_path, *args, **kw):
 		"""
@@ -251,6 +245,34 @@ class Test(object):
 
 	def fail(self, cause, *args):
 		x, y, *other = args; raise Fail(cause)
+
+def module_test(test):
+	"""
+	Fork for each test.
+	"""
+	module = importlib.import_module(test.identity)
+	module.__tests__ = gather(module)
+	test.fork(module)
+
+def package_test(test):
+	"""
+	Fork the test for each test module.
+	"""
+	# The package module
+	module = importlib.import_module(test.identity)
+	test/module.__name__ == test.identity
+	if 'context' in dir(module):
+		module.context() # XXX: manage package context for dependency maanagement
+
+	ir = routes.lib.Import.from_fullname(module.__name__)
+	module.__tests__ = [
+		(x.fullname, module_test) for x in ir.subnodes()[1]
+		if x.identity.startswith('test_')
+	]
+	test.fork(module)
+
+##
+# XXX: This is a mess. It will be getting cleaned up soon.
 
 def _print_tb(fate):
 	import traceback
@@ -269,140 +291,82 @@ def _print_tb(fate):
 		tb = ''.join(tb)
 		sys.stderr.write(tb)
 
-def _runtests(package, module, corefile, *xtests, foreachtest = contextlib.ExitStack):
-	import pdb
-	tests = gather(module.__dict__)
+def _run(test):
+	pid = os.fork()
+	if pid != 0:
+		return pid
 
-	if xtests:
-		test_progress = [tests[k] for k in xtests]
-	else:
-		test_progress = tests.values()
+	test.seal()
+	sys.stderr.write('[ {fate!s:^10} ] {tid} \n'.format(
+		fate = test.fate.__class__.__name__.lower(), tid = test.identity
+	))
 
-	for x in test_progress:
-		sys.stderr.write(x.identity + ': ')
-		sys.stderr.flush()
-		pid = os.fork()
-		if pid == 0:
-			try:
-				with foreachtest(module.__name__ + '.' + x.identity):
-					fate = x.seal()
-				sys.stderr.write(fate.__class__.__name__ + '\n')
-
-				if not isinstance(fate, Pass):
-					_print_tb(fate)
-					if isinstance(fate, Error):
-						# error cases chain the exception
-						pdb.post_mortem(fate.__cause__.__traceback__)
-					else:
-						pdb.post_mortem(fate.__traceback__)
-					break
-			except:
-				sys.excepthook(*sys.exc_info())
-			finally:
-				os._exit(0)
+	if isinstance(test.fate, Fork):
+		_dispatch(test.fate.content)
+	elif not isinstance(test.fate, Pass):
+		_print_tb(test.fate)
+		import pdb
+		if isinstance(test.fate, Error):
+			# error cases chain the exception
+			pdb.post_mortem(test.fate.__cause__.__traceback__)
 		else:
-			status = None
-			signalled = False
-			while status is None:
-				try:
-					# Interrupts can happen if a debugger is attached.
-					rpid, status = os.waitpid(pid, 0)
-				except OSError:
-					pass
-				except KeyboardInterrupt:
-					import signal
-					try:
-						os.kill(pid, signal.SIGINT)
-						signalled = True
-					except OSError:
-						pass
+			pdb.post_mortem(test.fate.__traceback__)
+	sys.exit(0)
 
-			if os.WCOREDUMP(status):
-				sys.stderr.write('Core\n')
-				if corefile is not None:
-					import subprocess
-					import shutil
-					import getpass
-					path = corefile(**{'pid': pid, 'uid': os.getuid(), 'user': getpass.getuser(), 'home': os.environ['HOME']})
-					if os.path.exists(path):
-						sys.stderr.write("CORE: Identified, {0!r}, loading debugger.\n".format(path))
-						p = subprocess.Popen((shutil.which('gdb'), '--quiet', '--core=' + path, sys.executable))
-						#p = subprocess.Popen((shutil.which('lldb'), '--core-file', path, sys.executable))
-						p.wait()
-						sys.stderr.write("CORE: Removed file.\n".format(path))
-						os.remove(path)
-					else:
-						sys.stderr.write('CORE: File does not exist: ' + repr(path) + '\n')
-			elif not os.WIFEXITED(status):
+def _handle_core(corefile):
+	sys.stderr.write('Core\n')
+	if corefile is None:
+		return
+	import subprocess
+	import shutil
+
+	if os.path.exists(corefile):
+		sys.stderr.write("CORE: Identified, {0!r}, loading debugger.\n".format(path))
+		p = subprocess.Popen((shutil.which('gdb'), '--quiet', '--core=' + path, sys.executable))
+		#p = subprocess.Popen((shutil.which('lldb'), '--core=' + path, sys.executable))
+		p.wait()
+		sys.stderr.write("CORE: Removed file.\n".format(path))
+		os.remove(path)
+	else:
+		sys.stderr.write('CORE: File does not exist: ' + repr(path) + '\n')
+
+def _dispatch(container):
+	for id, tcall in container.__tests__:
+		test = Test(id, tcall)
+		sys.stderr.write('[ {fate!s:^10} ] {tid}\r'.format(
+			fate = 'Fated', tid = test.identity
+		))
+		sys.stderr.flush() # want to see the test being ran
+
+		pid = _run(test)
+
+		status = None
+		signalled = False
+		while status is None:
+			try:
+				# Interrupts can happen if a debugger is attached.
+				rpid, status = os.waitpid(pid, 0)
+			except OSError:
+				pass
+			except KeyboardInterrupt:
 				import signal
 				try:
-					os.kill(pid, signal.SIGKILL)
+					os.kill(pid, signal.SIGINT)
+					signalled = True
 				except OSError:
 					pass
 
-def _execmodule(package, module = None,
-	args = (), corefile = None,
-):
-	if args:
-		modules = [
-			importlib.import_module(module.__package__ + '.' + args[0])
-		]
-	else:
-		# package module; iterate over the "test" modules.
-		packages, modules = listpackage(module)
+		if os.WCOREDUMP(status):
+			_handle_core(corelocation(pid))
+		elif not os.WIFEXITED(status):
+			# redrum
+			import signal
+			try:
+				os.kill(pid, signal.SIGKILL)
+			except OSError:
+				pass
 
-		modules = [
-			importlib.import_module(x)
-			for x in modules
-			if x.split('.')[-1].startswith('test_')
-		]
-
-	from . import libtrace
-	from . import libmeta
-	libmeta.void_package(package)
-	@contextlib.contextmanager
-	def construct_trace(testname, package = package):
-		T = libtrace.Trace(package)
-		with T:
-			yield None
-		T.aggregate(testname)
-
-	for x in modules:
-		_runtests(package, x, corefile, *args[1:], foreachtest = construct_trace)
-	return 0
-
-def execmodule(module = None):
-	import c.lib
-	from . import libcore
-
-	# promote to test, but iff the role was unchanged.
-	if c.lib.role is None:
-		c.lib.role = 'test'
-
-	# resolve the package module
-
-	if module is None:
-		module = sys.modules['__main__']
-		try:
-			name = module.__loader__.name
-		except AttributeError:
-			name = module.__loader__.fullname
-
-		# rename the module
-		sys.modules[name] = module
-		module.__name__ = name
-
-	# if it's __main__, refer to the package; package/__main__.py
-	if module.__package__ + '.__main__' == module.__name__:
-		module = importlib.import_module(module.__package__)
-
-	package = module.__name__.rsplit('.', 1)[0]
-
-	with contextlib.ExitStack() as stack:
-		# enable core dumps for c-exts
-		corefile = stack.enter_context(libcore.dumping())
-		# package module has context?
-		if 'context' in dir(module):
-			stack.enter_context(module.context())
-
-		sys.exit(_execmodule(package, module, args = sys.argv[1:], corefile = corefile))
+def execute(package, modules):
+	m = types.ModuleType("testing")
+	m.__tests__ = [(package + '.test', package_test)]
+	_dispatch(m)

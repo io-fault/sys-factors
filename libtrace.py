@@ -152,3 +152,4 @@ class Trace(object):
 		for path, seq in d.items():
 			seq.sort(key = getitem)
 			libmeta.append('functions', path, [(cause, seq)])
+

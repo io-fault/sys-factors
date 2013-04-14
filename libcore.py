@@ -5,9 +5,27 @@ import sys
 import os
 import os.path
 import contextlib
-import resource
+import functools
 
-if 'freebsd' in sys.platform or 'darwin' in sys.platform:
+try:
+	import resource
+except ImportError:
+	import types
+	resource = types.ModuleType("resource-null", "this platform does not have the resource module")
+	del types
+	def nothing(*args):
+		pass
+	resource.getrlimit = nothing
+	resource.setrlimit = nothing
+	resource.RLIMIT_CORE = 0
+	del types, nothing
+
+# Replace this with a sysctl c-extension
+if os.path.exists('/proc/sys/kernel/core_pattern'):
+	def kernel_core_pattern():
+		with open('/proc/sys/kernel/core_pattern') as f:
+			return f.read()
+elif 'freebsd' in sys.platform or 'darwin' in sys.platform:
 	def kernel_core_pattern():
 		import subprocess
 		p = subprocess.Popen(('sysctl', 'kern.corefile'),
@@ -15,23 +33,23 @@ if 'freebsd' in sys.platform or 'darwin' in sys.platform:
 		corepat = p.stdout.read().decode('utf-8')
 		prefix, corefile = corepat.split(':', 1)
 		return corefile.strip()
-elif os.path.exists('/proc/sys/kernel/core_pattern'):
-	def kernel_core_pattern():
-		with open('/proc/sys/kernel/core_pattern') as f:
-			return f.read()
 else:
 	def kernel_core_pattern():
 		raise RuntimeError("cannot resolve coredump pattern for this platform")
 
+def corelocation(pattern, pid):
+	import getpass
+	return pattern(**{'pid': pid, 'uid': os.getuid(), 'user': getpass.getuser(), 'home': os.environ['HOME']})
+
 @contextlib.contextmanager
 def dumping(
-	setting = -1,
+	size_limit = -1,
 	getrlimit = resource.getrlimit,
 	setrlimit = resource.setrlimit,
 	type = resource.RLIMIT_CORE
 ):
 	"""
-	dumping()
+	dumping(size_limit = -1)
 
 	Enable or disable core dumps during the context. Useful for managing tests that may dump core.
 
@@ -40,21 +58,18 @@ def dumping(
 		with dev.libcore.dumping():
 			...
 
-	Core dumps can disabled by designating size::
+	Core dumps can disabled by designating zero size::
 
 		with dev.libcore.dumping(0):
 			...
 	"""
-	setting = setting or 0
+	size_limit = size_limit or 0
 	try:
 		current = getrlimit(type)
-		setrlimit(type, (setting, setting))
-		if setting:
-			yield os.environ.get('COREPATTERN', '/cores/core.{pid}').format
+		setrlimit(type, (size_limit, size_limit))
+		if size_limit:
+			yield functools.partial(corelocation, os.environ.get('COREPATTERN', '/cores/core.{pid}'))
 		else:
 			yield None
 	finally:
 		setrlimit(type, current)
-
-if __name__ == '__main__':
-	pass
