@@ -51,7 +51,7 @@ def gather(container, prefix = 'test_'):
 	Collect the objects in the container whose name starts with "test_".
 	The ordered is defined by the :py:func:`get_test_index` function.
 	"""
-	tests = [(name, getattr(container, name)) for name in dir(container) if name.startswith(prefix)]
+	tests = [('.'.join((container.__name__, name)), getattr(container, name)) for name in dir(container) if name.startswith(prefix)]
 	tests.sort(key = test_order)
 	return tests
 
@@ -69,17 +69,6 @@ class Fate(BaseException):
 
 	def __init__(self, content):
 		self.content = content
-
-class Sum(Fate):
-	"""
-	Fate of a collection of tests.
-	"""
-	name = 'sum'
-
-	def __str__(self):
-		return sum([
-			k * v for (k, v) in self.content.items()
-		])
 
 class Pass(Fate):
 	'the test explicitly passed'
@@ -100,11 +89,6 @@ class Skip(Pass):
 	'the test was skipped'
 	impact = 0
 	name = 'skip'
-
-class Dependency(Skip):
-	'the test could not be ran because of a missing dependency'
-	impact = 0
-	name = 'dependency'
 
 class Fork(Fate):
 	'the test consisted of a set of tests'
@@ -160,9 +144,9 @@ class Subject(object):
 			def check(self, ob, cmpname = cmpname, comparison = v):
 				test, x, y = self.test, self.object, ob
 				if self.inverse:
-					if comparison(x, y): test.fail(cmpname, x, y)
+					if comparison(x, y): test.fail(cmpname)
 				else:
-					if not comparison(x, y): test.fail(cmpname, x, y)
+					if not comparison(x, y): test.fail(cmpname)
 			locals()[k] = check
 
 	##
@@ -173,14 +157,16 @@ class Subject(object):
 
 	def __exit__(self, typ, val, tb):
 		test, x = self.test, self.object
-		self.storage = val
+		y = self.storage = val
 
-		if not isinstance(val, x): self.fail("isinstance", val, x)
+		if not isinstance(y, x):
+			test.fail("not instance")
 		return True # !!! Inhibiting raise.
 
 	def __xor__(self, subject):
-		with self:
+		with self as exc:
 			subject()
+		return exc()
 	__rxor__ = __xor__
 
 class Test(object):
@@ -232,19 +218,10 @@ class Test(object):
 
 	def skip(self, condition):
 		if condition:
-			raise Skip()
+			raise Skip(condition)
 
-	def depends(self, module_path, *args, **kw):
-		"""
-		Import the module raising a Dependency fate if the module doesn't exist.
-		"""
-		try:
-			return importlib.import_module(module_path, *args, **kw)
-		except ImportError as exc:
-			raise Dependency(module_path) from exc
-
-	def fail(self, cause, *args):
-		x, y, *other = args; raise Fail(cause)
+	def fail(self, cause):
+		raise Fail(cause)
 
 def module_test(test):
 	"""
