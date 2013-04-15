@@ -4,13 +4,14 @@ Code coverage and profiling for use with libtest.
 For a real coverage tool, please see coverage.py. libtrace only performs naive coverage
 analysis.
 """
+import sys
+import os.path
+import operator
 import collections
 import functools
-import sys
+
 import routes.lib
-import os.path
 import rhythm.kernel
-import operator
 
 from . import libmeta
 
@@ -23,9 +24,10 @@ class Trace(object):
 	Trace the execution within a particular package. The trace will only report
 	information on frames that were produced by these packages.
 	"""
-	def __init__(self, package):
-		self.tracing = False
+	def __init__(self, package, cause):
 		self.package = package
+		self.cause = cause
+		self.tracing = False
 		self.records = list()
 		self.chronometer = rhythm.kernel.Chronometer()
 		self.endpoint = functools.partial(self.collect, self.relevant, self.records.append, self.chronometer.__next__)
@@ -72,7 +74,7 @@ class Trace(object):
 		sys.settrace(None)
 		self.tracing = False
 
-	def aggregate(self, cause, crealpath = crealpath):
+	def aggregate(self, crealpath = crealpath):
 		"""
 		aggregate()
 
@@ -127,7 +129,7 @@ class Trace(object):
 				l = [
 					('L' + str(k), str(v)) for (k, v) in lines.items()
 				]
-				libmeta.append('lines', evpath, [(cause, l)])
+				libmeta.append('lines', evpath, [(self.cause, l)])
 			# ignore lines outside of our package
 
 		# group by file
@@ -151,5 +153,4 @@ class Trace(object):
 		# write
 		for path, seq in d.items():
 			seq.sort(key = getitem)
-			libmeta.append('functions', path, [(cause, seq)])
-
+			libmeta.append('functions', path, [(self.cause, seq)])

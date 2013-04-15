@@ -37,9 +37,9 @@ else:
 	def kernel_core_pattern():
 		raise RuntimeError("cannot resolve coredump pattern for this platform")
 
-def corelocation(pattern, pid):
+def corelocation(pid, pattern = functools.partial(os.environ.get, 'COREPATTERN', '/cores/core.{pid}')):
 	import getpass
-	return pattern(**{'pid': pid, 'uid': os.getuid(), 'user': getpass.getuser(), 'home': os.environ['HOME']})
+	return pattern().format(**{'pid': pid, 'uid': os.getuid(), 'user': getpass.getuser(), 'home': os.environ['HOME']})
 
 @contextlib.contextmanager
 def dumping(
@@ -67,9 +67,6 @@ def dumping(
 	try:
 		current = getrlimit(type)
 		setrlimit(type, (size_limit, size_limit))
-		if size_limit:
-			yield functools.partial(corelocation, os.environ.get('COREPATTERN', '/cores/core.{pid}'))
-		else:
-			yield None
+		yield None
 	finally:
 		setrlimit(type, current)
