@@ -4,9 +4,6 @@ the actual tests for the purpose of keeping the execution machinary as simple as
 """
 import os
 import sys
-import collections
-import pkgutil
-import itertools
 import importlib
 import contextlib
 import operator
@@ -19,8 +16,8 @@ from . import libcore
 #: Mapping of Fate names to colors.
 color_of_fate = {
 	'fate': 'white',
-	'pass': 'green',
-	'return': '0x00aa00',
+	'pass': 'green', # bright green. pass is unusual
+	'return': '0x00aa00', # dim green. return is usual.
 	'skip': 'cyan',
 	'fork': 'blue',
 	'explicit': 'magenta',
@@ -32,19 +29,14 @@ color_of_fate = {
 	'expire': 'yellow',
 }
 
-color_of_identity = {
-	'package': 'gray',
-	'test': '',
-}
-
 import txt.libint
 
 def color(color, text, _model = "∫text xterm.fg.%s∫"):
 	return txt.libint.Model(_model % (color,)).argformat(text)
 
-top_fate_messages = color('0x1c1c1c', '┌' + ('─' * 10) + '┐')
 open_fate_message = color('0x1c1c1c', '│')
 close_fate_message = color('0x1c1c1c', '│')
+top_fate_messages = color('0x1c1c1c', '┌' + ('─' * 10) + '┐')
 bottom_fate_messages = color('0x1c1c1c', '└' + ('─' * 10) + '┘')
 
 def get_test_index(tester):
@@ -168,16 +160,16 @@ class Subject(object):
 			continue
 		if k.strip('_') in operator.__dict__:
 			if k in _override:
-				cmpname, v = _override[k]
+				opname, v = _override[k]
 			else:
-				cmpname = k
+				opname = k
 
-			def check(self, ob, cmpname = cmpname, comparison = v):
+			def check(self, ob, opname = opname, operator = v):
 				test, x, y = self.test, self.object, ob
 				if self.inverse:
-					if comparison(x, y): test.fail(cmpname)
+					if operator(x, y): test.fail(opname)
 				else:
-					if not comparison(x, y): test.fail(cmpname)
+					if not operator(x, y): test.fail(opname)
 			locals()[k] = check
 
 	##
@@ -254,168 +246,178 @@ class Test(object):
 	def fail(self, cause):
 		raise Fail(cause)
 
-def module_test(test):
+class Proceeding(object):
 	"""
-	Fork for each test.
+	The collection and executions of a series of tests.
 	"""
-	module = importlib.import_module(test.identity)
-	module.__tests__ = gather(module)
-	test.fork(module)
+	def __init__(self, package):
+		self.package = package
+		self.selectors = []
 
-def package_test(test):
-	"""
-	Fork the test for each test module.
-	"""
-	# The package module
-	module = importlib.import_module(test.identity)
-	test/module.__name__ == test.identity
-	if 'context' in dir(module):
-		module.context() # XXX: manage package context for dependency maanagement
+	def module_test(self, test):
+		"""
+		Fork for each test.
+		"""
+		module = importlib.import_module(test.identity)
+		module.__tests__ = gather(module)
+		test.fork(module)
 
-	ir = routes.lib.Import.from_fullname(module.__name__)
-	module.__tests__ = [
-		(x.fullname, module_test) for x in ir.subnodes()[1]
-		if x.identity.startswith('test_') and (not test.constraints or x.identity in test.constraints)
-	]
-	test.fork(module)
+	def package_test(self, test):
+		"""
+		Fork the test for each test module.
+		"""
+		# The package module
+		module = importlib.import_module(test.identity)
+		test/module.__name__ == test.identity
+		if 'context' in dir(module):
+			module.context() # XXX: manage package context for dependency maanagement
 
-##
-# XXX: This is a mess. It will be getting cleaned up soon.
+		ir = routes.lib.Import.from_fullname(module.__name__)
+		module.__tests__ = [
+			(x.fullname, self.module_test) for x in ir.subnodes()[1]
+			if x.identity.startswith('test_') and (not test.constraints or x.identity in test.constraints)
+		]
+		test.fork(module)
 
-def _print_tb(fate):
-	import traceback
-	try:
-		# dev.libtraceback por favor
-		from IPython.core import ultratb
-		x = ultratb.VerboseTB(ostream = sys.stderr)
-		# doesn't support chains yet, so fallback to cause traceback.
-		if fate.__cause__:
-			exc = fate.__cause__
-		else:
-			exc = fate
-		x(exc.__class__, exc, exc.__traceback__)
-	except ImportError:
-		tb = traceback.format_exception(fate.__class__, fate, fate.__traceback__)
-		tb = ''.join(tb)
-		sys.stderr.write(tb)
+	##
+	# XXX: This is a mess. It will be getting cleaned up soon.
 
-def _run(package, test, contexts, Test = Test):
-	pid = os.fork()
-	if pid != 0:
-		return pid
-
-	with contexts[1](package, test.identity):
-		test.seal()
-
-	faten = test.fate.__class__.__name__.lower()
-	parts = test.identity.split('.')
-	parts[0] = color('0x1c1c1c', parts[0])
-	parts[:-1] = [color('gray', x) for x in parts[:-1]]
-	ident = color('red', '.').join(parts)
-	sys.stderr.write('\r{start} {fate!s} {stop} {tid}                \n'.format(
-		fate = color(color_of_fate[faten], faten.ljust(8)),
-		tid = ident,
-		start = open_fate_message,
-		stop = close_fate_message
-	))
-
-	if isinstance(test.fate, Fork):
-		_dispatch(package, test.fate.content, (), contexts, Test = Test)
-	elif isinstance(test.fate, Error):
-		_print_tb(test.fate)
-		import pdb
-		# error cases chain the exception
-		pdb.post_mortem(test.fate.__cause__.__traceback__)
-
-	if test.fate.impact < 0:
-		sys.exit(9)
-	else:
-		sys.exit(0)
-
-def _handle_core(corefile):
-	if corefile is None:
-		return
-	import subprocess
-	import shutil
-
-	if os.path.exists(corefile):
-		sys.stderr.write("CORE: Identified, {0!r}, loading debugger.\n".format(corefile))
-		p = subprocess.Popen((shutil.which('gdb'), '--quiet', '--core=' + corefile, sys.executable))
-		#p = subprocess.Popen((shutil.which('lldb'), '--core=' + corefile, sys.executable))
-		p.wait()
-		sys.stderr.write("CORE: Removed file.\n".format(corefile))
-		os.remove(corefile)
-	else:
-		sys.stderr.write('CORE: File does not exist: ' + repr(corefile) + '\n')
-
-def _complete(test, pid):
-	status = None
-	signalled = False
-	while status is None:
+	def _print_tb(self, fate):
+		import traceback
 		try:
-			# Interrupts can happen if a debugger is attached.
-			rpid, status = os.waitpid(pid, 0)
-		except OSError:
-			pass
-		except KeyboardInterrupt:
+			# dev.libtraceback por favor
+			from IPython.core import ultratb
+			x = ultratb.VerboseTB(ostream = sys.stderr)
+			# doesn't support chains yet, so fallback to cause traceback.
+			if fate.__cause__:
+				exc = fate.__cause__
+			else:
+				exc = fate
+			x(exc.__class__, exc, exc.__traceback__)
+		except ImportError:
+			tb = traceback.format_exception(fate.__class__, fate, fate.__traceback__)
+			tb = ''.join(tb)
+			sys.stderr.write(tb)
+
+	def _run(self, test, contexts, Test = Test):
+		pid = os.fork()
+		if pid != 0:
+			return pid
+
+		with contexts[1](self.package, test.identity):
+			test.seal()
+
+		faten = test.fate.__class__.__name__.lower()
+		parts = test.identity.split('.')
+		parts[0] = color('0x1c1c1c', parts[0])
+		if test.fate.impact >= 0:
+			parts[1:] = [color('gray', x) for x in parts[1:]]
+		else:
+			parts[1:-1] = [color('gray', x) for x in parts[1:-1]]
+		ident = color('red', '.').join(parts)
+		sys.stderr.write('\r{start} {fate!s} {stop} {tid}                \n'.format(
+			fate = color(color_of_fate[faten], faten.ljust(8)),
+			tid = ident,
+			start = open_fate_message,
+			stop = close_fate_message
+		))
+
+		if isinstance(test.fate, Fork):
+			self._dispatch(test.fate.content, (), contexts, Test = Test)
+		elif isinstance(test.fate, Error):
+			self._print_tb(test.fate)
+			import pdb
+			# error cases chain the exception
+			pdb.post_mortem(test.fate.__cause__.__traceback__)
+
+		if test.fate.impact < 0:
+			sys.exit(9)
+		else:
+			sys.exit(0)
+
+	def _handle_core(self, corefile):
+		if corefile is None:
+			return
+		import subprocess
+		import shutil
+
+		if os.path.exists(corefile):
+			sys.stderr.write("CORE: Identified, {0!r}, loading debugger.\n".format(corefile))
+			p = subprocess.Popen((shutil.which('gdb'), '--quiet', '--core=' + corefile, sys.executable))
+			#p = subprocess.Popen((shutil.which('lldb'), '--core=' + corefile, sys.executable))
+			p.wait()
+			sys.stderr.write("CORE: Removed file.\n".format(corefile))
+			os.remove(corefile)
+		else:
+			sys.stderr.write('CORE: File does not exist: ' + repr(corefile) + '\n')
+
+	def _complete(self, test, pid):
+		status = None
+		signalled = False
+		while status is None:
+			try:
+				# Interrupts can happen if a debugger is attached.
+				rpid, status = os.waitpid(pid, 0)
+			except OSError:
+				pass
+			except KeyboardInterrupt:
+				import signal
+				try:
+					os.kill(pid, signal.SIGINT)
+					signalled = True
+				except OSError:
+					pass
+
+		if os.WCOREDUMP(status):
+			faten = 'core'
+			parts = test.identity.split('.')
+			parts[0] = color('0x1c1c1c', parts[0])
+			parts[:-1] = [color('gray', x) for x in parts[:-1]]
+			ident = color('red', '.').join(parts)
+			sys.stderr.write('\r{start} {fate!s} {stop} {tid}                \n'.format(
+				fate = color(color_of_fate[faten], faten.ljust(8)), tid = ident,
+				start = open_fate_message,
+				stop = close_fate_message
+			))
+			self._handle_core(libcore.corelocation(pid))
+			return 7
+		elif not os.WIFEXITED(status):
+			# redrum
 			import signal
 			try:
-				os.kill(pid, signal.SIGINT)
-				signalled = True
+				os.kill(pid, signal.SIGKILL)
 			except OSError:
 				pass
 
-	if os.WCOREDUMP(status):
-		faten = 'core'
-		parts = test.identity.split('.')
-		parts[0] = color('0x1c1c1c', parts[0])
-		parts[:-1] = [color('gray', x) for x in parts[:-1]]
-		ident = color('red', '.').join(parts)
-		sys.stderr.write('\r{start} {fate!s} {stop} {tid}                \n'.format(
-			fate = color(color_of_fate[faten], faten.ljust(8)), tid = ident,
-			start = open_fate_message,
-			stop = close_fate_message
-		))
-		_handle_core(libcore.corelocation(pid))
-		return 7
-	elif not os.WIFEXITED(status):
-		# redrum
-		import signal
-		try:
-			os.kill(pid, signal.SIGKILL)
-		except OSError:
-			pass
+		return os.WEXITSTATUS(status)
 
-	return os.WEXITSTATUS(status)
+	def _dispatch(self, container, constraints, contexts, Test = Test):
+		for id, tcall in container.__tests__:
+			test = Test(id, tcall, *constraints)
 
-def _dispatch(package, container, constraints, contexts, Test = Test):
-	for id, tcall in container.__tests__:
-		test = Test(id, tcall, *constraints)
+			parts = test.identity.split('.')
+			parts[0] = color('0x1c1c1c', parts[0])
+			parts[:-1] = [color('gray', x) for x in parts[:-1]]
+			ident = color('red', '.').join(parts)
+			sys.stderr.write('{bottom} {tid} ...'.format(
+				bottom = bottom_fate_messages,
+				tid = ident,
+			))
+			sys.stderr.flush() # want to see the test being ran
 
-		parts = test.identity.split('.')
-		parts[0] = color('0x1c1c1c', parts[0])
-		parts[:-1] = [color('gray', x) for x in parts[:-1]]
-		ident = color('red', '.').join(parts)
-		sys.stderr.write('{start} {fate!s} {stop} {tid} ...'.format(
-			fate = 'fated'.ljust(8), tid = ident,
-			start = open_fate_message,
-			stop = close_fate_message
-		))
-		sys.stderr.flush() # want to see the test being ran
+			pid = self._run(test, contexts, Test = Test)
+			sys.stderr.write('\b\b\b' + color('red', str(pid)))
+			sys.stderr.flush() # want to see the test being ran
 
-		pid = _run(package, test, contexts, Test = Test)
-		sys.stderr.write('\b\b\b' + str(pid))
-		sys.stderr.flush() # want to see the test being ran
+			with contexts[0]():
+				# (package, test.identity, pid)
+				status = self._complete(test, pid)
+				if status:
+					sys.exit(status)
 
-		with contexts[0]():
-			# (package, test.identity, pid)
-			status = _complete(test, pid)
-			if status:
-				sys.exit(status)
-
-def execute(package, modules, contexts, Test = Test):
-	m = types.ModuleType("testing")
-	m.__tests__ = [(package + '.test', package_test)]
-	sys.stderr.write(top_fate_messages + '\n')
-	_dispatch(package, m, modules, contexts, Test = Test)
-	sys.stderr.write(bottom_fate_messages + '\n')
+	def execute(self, modules, contexts, Test = Test):
+		m = types.ModuleType("testing")
+		m.__tests__ = [(self.package + '.test', self.package_test)]
+		sys.stderr.write(top_fate_messages + '\n')
+		self._dispatch(m, modules, contexts, Test = Test)
+		sys.stderr.write(bottom_fate_messages + '\n')
