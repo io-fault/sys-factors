@@ -142,10 +142,9 @@ class Trace(object):
 		for filename, lines in line_counts.items():
 			evpath = crealpath(filename)
 			if evpath.startswith(pkgdir):
-				l = [
-					('L' + str(k), str(v)) for (k, v) in lines.items()
-				]
-				libmeta.append('lines', evpath, [(self.cause, l)])
+				counts = list(lines.items())
+				counts.sort()
+				libmeta.append(libmeta.crossed_name, evpath, [(self.cause, counts)])
 			# ignore lines outside of our package
 
 		# group by file
