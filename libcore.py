@@ -6,6 +6,8 @@ import os
 import os.path
 import contextlib
 import functools
+import subprocess
+import shutil
 
 try:
 	import resource
@@ -70,3 +72,40 @@ def dumping(
 		yield None
 	finally:
 		setrlimit(type, current)
+
+def debug(corefile, executable = sys.executable):
+	"""
+	debug(corefile, executable = sys.executable)
+
+	Load the debugger for a given core file, `corefile` and `executable`.
+	This will operate interactively and return the status code on exit.
+
+	By default, the executable is the Python executable.
+	"""
+	debugger = shutil.which('lldb') or shutil.which('gdb')
+	p = subprocess.Popen((debugger, '--core=' + corefile, executable))
+	return p.wait()
+
+gdb_snapshot = [
+	'info shared',
+	'thread backtrace all',
+]
+
+lldb_snapshot = [
+	'image list',
+	'thread apply all bt full',
+]
+
+def snapshot(corefile, executable = sys.executable):
+	"""
+	Get a text dump of the corefile.
+	"""
+	debugger = shutil.which('lldb')
+	if debugger:
+		commands = lldb_snapshot
+	else:
+		debugger = shutil.which('gdb')
+		commands = gdb_snapshot
+
+	p = subprocess.Popen((debugger, '--core=' + corefile, executable))
+	p.wait()
