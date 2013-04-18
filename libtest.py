@@ -181,8 +181,13 @@ class Subject(object):
 	def __exit__(self, typ, val, tb):
 		test, x = self.test, self.object
 		y = self.storage = val
+		if isinstance(y, Fate):
+			# Don't trap test Fates.
+			# The failure has already been analyzed or some
+			# other effect is desired.
+			return
 
-		if not isinstance(y, x): test.fail("not exception")
+		if not isinstance(y, x): test.fail("unexpected exception")
 		return True # !!! Inhibiting raise.
 
 	def __xor__(self, subject):
@@ -246,6 +251,20 @@ class Test(object):
 	def fail(self, cause):
 		raise Fail(cause)
 
+	def trap(self):
+		"""
+		Set a Trap for exceptions converting the Error fate to a Failure::
+
+			with test.trap():
+				...
+
+		This allows :py:meth:`fail` implementations set a trace prior to exiting
+		the test :term:`focus`.
+
+		:py:class:`Fate` exceptions are not trapped.
+		"""
+		return (self / None.__class__)
+
 class Proceeding(object):
 	"""
 	The collection and executions of a series of tests.
@@ -256,7 +275,8 @@ class Proceeding(object):
 
 	def module_test(self, test):
 		"""
-		Fork for each test.
+		Fork for each test. The actual execution of the module tests may not be in forked
+		subprocesses. The *test* forks, which may or may not result in a process fork.
 		"""
 		module = importlib.import_module(test.identity)
 		module.__tests__ = gather(module)
@@ -264,7 +284,8 @@ class Proceeding(object):
 
 	def package_test(self, test):
 		"""
-		Fork the test for each test module.
+		Fork for each test module. The actual execution of the module tests may not be in forked
+		subprocesses. The *test* forks, which may or may not result in a process fork.
 		"""
 		# The package module
 		module = importlib.import_module(test.identity)
@@ -343,9 +364,7 @@ class Proceeding(object):
 
 		if os.path.exists(corefile):
 			sys.stderr.write("CORE: Identified, {0!r}, loading debugger.\n".format(corefile))
-			p = subprocess.Popen((shutil.which('gdb'), '--quiet', '--core=' + corefile, sys.executable))
-			#p = subprocess.Popen((shutil.which('lldb'), '--core=' + corefile, sys.executable))
-			p.wait()
+			libcore.debug(corefile)
 			sys.stderr.write("CORE: Removed file.\n".format(corefile))
 			os.remove(corefile)
 		else:
@@ -409,7 +428,7 @@ class Proceeding(object):
 			sys.stderr.write('\b\b\b' + color('red', str(pid)))
 			sys.stderr.flush() # want to see the test being ran
 
-			with contexts[0]():
+			with contexts[0](test.identity):
 				# (package, test.identity, pid)
 				status = self._complete(test, pid)
 				if status:
