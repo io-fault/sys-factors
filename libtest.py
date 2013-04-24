@@ -11,6 +11,7 @@ import functools
 import types
 
 import routes.lib
+import fork.thread
 from . import libcore
 
 #: Mapping of Fate names to colors.
@@ -79,68 +80,6 @@ def gather(container, prefix = 'test_'):
 	tests.sort(key = test_order)
 	return tests
 
-##
-# Fate exceptions are used to manage the exception
-# and the completion state of a test. Fate is a Control exception (BaseException).
-class Fate(BaseException):
-	"""
-	The Fate of a test. Sealed by :py:meth:`Test.seal`.
-	"""
-	name = 'fate'
-	content = None
-	impact = None
-	line = None
-
-	def __init__(self, content):
-		self.content = content
-
-class Pass(Fate):
-	'the test explicitly passed'
-	impact = 1
-	name = 'pass'
-
-class Return(Pass):
-	'the test returned'
-	impact = 1
-	name = 'return'
-
-class Explicit(Pass):
-	'the test cannot be implicitly invoked'
-	impact = 0
-	name = 'explicit'
-
-class Skip(Pass):
-	'the test was skipped'
-	impact = 0
-	name = 'skip'
-
-class Fork(Fate):
-	'the test consisted of a set of tests'
-	impact = 0
-	name = 'fork'
-
-	def __init__(self, container, limit = 1):
-		self.content = container
-		self.tests = []
-		self.limit = limit
-
-class Fail(Fate):
-	'the test failed'
-	impact = -1
-	name = 'fail'
-
-class Core(Fail):
-	'the test caused a core dumped'
-	name = 'core'
-
-class Error(Fail):
-	'the test raised an exception'
-	name = 'error'
-
-class Expire(Fail):
-	'the test did not finish in the allowed time'
-	name = 'expire'
-
 # Exposes an assert like interface to testing.
 class Subject(object):
 	__slots__ = ('test', 'object', 'storage', 'inverse')
@@ -181,7 +120,7 @@ class Subject(object):
 	def __exit__(self, typ, val, tb):
 		test, x = self.test, self.object
 		y = self.storage = val
-		if isinstance(y, Fate):
+		if isinstance(y, test.Fate):
 			# Don't trap test Fates.
 			# The failure has already been analyzed or some
 			# other effect is desired.
@@ -197,7 +136,83 @@ class Subject(object):
 	__rxor__ = __xor__
 
 class Test(object):
+	"""
+	An object that manages an individual test unit.
+
+	A test unit consists of a `focus`, `identity`, and `fate`:
+
+	 `identity`
+	  A unique identifier for the `Test`. Usually, a qualified name that can be used to
+	  locate the `focus`.
+	 `focus`
+	  The callable that performs a series of checks--using the `Test` instance--that
+	  determines the `fate`.
+	 `fate`
+	  The conclusion of the Test; pass, fail, error, skip.
+	"""
 	__slots__ = ('focus', 'identity', 'constraints', 'fate')
+
+	##
+	# Fate exceptions are used to manage the exception
+	# and the completion state of a test. Fate is a Control exception (BaseException).
+	class Fate(BaseException):
+		"""
+		The Fate of a test. Sealed by :py:meth:`Test.seal`.
+		"""
+		name = 'fate'
+		content = None
+		impact = None
+		line = None
+
+		def __init__(self, content):
+			self.content = content
+
+	class Pass(Fate):
+		'the test explicitly passed'
+		impact = 1
+		name = 'pass'
+
+	class Return(Pass):
+		'the test returned'
+		impact = 1
+		name = 'return'
+
+	class Explicit(Pass):
+		'the test cannot be implicitly invoked'
+		impact = 0
+		name = 'explicit'
+
+	class Skip(Pass):
+		'the test was skipped'
+		impact = 0
+		name = 'skip'
+
+	class Fork(Fate):
+		'the test consisted of a set of tests'
+		impact = 0
+		name = 'fork'
+
+		def __init__(self, container, limit = 1):
+			self.content = container
+			self.tests = []
+			self.limit = limit
+
+	class Fail(Fate):
+		'the test failed'
+		impact = -1
+		name = 'fail'
+
+	class Core(Fail):
+		'the test caused a core dumped'
+		name = 'core'
+
+	class Error(Fail):
+		'the test raised an exception'
+		name = 'error'
+
+	class Expire(Fail):
+		'the test did not finish in the allowed time'
+		name = 'expire'
 
 	def __init__(self, identity, focus, *constraints):
 		# allow explicit identity as the callable may be a wrapped function
@@ -225,31 +240,31 @@ class Test(object):
 
 		try:
 			r = self.focus(self)
-			self.fate = Return(r)
-		except Fate as exc:
+			if not isinstance(r, self.Fate):
+				self.fate = self.Return(r)
+			else:
+				self.fate = r
+		except self.Fate as exc:
 			tb = exc.__traceback__ = exc.__traceback__.tb_next
 			self.fate = exc
 		except BaseException as err:
 			# place error out
 			tb = err.__traceback__ = err.__traceback__.tb_next
-			self.fate = Error('test raised exception')
+			self.fate = self.Error('test raised exception')
 			self.fate.__cause__ = err
 
 		if tb is not None:
 			self.fate.line = tb.tb_lineno
 
-	def fork(self, container):
-		raise Fork(container)
-
 	def explicit(self):
-		raise Explicit("must be explicitly invoked")
+		raise self.Explicit("must be explicitly invoked")
 
 	def skip(self, condition):
 		if condition:
-			raise Skip(condition)
+			raise self.Skip(condition)
 
 	def fail(self, cause):
-		raise Fail(cause)
+		raise self.Fail(cause)
 
 	def trap(self):
 		"""
@@ -269,9 +284,10 @@ class Proceeding(object):
 	"""
 	The collection and executions of a series of tests.
 	"""
-	def __init__(self, package):
+	def __init__(self, package, Test = Test):
 		self.package = package
 		self.selectors = []
+		self.Test = Test
 
 	def module_test(self, test):
 		"""
@@ -280,7 +296,7 @@ class Proceeding(object):
 		"""
 		module = importlib.import_module(test.identity)
 		module.__tests__ = gather(module)
-		test.fork(module)
+		return test.Fork(module)
 
 	def package_test(self, test):
 		"""
@@ -298,7 +314,7 @@ class Proceeding(object):
 			(x.fullname, self.module_test) for x in ir.subnodes()[1]
 			if x.identity.startswith('test_') and (not test.constraints or x.identity in test.constraints)
 		]
-		test.fork(module)
+		return test.Fork(module)
 
 	##
 	# XXX: This is a mess. It will be getting cleaned up soon.
@@ -320,11 +336,7 @@ class Proceeding(object):
 			tb = ''.join(tb)
 			sys.stderr.write(tb)
 
-	def _run(self, test, contexts, Test = Test):
-		pid = os.fork()
-		if pid != 0:
-			return pid
-
+	def _run(self, test, contexts):
 		with contexts[1](self.package, test.identity):
 			test.seal()
 
@@ -343,9 +355,9 @@ class Proceeding(object):
 			stop = close_fate_message
 		))
 
-		if isinstance(test.fate, Fork):
-			self._dispatch(test.fate.content, (), contexts, Test = Test)
-		elif isinstance(test.fate, Error):
+		if isinstance(test.fate, test.Fork):
+			self._dispatch(test.fate.content, (), contexts)
+		elif isinstance(test.fate, test.Error):
 			self._print_tb(test.fate)
 			import pdb
 			# error cases chain the exception
@@ -355,6 +367,13 @@ class Proceeding(object):
 			sys.exit(9)
 		else:
 			sys.exit(0)
+
+	def _forked(self, *args):
+		pid = os.fork()
+		if pid == 0:
+			self._run(*args)
+			return None
+		return pid
 
 	def _handle_core(self, corefile):
 		if corefile is None:
@@ -380,12 +399,7 @@ class Proceeding(object):
 			except OSError:
 				pass
 			except KeyboardInterrupt:
-				import signal
-				try:
-					os.kill(pid, signal.SIGINT)
-					signalled = True
-				except OSError:
-					pass
+				signalled = True
 
 		if os.WCOREDUMP(status):
 			faten = 'core'
@@ -410,9 +424,9 @@ class Proceeding(object):
 
 		return os.WEXITSTATUS(status)
 
-	def _dispatch(self, container, constraints, contexts, Test = Test):
+	def _dispatch(self, container, constraints, contexts):
 		for id, tcall in container.__tests__:
-			test = Test(id, tcall, *constraints)
+			test = self.Test(id, tcall, *constraints)
 
 			parts = test.identity.split('.')
 			parts[0] = color('0x1c1c1c', parts[0])
@@ -424,7 +438,7 @@ class Proceeding(object):
 			))
 			sys.stderr.flush() # want to see the test being ran
 
-			pid = self._run(test, contexts, Test = Test)
+			pid = self._forked(test, contexts)
 			sys.stderr.write('\b\b\b' + color('red', str(pid)))
 			sys.stderr.flush() # want to see the test being ran
 
@@ -434,9 +448,9 @@ class Proceeding(object):
 				if status:
 					sys.exit(status)
 
-	def execute(self, modules, contexts, Test = Test):
+	def execute(self, modules, contexts):
 		m = types.ModuleType("testing")
 		m.__tests__ = [(self.package + '.test', self.package_test)]
 		sys.stderr.write(top_fate_messages + '\n')
-		self._dispatch(m, modules, contexts, Test = Test)
+		self._dispatch(m, modules, contexts)
 		sys.stderr.write(bottom_fate_messages + '\n')

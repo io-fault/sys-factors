@@ -3,7 +3,7 @@
 #: Project name.
 name = 'dev'
 abstract = 'libraries and tools for Python development'
-icon = '⛔'
+icon = '🐜'
 
 #: IRI based project identity. (project homepage)
 identity = 'http://fault.io/case/python/dev'

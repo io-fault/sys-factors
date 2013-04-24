@@ -10,7 +10,7 @@ def lines(path):
 		for x in ast.walk(a):
 			if hasattr(x, 'lineno'):
 				if x.col_offset != -1:
-					if isinstance(x, (ast.Expr, ast.Str)):
+					if isinstance(x, (ast.Name, ast.List, ast.Tuple, ast.Nonlocal)):
 						# Covers some doc-string edges.
 						continue
 					seq.add(x.lineno)

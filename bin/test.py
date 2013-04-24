@@ -3,20 +3,23 @@ Run developer tests emitting test meta data.
 
 Each test is ran in a subprocess, one at a time.
 """
+import os
 import sys
 import contextlib
-import compile.lib
-import compile.loader
+import signal
+
+import factory.lib
+import factory.loader
+
+import routes.lib
+import fork.lib
+
 from .. import libcore
 from .. import libtest
 from .. import libmeta
 from .. import libtrace
 from .. import libtraceback
 from .. import gcov
-
-import routes.lib
-import fork.cpython
-import signal
 
 class Test(libtest.Test):
 	def fail(self, *args):
@@ -28,18 +31,41 @@ class Test(libtest.Test):
 		super().fail(*args)
 
 def main(package, modules):
+	def info():
+		import linecache
+		import fork.thread
+		snapshot = dict(sys._current_frames())
+		pid = os.getpid()
+		ttid = fork.thread.identity()
+		buf = "[{pid}] {nthreads} threads\n".format(pid=pid, nthreads=len(snapshot)-1)
+
+		for tid, f in snapshot.items():
+			if tid == ttid:
+				continue
+			co = f.f_code
+			l = f.f_lineno
+			path = co.co_filename
+			func = co.co_name
+			line = linecache.getline(path, l)
+			buf += "File \"{file}\" line {lineno} in {func} ({tid})\n{line}".format(tid=hex(tid), func=func, file=path, lineno=l, line=line)
+		print(buf)
+	def _info(*args):
+		fork.lib.taskq.enqueue(info)
+
+	signal.signal(signal.SIGINFO, _info)
+
 	# promote to test, but iff the role was unchanged.
 	# in cases where finals are ran, this will be 'factor'.
-	if compile.lib.role is None:
-		compile.lib.role = 'test'
+	if factory.lib.role is None:
+		factory.lib.role = 'test'
 
-	if compile.lib.role == 'test':
+	if factory.lib.role == 'test':
 		# gather extension modules
 		x = routes.lib.Import.from_fullname(package)
 		pkg, mods = x.tree()
 		cexts = [
 			x for x in mods
-			if isinstance(x.loader, compile.loader.CLoader)
+			if isinstance(x.loader, factory.loader.CLoader)
 		]
 		@contextlib.contextmanager
 		def external(identity, _cexts = cexts):
@@ -62,8 +88,8 @@ def main(package, modules):
 
 	libmeta.void_package(package)
 	with libcore.dumping():
-		p = libtest.Proceeding(package)
-		p.execute(modules, (external, libtrace.Trace), Test = Test)
+		p = libtest.Proceeding(package, Test = Test)
+		p.execute(modules, (external, libtrace.Tracing))
 
 if __name__ == '__main__':
 	import sys

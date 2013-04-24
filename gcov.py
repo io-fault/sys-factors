@@ -46,6 +46,7 @@ def lout(filepath,
 	sequence = [
 		# project
 		('grep', '^[ \t]*[^-]\+:'),
+		('sed', 's/.*XCOVERAGE$//'),
 		('cut', '-s', '-d', ':', '-f' '2'),
 	],
 ):
