@@ -22,6 +22,16 @@ from .. import libtraceback
 from .. import gcov
 
 class Test(libtest.Test):
+	def __init__(self, proceeding, *args, **kw):
+		self.tracing = proceeding.tracing
+		self.package = proceeding.package
+
+		super().__init__(proceeding, *args, **kw)
+
+	def seal(self):
+		with self.tracing(self.package, self.identity):
+			super().seal()
+
 	def fail(self, *args):
 		import pdb
 		sys.stderr.write('\n')
@@ -29,6 +39,36 @@ class Test(libtest.Test):
 		pdb.set_trace()
 		sys.stderr.write(libtest.top_fate_messages + '\n')
 		super().fail(*args)
+
+class Proceeding(libtest.Proceeding):
+	def track_imports(self, imported):
+		self.fimports.add((imported.fullname, imported.source))
+
+	def _run(self, *args, **kw):
+		report = super()._run(*args, **kw)
+		report['fimports'] = list(self.fimports)
+		self.fimports.clear()
+		return report
+
+	def _complete(self, test, *args):
+		report = super()._complete(test, *args)
+
+		if factory.lib.role == 'test':
+			for fullname, source in report.get('fimports', ()):
+				gcov.record(test.identity, fullname)
+				if not libmeta.route(source, "lines").exists():
+					# Fill out crossable and ignored records for the module
+					# Python modules should do this at some point.
+					gcov.record('crossable', fullname, metatype = "lines", proc = gcov.crossable)
+					gcov.record('ignored', fullname, metatype = "lines", proc = gcov.ignored)
+		return report
+
+	def __init__(self, *args):
+		# tests return the cextensions loaded so we can collect coverage data
+		self.fimports = set()
+		factory.loader.CLoader.traceset.add(self.track_imports)
+		self.tracing = libtrace.Tracing
+		super().__init__(*args, Test = Test)
 
 def main(package, modules):
 	def info():
@@ -59,37 +99,10 @@ def main(package, modules):
 	if factory.lib.role is None:
 		factory.lib.role = 'test'
 
-	if factory.lib.role == 'test':
-		# gather extension modules
-		x = routes.lib.Import.from_fullname(package)
-		pkg, mods = x.tree()
-		cexts = [
-			x for x in mods
-			if isinstance(x.loader, factory.loader.CLoader)
-		]
-		@contextlib.contextmanager
-		def external(identity, _cexts = cexts):
-			try:
-				yield None
-			finally:
-				for x in _cexts:
-					gcov.record(identity, x.fullname)
-					# Fill out coverable lines
-					if not libmeta.route(x.file().fullpath, "lines").exists():
-						gcov.record('variable', x.fullname, metatype = "lines", proc = gcov.lout)
-	else:
-		@contextlib.contextmanager
-		def nothing(identity):
-			try:
-				yield None
-			finally:
-				pass
-		external = nothing
-
 	libmeta.void_package(package)
 	with libcore.dumping():
-		p = libtest.Proceeding(package, Test = Test)
-		p.execute(modules, (external, libtrace.Tracing))
+		p = Proceeding(package)
+		fork.lib.pivot(p.execute, modules)
 
 if __name__ == '__main__':
 	import sys

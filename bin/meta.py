@@ -11,6 +11,9 @@ def main(args):
 			print(libmeta.route(path, metatype[0]).fullpath)
 		else:
 			print(libmeta.route(path, 'none').container.fullpath)
+	elif cmd == 'coverage':
+		for x in cargs:
+			libmeta.creport(x)
 	else:
 		raise RuntimeError("unknown command: " + cmd)
 

@@ -61,13 +61,24 @@ def coverage(package):
 		if xb.exists():
 			# lines file exists, use this to identify crossable.
 			with xb.open() as fxb:
-				lines = set([
-					int(x.split()[-1])
-					for x in fxb.read().split('\n')
-					if x.startswith('++')
-				])
+				data = fxb.read()
+
+			before, after = data.split('--', 1)
+
+			lines = set([
+				int(x.split()[-1])
+				for x in before.split('\n')
+				if x.startswith('++')
+			])
+
+			ignored = set([
+				int(x.split()[-1])
+				for x in after.split('\n')
+				if x.startswith('++')
+			])
 		else:
 			lines = libpython.lines(path)
+			ignored = set()
 
 		# crossed
 		if xl.exists():
@@ -77,7 +88,7 @@ def coverage(package):
 					int(x.split()[1])
 					for x in xlines
 				])
-				yield x.fullname, crossed, lines
+				yield x.fullname, crossed, lines, ignored
 
 def append(type, filepath, settings, from_abs = routes.lib.File.from_absolute):
 	"""
@@ -95,7 +106,14 @@ def append(type, filepath, settings, from_abs = routes.lib.File.from_absolute):
 		f.write('--\n')
 
 def creport(package):
-	for module, lines, total_lines in coverage(package):
+	for module, lines, total_lines, ignored in coverage(package):
+		# cover cases where crosses are reported, but
+		# the analyzer filtered.
+		total_lines = total_lines - ignored
+		extras = lines - total_lines
+		total_lines.update(extras)
+		total_lines = total_lines
+
 		missing = list(total_lines - lines)
 		tn = len(total_lines)
 		cn = len(lines)

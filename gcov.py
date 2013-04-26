@@ -27,7 +27,7 @@ def _pipeline(inputfile, seq, popen = subprocess.Popen, pipe = subprocess.PIPE):
 # We are processing this file for each test, so let's avoid the overhead
 # involved with instantiating Python objects. For smaller files it would be
 # okay, but for larger files, it's N passes.
-def out(filepath,
+def crossed(filepath,
 	sequence = [
 		# project
 		('grep', '^ *[0-9]\+'),
@@ -42,11 +42,10 @@ def out(filepath,
 	"""
 	return _pipeline(filepath, sequence)
 
-def lout(filepath,
+def crossable(filepath,
 	sequence = [
 		# project
 		('grep', '^[ \t]*[^-]\+:'),
-		('sed', 's/.*XCOVERAGE$//'),
 		('cut', '-s', '-d', ':', '-f' '2'),
 	],
 ):
@@ -56,6 +55,17 @@ def lout(filepath,
 	:param filepath: Path to the .gcov file.
 
 	Run the gcov output, '.gcov', through a pipeline that renders coverable lines.
+	"""
+	return _pipeline(filepath, sequence)
+
+def ignored(filepath,
+	sequence = [
+		('grep', '[ \t]XCOVERAGE$'),
+		('cut', '-s', '-d', ':', '-f' '2'),
+	],
+):
+	"""
+	Get the lines of the source that were explicitly ignored.
 	"""
 	return _pipeline(filepath, sequence)
 
@@ -71,15 +81,13 @@ def gcov(data, *sources):
 		'--object-file', data
 	) + sources
 
-def render(route, proc = out):
+def render(route, proc = crossed):
 	"""
 	Update the coverage meta data for the module.
 	"""
 	# get paths
 	ir = route
-	bottom = ir.bottom()
 	srcr = ir.file()
-	pkgdir = bottom.file()
 
 	# loader tells us where the dll and associated files are.
 	l = ir.loader
@@ -99,11 +107,7 @@ def render(route, proc = out):
 		# extract and write coverage
 		return srcr.fullpath, proc((tr/filename).suffix('.gcov').fullpath)
 
-def lines(fullname):
-	path, lines = render(fullname, proc = lout)
-	return set(int(x) for x in lines.split(b'\n') if x)
-
-def record(cause, fullname, metatype = 'xlines', proc = out):
+def record(cause, fullname, metatype = 'xlines', proc = crossed):
 	"""
 	Update the coverage meta data for the module.
 	"""

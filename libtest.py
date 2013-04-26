@@ -12,6 +12,7 @@ import types
 
 import routes.lib
 import fork.thread
+import fork.process
 from . import libcore
 
 #: Mapping of Fate names to colors.
@@ -214,7 +215,7 @@ class Test(object):
 		'the test did not finish in the allowed time'
 		name = 'expire'
 
-	def __init__(self, identity, focus, *constraints):
+	def __init__(self, proceeding, identity, focus, *constraints):
 		# allow explicit identity as the callable may be a wrapped function
 		self.identity = identity
 		self.focus = focus
@@ -288,6 +289,7 @@ class Proceeding(object):
 		self.package = package
 		self.selectors = []
 		self.Test = Test
+		self.cextensions = []
 
 	def module_test(self, test):
 		"""
@@ -336,9 +338,11 @@ class Proceeding(object):
 			tb = ''.join(tb)
 			sys.stderr.write(tb)
 
-	def _run(self, test, contexts):
-		with contexts[1](self.package, test.identity):
-			test.seal()
+	def _run(self, test):
+		sys.stderr.write('\b\b\b' + color('red', str(os.getpid())))
+		sys.stderr.flush() # want to see the test being ran
+
+		test.seal()
 
 		faten = test.fate.__class__.__name__.lower()
 		parts = test.identity.split('.')
@@ -347,6 +351,7 @@ class Proceeding(object):
 			parts[1:] = [color('gray', x) for x in parts[1:]]
 		else:
 			parts[1:-1] = [color('gray', x) for x in parts[1:-1]]
+
 		ident = color('red', '.').join(parts)
 		sys.stderr.write('\r{start} {fate!s} {stop} {tid}                \n'.format(
 			fate = color(color_of_fate[faten], faten.ljust(8)),
@@ -355,25 +360,21 @@ class Proceeding(object):
 			stop = close_fate_message
 		))
 
+		report = {
+			'test': test.identity,
+			'impact': test.fate.impact,
+			'fate': faten,
+		}
+
 		if isinstance(test.fate, test.Fork):
-			self._dispatch(test.fate.content, (), contexts)
+			self._dispatch(test.fate.content, ())
 		elif isinstance(test.fate, test.Error):
 			self._print_tb(test.fate)
 			import pdb
 			# error cases chain the exception
 			pdb.post_mortem(test.fate.__cause__.__traceback__)
 
-		if test.fate.impact < 0:
-			sys.exit(9)
-		else:
-			sys.exit(0)
-
-	def _forked(self, *args):
-		pid = os.fork()
-		if pid == 0:
-			self._run(*args)
-			return None
-		return pid
+		return report
 
 	def _handle_core(self, corefile):
 		if corefile is None:
@@ -389,20 +390,12 @@ class Proceeding(object):
 		else:
 			sys.stderr.write('CORE: File does not exist: ' + repr(corefile) + '\n')
 
-	def _complete(self, test, pid):
-		status = None
-		signalled = False
-		while status is None:
-			try:
-				# Interrupts can happen if a debugger is attached.
-				rpid, status = os.waitpid(pid, 0)
-			except OSError:
-				pass
-			except KeyboardInterrupt:
-				signalled = True
+	def _complete(self, test, report):
+		rpid, status = os.waitpid(-1, 0)
 
 		if os.WCOREDUMP(status):
 			faten = 'core'
+			report['fate'] = 'core'
 			parts = test.identity.split('.')
 			parts[0] = color('0x1c1c1c', parts[0])
 			parts[:-1] = [color('gray', x) for x in parts[:-1]]
@@ -412,8 +405,7 @@ class Proceeding(object):
 				start = open_fate_message,
 				stop = close_fate_message
 			))
-			self._handle_core(libcore.corelocation(pid))
-			return 7
+			self._handle_core(libcore.corelocation(rpid))
 		elif not os.WIFEXITED(status):
 			# redrum
 			import signal
@@ -422,11 +414,12 @@ class Proceeding(object):
 			except OSError:
 				pass
 
-		return os.WEXITSTATUS(status)
+		report['exitstatus'] = os.WEXITSTATUS(status)
+		return report
 
-	def _dispatch(self, container, constraints, contexts):
+	def _dispatch(self, container, constraints):
 		for id, tcall in container.__tests__:
-			test = self.Test(id, tcall, *constraints)
+			test = self.Test(self, id, tcall, *constraints)
 
 			parts = test.identity.split('.')
 			parts[0] = color('0x1c1c1c', parts[0])
@@ -438,19 +431,16 @@ class Proceeding(object):
 			))
 			sys.stderr.flush() # want to see the test being ran
 
-			pid = self._forked(test, contexts)
-			sys.stderr.write('\b\b\b' + color('red', str(pid)))
-			sys.stderr.flush() # want to see the test being ran
+			rref = fork.process.dispatch(self._run, test)
 
-			with contexts[0](test.identity):
-				# (package, test.identity, pid)
-				status = self._complete(test, pid)
-				if status:
-					sys.exit(status)
+			report = rref() or {'fate': 'unknown', 'impact': -1}
+			self._complete(test, report)
+			if report['impact'] < 0:
+				sys.exit(report['exitstatus'])
 
-	def execute(self, modules, contexts):
+	def execute(self, modules):
 		m = types.ModuleType("testing")
 		m.__tests__ = [(self.package + '.test', self.package_test)]
 		sys.stderr.write(top_fate_messages + '\n')
-		self._dispatch(m, modules, contexts)
+		self._dispatch(m, modules)
 		sys.stderr.write(bottom_fate_messages + '\n')
