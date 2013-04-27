@@ -30,7 +30,7 @@ class Test(libtest.Test):
 
 	def seal(self):
 		with self.tracing(self.package, self.identity):
-			super().seal()
+			return super().seal()
 
 	def fail(self, *args):
 		import pdb

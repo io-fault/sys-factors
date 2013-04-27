@@ -88,7 +88,6 @@ trace(PyObj self, PyFrameObject *f, int what, PyObj arg)
 
 	PyTuple_SET_ITEM(item, 0, module_name);
 	PyTuple_SET_ITEM(item, 1, class_name);
-	Py_INCREF(Py_None);
 	PyTuple_SET_ITEM(item, 2, filename);
 	Py_INCREF(filename);
 
@@ -121,6 +120,7 @@ trace(PyObj self, PyFrameObject *f, int what, PyObj arg)
 error:
 	Py_XDECREF(firstlineno);
 	Py_XDECREF(lineno);
+	Py_XDECREF(module_name);
 	return(-1);
 }
 
