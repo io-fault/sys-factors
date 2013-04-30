@@ -18,14 +18,12 @@ from .. import libcore
 from .. import libtest
 from .. import libmeta
 from .. import libtrace
-from .. import libtraceback
 from .. import gcov
 
 class Test(libtest.Test):
 	def __init__(self, proceeding, *args, **kw):
 		self.tracing = proceeding.tracing
 		self.package = proceeding.package
-
 		super().__init__(proceeding, *args, **kw)
 
 	def seal(self):

@@ -36,10 +36,10 @@ import txt.libint
 def color(color, text, _model = "∫text xterm.fg.%s∫"):
 	return txt.libint.Model(_model % (color,)).argformat(text)
 
-open_fate_message = color('0x1c1c1c', '│')
-close_fate_message = color('0x1c1c1c', '│')
-top_fate_messages = color('0x1c1c1c', '┌' + ('─' * 10) + '┐')
-bottom_fate_messages = color('0x1c1c1c', '└' + ('─' * 10) + '┘')
+open_fate_message = color('0x1c1c1c', '|')
+close_fate_message = color('0x1c1c1c', '|')
+top_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+')
+bottom_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+')
 
 def get_test_index(tester):
 	"""
