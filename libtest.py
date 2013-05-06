@@ -298,6 +298,9 @@ class Proceeding(object):
 		"""
 		module = importlib.import_module(test.identity)
 		module.__tests__ = gather(module)
+		if '__test__' in dir(module):
+			# allow module to skip the entire set
+			module.__test__(test)
 		return test.Fork(module)
 
 	def package_test(self, test):
