@@ -1,12 +1,13 @@
 """
 Run developer tests emitting test meta data.
 
-Each test is ran in a subprocess, one at a time.
+Each test is ran in a clone, one at a time.
 """
 import os
 import sys
 import contextlib
 import signal
+import functools
 
 import factory.lib
 import factory.loader
@@ -19,6 +20,12 @@ from .. import libtest
 from .. import libmeta
 from .. import libtrace
 from .. import gcov
+
+##
+# Test and Proceeding are extremely basic in libtest, and
+# dev.bin.test exists to provide a more communicable interface
+# to the execution of a set of tests.
+##
 
 class Test(libtest.Test):
 	def __init__(self, proceeding, *args, **kw):
@@ -37,6 +44,26 @@ class Test(libtest.Test):
 		pdb.set_trace()
 		sys.stderr.write(libtest.top_fate_messages + '\n')
 		super().fail(*args)
+
+@fork.lib.procedure
+def dispatch(
+	catalog,
+	test_process = fork.lib.Process,
+	test = Test,
+):
+	@fork.lib.crossmethod
+	def start(test):
+		"""
+		Kick off the test in a subprocess.
+		"""
+		catalog.test_process = context().spawn('fork', test)
+
+	@fork.lib.crossmethod
+	def finished(test_process, process_exit = tuple):
+		"""
+		Executed when the test subprocess exits.
+		"""
+		pass
 
 class Proceeding(libtest.Proceeding):
 	def track_imports(self, imported):
@@ -69,48 +96,19 @@ class Proceeding(libtest.Proceeding):
 		super().__init__(*args, Test = Test)
 
 def main(package, modules):
-	def info():
-		import linecache
-		import fork.thread
-		snapshot = dict(sys._current_frames())
-		pid = os.getpid()
-		ttid = fork.thread.identity()
-		buf = "[{pid}] {nthreads} threads\n".format(pid=pid, nthreads=len(snapshot)-1)
-
-		for tid, f in snapshot.items():
-			if tid == ttid:
-				continue
-			co = f.f_code
-			l = f.f_lineno
-			path = co.co_filename
-			func = co.co_name
-			line = linecache.getline(path, l)
-			buf += "File \"{file}\" line {lineno} in {func} ({tid})\n{line}".format(tid=hex(tid), func=func, file=path, lineno=l, line=line)
-		print(buf)
-	def _info(*args):
-		fork.lib.taskq.enqueue(info)
-
-	signal.signal(signal.SIGINFO, _info)
-
 	# promote to test, but iff the role was unchanged.
 	# in cases where finals are ran, this will be 'factor'.
 	if factory.lib.role is None:
 		factory.lib.role = 'test'
 
+	# clear prior reporting
 	libmeta.void_package(package)
-	with libcore.dumping():
-		p = Proceeding(package)
-		fork.lib.pivot(p.execute, modules)
+
+	# enable core dumps
+	p = Proceeding(package)
+	enqueue(functools.partial(p.execute, modules))
 
 if __name__ == '__main__':
-	import sys
-
-	def ijtrace(*args):
-		import os
-		print(os.getpid())
-		signal.signal(signal.SIGINT, signal.SIG_DFL)
-		import pdb; pdb.set_trace() # sigint
-	#signal.signal(signal.SIGINT, ijtrace)
-
 	package, *modules = sys.argv[1:]
-	main(package, modules)
+	with libcore.dumping():
+		fork.lib.control(init = functools.partial(main, package, modules))

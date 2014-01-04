@@ -4,6 +4,7 @@ the actual tests for the purpose of keeping the execution machinary as simple as
 """
 import os
 import sys
+import gc
 import importlib
 import contextlib
 import operator
@@ -11,25 +12,9 @@ import functools
 import types
 
 import routes.lib
-import fork.thread
-import fork.process
+import fork.lib
 from . import libcore
-
-#: Mapping of Fate names to colors.
-color_of_fate = {
-	'fate': 'white',
-	'pass': 'green', # bright green. pass is unusual
-	'return': '0x00aa00', # dim green. return is usual.
-	'skip': 'cyan',
-	'fork': 'blue',
-	'explicit': 'magenta',
-
-# failures
-	'error': 'red',
-	'core': 'orange',
-	'fail': 'yellow',
-	'expire': 'yellow',
-}
+from . import libmeta
 
 import txt.libint
 
@@ -67,6 +52,10 @@ def get_test_index(tester):
 		return None
 
 def test_order(kv):
+	"""
+	Key function used by :py:func:`gather` that uses :py:func:`get_test_index` in
+	order to elevate a test's position given that it was explicitly listed.
+	"""
 	return get_test_index(kv[1])
 
 def gather(container, prefix = 'test_'):
@@ -81,7 +70,7 @@ def gather(container, prefix = 'test_'):
 	tests.sort(key = test_order)
 	return tests
 
-# Exposes an assert like interface to testing.
+# Exposes an assert like interface to Test objects.
 class Subject(object):
 	__slots__ = ('test', 'object', 'storage', 'inverse')
 
@@ -151,7 +140,7 @@ class Test(object):
 	 `fate`
 	  The conclusion of the Test; pass, fail, error, skip.
 	"""
-	__slots__ = ('focus', 'identity', 'constraints', 'fate')
+	__slots__ = ('focus', 'identity', 'constraints', 'fate', 'proceeding',)
 
 	##
 	# Fate exceptions are used to manage the exception
@@ -164,6 +153,7 @@ class Test(object):
 		content = None
 		impact = None
 		line = None
+		color = 'white'
 
 		def __init__(self, content):
 			self.content = content
@@ -172,26 +162,36 @@ class Test(object):
 		'the test explicitly passed'
 		impact = 1
 		name = 'pass'
+		code = 0
+		color = 'green'
 
 	class Return(Pass):
 		'the test returned'
 		impact = 1
 		name = 'return'
+		code = 1
+		color = 'green'
 
 	class Explicit(Pass):
 		'the test cannot be implicitly invoked'
 		impact = 0
 		name = 'explicit'
+		code = 2
+		color = 'magenta'
 
 	class Skip(Pass):
 		'the test was skipped'
 		impact = 0
 		name = 'skip'
+		code = 3
+		color = 'cyan'
 
-	class Fork(Fate):
+	class Divide(Fate):
 		'the test consisted of a set of tests'
 		impact = 0
-		name = 'fork'
+		name = 'divide'
+		code = 4
+		color = 'blue'
 
 		def __init__(self, container, limit = 1):
 			self.content = container
@@ -202,21 +202,30 @@ class Test(object):
 		'the test failed'
 		impact = -1
 		name = 'fail'
+		code = 5
+		color = 'yellow'
 
 	class Core(Fail):
 		'the test caused a core dumped'
 		name = 'core'
+		code = 6
+		color = 'orange'
 
 	class Error(Fail):
 		'the test raised an exception'
 		name = 'error'
+		code = 7
+		color = 'red'
 
 	class Expire(Fail):
 		'the test did not finish in the allowed time'
 		name = 'expire'
+		code = 8
+		color = 'yellow'
 
 	def __init__(self, proceeding, identity, focus, *constraints):
 		# allow explicit identity as the callable may be a wrapped function
+		self.proceeding = proceeding
 		self.identity = identity
 		self.focus = focus
 		self.constraints = constraints
@@ -241,6 +250,7 @@ class Test(object):
 
 		try:
 			r = self.focus(self)
+			gc.collect()
 			if not isinstance(r, self.Fate):
 				self.fate = self.Return(r)
 			else:
@@ -281,9 +291,25 @@ class Test(object):
 		"""
 		return (self / None.__class__)
 
+def execute(module):
+	"""
+	Execute the tests contained in the given container. Usually given a module object.
+
+	This test runner exists primarily for initial dev.bin.test dependency testing.
+	Proceeding has a fair amount of complexity that presumes much about the
+	structure of the package being tested.
+
+	.. warning:: No status information is printed. Raises the first negative impact Test.
+	"""
+	for id, func in gather(module):
+		test = Test(None, id, func)
+		test.seal()
+		if test.fate.impact < 0:
+			raise test.fate
+
 class Proceeding(object):
 	"""
-	The collection and executions of a series of tests.
+	The collection and execution of a series of tests.
 	"""
 	def __init__(self, package, Test = Test):
 		self.package = package
@@ -301,7 +327,7 @@ class Proceeding(object):
 		if '__test__' in dir(module):
 			# allow module to skip the entire set
 			module.__test__(test)
-		return test.Fork(module)
+		return test.Divide(module)
 
 	def package_test(self, test):
 		"""
@@ -319,7 +345,7 @@ class Proceeding(object):
 			(x.fullname, self.module_test) for x in ir.subnodes()[1]
 			if x.identity.startswith('test_') and (not test.constraints or x.identity in test.constraints)
 		]
-		return test.Fork(module)
+		return test.Divide(module)
 
 	##
 	# XXX: This is a mess. It will be getting cleaned up soon.
@@ -357,7 +383,7 @@ class Proceeding(object):
 
 		ident = color('red', '.').join(parts)
 		sys.stderr.write('\r{start} {fate!s} {stop} {tid}                \n'.format(
-			fate = color(color_of_fate[faten], faten.ljust(8)),
+			fate = color(test.fate.color, faten.ljust(8)),
 			tid = ident,
 			start = open_fate_message,
 			stop = close_fate_message
@@ -369,7 +395,7 @@ class Proceeding(object):
 			'fate': faten,
 		}
 
-		if isinstance(test.fate, test.Fork):
+		if isinstance(test.fate, test.Divide):
 			self._dispatch(test.fate.content, ())
 		elif isinstance(test.fate, test.Error):
 			self._print_tb(test.fate)
@@ -394,7 +420,7 @@ class Proceeding(object):
 			sys.stderr.write('CORE: File does not exist: ' + repr(corefile) + '\n')
 
 	def _complete(self, test, report):
-		rpid, status = os.waitpid(-1, 0)
+		rpid, status
 
 		if os.WCOREDUMP(status):
 			faten = 'core'
@@ -404,7 +430,7 @@ class Proceeding(object):
 			parts[:-1] = [color('gray', x) for x in parts[:-1]]
 			ident = color('red', '.').join(parts)
 			sys.stderr.write('\r{start} {fate!s} {stop} {tid}                \n'.format(
-				fate = color(color_of_fate[faten], faten.ljust(8)), tid = ident,
+				fate = color(test.fate.color, faten.ljust(8)), tid = ident,
 				start = open_fate_message,
 				stop = close_fate_message
 			))
@@ -434,9 +460,10 @@ class Proceeding(object):
 			))
 			sys.stderr.flush() # want to see the test being ran
 
-			rref = fork.process.dispatch(self._run, test)
+			rsrc = spawn('clone', functools.partial(enqueue, self._run, test))
+			graph(rsrc, crossmethod)
 
-			report = rref() or {'fate': 'unknown', 'impact': -1}
+			report = {'fate': 'unknown', 'impact': -1}
 			self._complete(test, report)
 			if report['impact'] < 0:
 				sys.exit(report['exitstatus'])
