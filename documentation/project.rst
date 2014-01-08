@@ -32,10 +32,7 @@ dev has no requirements other than a functioning Python installation.
 Conventions
 ===========
 
-Terminology:
-
- Fate
-  The result of a test. Normally, Pass or Fail.
+For profiling and coverage, Meta data is collected into `.meta` directories.
 
 Defense
 =======
@@ -72,5 +69,4 @@ Bylaws
  * Development of a test framework whose purpose is simplicity and conciseness.
  * Development of an improved debugger.
  * Development of profiler and coverage context that can be easily augmented to test runs.
-   Likely depending on Ned's work.
- * Maintenance of the project skeleton.
+ * Development of the project skeleton.

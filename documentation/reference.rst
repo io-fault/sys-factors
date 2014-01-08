@@ -7,23 +7,23 @@ provided by `dev`. It refrains from discussing how the parts might be used
 in a wider scope; the :doc:`usage` document should be read for such
 information.
 
-:mod:`dev`
-==========
+:mod:`fault.dev`
+================
 
-.. automodule:: dev
+.. automodule:: fault.dev
     :show-inheritance:
     :members:
 
-:mod:`dev.libtest`
-==================
+:mod:`fault.dev.libtest`
+========================
 
-.. automodule:: dev.libtest
+.. automodule:: fault.dev.libtest
     :show-inheritance:
     :members:
 
-:mod:`dev.project`
-==================
+:mod:`fault.dev.project`
+========================
 
-.. automodule:: dev.project
+.. automodule:: fault.dev.project
     :members:
     :show-inheritance:
