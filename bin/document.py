@@ -2,10 +2,8 @@ import sys
 from .. import libsphinx
 
 def main(args):
-	output = [
-		libsphinx.build(x, statusfile = sys.stderr, warningfile = sys.stderr) for x in args
-	]
-	for x in output:
+	dirs = [libsphinx.build(x, statusfile = sys.stderr, warningfile = sys.stderr) for x in args]
+	for x in dirs:
 		print(x)
 
 if __name__ == '__main__':

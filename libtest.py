@@ -14,8 +14,8 @@ import types
 from . import libcore
 from . import libmeta
 
-from ..routes import lib as routeslib
-from ..txt import libint
+from ..routes import lib as routeslib # fault incorporated
+from ..txt import libint # fault incorporated
 
 def color(color, text, _model = "∫text xterm.fg.%s∫"):
 	return libint.Model(_model % (color,)).argformat(text)
@@ -59,7 +59,7 @@ def test_order(kv):
 
 def gather(container, prefix = 'test_'):
 	"""
-	:returns: Ordered dictionary of attribute names associated with a :py:class:`Test` instance.
+	:returns: Ordered dictionary of attribute names associated with a `Test` instance.
 	:rtype: {k : Test(v, k) for k, v in container.items()}
 
 	Collect the objects in the container whose name starts with "test_".
@@ -146,7 +146,7 @@ class Test(object):
 	# and the completion state of a test. Fate is a Control exception (BaseException).
 	class Fate(BaseException):
 		"""
-		The Fate of a test. Sealed by :py:meth:`Test.seal`.
+		The Fate of a test. Sealed by :py:meth:`.Test.seal`.
 		"""
 		name = 'fate'
 		content = None
@@ -249,6 +249,7 @@ class Test(object):
 
 		try:
 			r = self.focus(self)
+			# Make an attempt at causing any deletions.
 			gc.collect()
 			if not isinstance(r, self.Fate):
 				self.fate = self.Return(r)

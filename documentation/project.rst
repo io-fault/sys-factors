@@ -12,16 +12,13 @@ Structure
 =========
 
 Dev is structured as a single Python package. Everything pertinent to
-Dev's operation is contained within the :py:mod:`dev` package.
+Dev's operation is contained within the package.
 
-The :py:mod:`dev.release` package deals with distribution and contains
-project release management code.
-
-The :py:mod:`dev.documentation` package module houses the project's
+The :py:mod:`.documentation` package module houses the project's
 documentation. Therein, the `html` directory can be referenced locally to read
 this documentation.
 
-The :py:mod:`dev.libtest` module provides functions for collecting and running
+The :py:mod:`.libtest` module provides functions for collecting and running
 tests.
 
 Requirements
