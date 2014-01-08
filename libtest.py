@@ -11,15 +11,14 @@ import operator
 import functools
 import types
 
-import routes.lib
-import fork.lib
 from . import libcore
 from . import libmeta
 
-import txt.libint
+from ..routes import lib as routeslib
+from ..txt import libint
 
 def color(color, text, _model = "∫text xterm.fg.%s∫"):
-	return txt.libint.Model(_model % (color,)).argformat(text)
+	return libint.Model(_model % (color,)).argformat(text)
 
 open_fate_message = color('0x1c1c1c', '|')
 close_fate_message = color('0x1c1c1c', '|')
@@ -340,7 +339,7 @@ class Proceeding(object):
 		if 'context' in dir(module):
 			module.context() # XXX: manage package context for dependency maanagement
 
-		ir = routes.lib.Import.from_fullname(module.__name__)
+		ir = routeslib.Import.from_fullname(module.__name__)
 		module.__tests__ = [
 			(x.fullname, self.module_test) for x in ir.subnodes()[1]
 			if x.identity.startswith('test_') and (not test.constraints or x.identity in test.constraints)

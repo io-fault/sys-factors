@@ -4,14 +4,15 @@ Package files metadata interface.
 This module provides easy access to updating and getting test metadata out of the
 dot-meta directories that populate the package after a developer test run.
 """
-import routes.lib
 from . import libpython
+
+from ..routes import lib as routeslib
 
 meta_name = '.meta'
 crossed_name = 'xlines'
 crossable_name = 'lines'
 
-def route(filepath, meta_records_name = None, from_abs = routes.lib.File.from_absolute):
+def route(filepath, meta_records_name = None, from_abs = routeslib.File.from_absolute):
 	"""
 	route(filepath, meta_records_name = None)
 
@@ -37,15 +38,15 @@ def void(route):
 		void(fr)
 
 def void_package(package):
-	ir = routes.lib.Import.from_fullname(package)
+	ir = routeslib.Import.from_fullname(package)
 	void(ir.package.file().container)
 
 def void_path(path):
-	fr = routes.lib.File.from_path(path)
+	fr = routeslib.File.from_path(path)
 	void(fr)
 
 def coverage(package):
-	ir = routes.lib.Import.from_fullname(package)
+	ir = routeslib.Import.from_fullname(package)
 	pkg, mods = ir.tree()
 	pl = []
 	ml = []
@@ -90,7 +91,7 @@ def coverage(package):
 				])
 				yield x.fullname, crossed, lines, ignored
 
-def append(type, filepath, settings, from_abs = routes.lib.File.from_absolute):
+def append(type, filepath, settings, from_abs = routeslib.File.from_absolute):
 	"""
 	append(type, filepath, settings)
 	"""
