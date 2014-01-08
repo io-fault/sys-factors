@@ -1,8 +1,6 @@
 """
-A default library module for a package.
-
-In the case where a package has a primary module, the "project.lib" module should
-be used.
+Primary project access. High-level concepts or common practices may be discussed here for
+easy reference.
 """
 
 def bar():

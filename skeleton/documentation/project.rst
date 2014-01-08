@@ -2,7 +2,7 @@
 Project
 =======
 
-SKELETON description.
+Short description of the project.
 
 Introduction
 ============
@@ -12,8 +12,8 @@ Longer introduction to the project.
 Structure
 =========
 
-Discuss the structure of the project. Prevalent high-level concepts. Where such concepts
-are manifested.
+The structure of the project. Prevalent high-level concepts.
+Where such concepts are manifested.
 
 Requirements
 ============
@@ -23,7 +23,7 @@ Any hidden dependencies or notes about dependencies.
 Conventions
 ===========
 
-Discuss project conventions that might seem strange to a new user.
+List of common project conventions.
 
 Defense
 =======
