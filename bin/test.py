@@ -9,17 +9,24 @@ import contextlib
 import signal
 import functools
 
-import factory.lib
-import factory.loader
+from ...xeno import lib as xenolib
+from ...routes import lib as routeslib
+from ...fork import lib as forklib
+from ...txt import libint
 
-import routes.lib
-import fork.lib
-
-from .. import libcore
 from .. import libtest
+from .. import libcore
 from .. import libmeta
 from .. import libtrace
 from .. import gcov
+
+def color(color, text, _model = "∫text xterm.fg.%s∫"):
+	return libint.Model(_model % (color,)).argformat(text)
+
+open_fate_message = color('0x1c1c1c', '|')
+close_fate_message = color('0x1c1c1c', '|')
+top_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+')
+bottom_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+')
 
 ##
 # Test and Proceeding are extremely basic in libtest, and
@@ -45,27 +52,176 @@ class Test(libtest.Test):
 		sys.stderr.write(libtest.top_fate_messages + '\n')
 		super().fail(*args)
 
-@fork.lib.procedure
-def dispatch(
-	catalog,
-	test_process = fork.lib.Process,
-	test = Test,
-):
-	@fork.lib.crossmethod
-	def start(test):
-		"""
-		Kick off the test in a subprocess.
-		"""
-		catalog.test_process = context().spawn('fork', test)
+class Proceeding(object):
+	"""
+	The collection and execution of a series of tests.
+	"""
+	Test = Test
 
-	@fork.lib.crossmethod
-	def finished(test_process, process_exit = tuple):
-		"""
-		Executed when the test subprocess exits.
-		"""
-		pass
+	def __init__(self, package):
+		self.package = package
+		self.selectors = []
+		self.cextensions = []
 
-class Proceeding(libtest.Proceeding):
+	def module_test(self, test):
+		"""
+		Fork for each test. The actual execution of the module tests may not be in forked
+		subprocesses. The *test* forks, which may or may not result in a process fork.
+		"""
+		module = importlib.import_module(test.identity)
+		module.__tests__ = gather(module)
+		if '__test__' in dir(module):
+			# allow module to skip the entire set
+			module.__test__(test)
+		return test.Divide(module)
+
+	def package_test(self, test):
+		"""
+		Fork for each test module. The actual execution of the module tests may not be in forked
+		subprocesses. The *test* forks, which may or may not result in a process fork.
+		"""
+		# The package module
+		module = importlib.import_module(test.identity)
+		test/module.__name__ == test.identity
+		if 'context' in dir(module):
+			module.context() # XXX: manage package context for dependency maanagement
+
+		ir = routeslib.Import.from_fullname(module.__name__)
+		module.__tests__ = [
+			(x.fullname, self.module_test) for x in ir.subnodes()[1]
+			if x.identity.startswith('test_') and (not test.constraints or x.identity in test.constraints)
+		]
+		return test.Divide(module)
+
+	##
+	# XXX: This is a mess. It will be getting cleaned up soon.
+
+	def _print_tb(self, fate):
+		import traceback
+		try:
+			# dev.libtraceback por favor
+			from IPython.core import ultratb
+			x = ultratb.VerboseTB(ostream = sys.stderr)
+			# doesn't support chains yet, so fallback to cause traceback.
+			if fate.__cause__:
+				exc = fate.__cause__
+			else:
+				exc = fate
+			x(exc.__class__, exc, exc.__traceback__)
+		except ImportError:
+			tb = traceback.format_exception(fate.__class__, fate, fate.__traceback__)
+			tb = ''.join(tb)
+			sys.stderr.write(tb)
+
+	def _run(self, test):
+		sys.stderr.write('\b\b\b' + color('red', str(os.getpid())))
+		sys.stderr.flush() # want to see the test being ran
+
+		test.seal()
+
+		faten = test.fate.__class__.__name__.lower()
+		parts = test.identity.split('.')
+		parts[0] = color('0x1c1c1c', parts[0])
+		if test.fate.impact >= 0:
+			parts[1:] = [color('gray', x) for x in parts[1:]]
+		else:
+			parts[1:-1] = [color('gray', x) for x in parts[1:-1]]
+
+		ident = color('red', '.').join(parts)
+		sys.stderr.write('\r{start} {fate!s} {stop} {tid}                \n'.format(
+			fate = color(test.fate.color, faten.ljust(8)),
+			tid = ident,
+			start = open_fate_message,
+			stop = close_fate_message
+		))
+
+		report = {
+			'test': test.identity,
+			'impact': test.fate.impact,
+			'fate': faten,
+		}
+
+		if isinstance(test.fate, test.Divide):
+			self._dispatch(test.fate.content, ())
+		elif isinstance(test.fate, test.Error):
+			self._print_tb(test.fate)
+			import pdb
+			# error cases chain the exception
+			pdb.post_mortem(test.fate.__cause__.__traceback__)
+
+		return report
+
+	def _handle_core(self, corefile):
+		if corefile is None:
+			return
+		import subprocess
+		import shutil
+
+		if os.path.exists(corefile):
+			sys.stderr.write("CORE: Identified, {0!r}, loading debugger.\n".format(corefile))
+			libcore.debug(corefile)
+			sys.stderr.write("CORE: Removed file.\n".format(corefile))
+			os.remove(corefile)
+		else:
+			sys.stderr.write('CORE: File does not exist: ' + repr(corefile) + '\n')
+
+	def _complete(self, test, report):
+		rpid, status
+
+		if os.WCOREDUMP(status):
+			faten = 'core'
+			report['fate'] = 'core'
+			parts = test.identity.split('.')
+			parts[0] = color('0x1c1c1c', parts[0])
+			parts[:-1] = [color('gray', x) for x in parts[:-1]]
+			ident = color('red', '.').join(parts)
+			sys.stderr.write('\r{start} {fate!s} {stop} {tid}                \n'.format(
+				fate = color(test.fate.color, faten.ljust(8)), tid = ident,
+				start = open_fate_message,
+				stop = close_fate_message
+			))
+			self._handle_core(libcore.corelocation(rpid))
+		elif not os.WIFEXITED(status):
+			# redrum
+			import signal
+			try:
+				os.kill(pid, signal.SIGKILL)
+			except OSError:
+				pass
+
+		report['exitstatus'] = os.WEXITSTATUS(status)
+		return report
+
+	def _dispatch(self, container, constraints):
+		for id, tcall in container.__tests__:
+			test = self.Test(self, id, tcall, *constraints)
+
+			parts = test.identity.split('.')
+			parts[0] = color('0x1c1c1c', parts[0])
+			parts[:-1] = [color('gray', x) for x in parts[:-1]]
+			ident = color('red', '.').join(parts)
+			sys.stderr.write('{bottom} {tid} ...'.format(
+				bottom = bottom_fate_messages,
+				tid = ident,
+			))
+			sys.stderr.flush() # want to see the test being ran
+
+			rsrc = spawn('clone', functools.partial(enqueue, self._run, test))
+			graph(rsrc, crossmethod)
+
+			report = {'fate': 'unknown', 'impact': -1}
+			self._complete(test, report)
+			if report['impact'] < 0:
+				sys.exit(report['exitstatus'])
+
+	def execute(self, modules):
+		m = types.ModuleType("testing")
+		m.__tests__ = [(self.package + '.test', self.package_test)]
+		sys.stderr.write(top_fate_messages + '\n')
+		self._dispatch(m, modules)
+		sys.stderr.write(bottom_fate_messages + '\n')
+
+class Proceeding(Proceeding):
 	def track_imports(self, imported):
 		self.fimports.add((imported.fullname, imported.source))
 

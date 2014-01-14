@@ -1,29 +1,15 @@
 """
 A testing library that minimizes the distance between the test runner, and
 the actual tests for the purpose of keeping the execution machinary as simple as possible.
+
+libtest provides the very basics for testing in Python. Test runners are implemented else
+where as they tend to be significant pieces of code. However, a trivial :py:func:`execute`
+function is provided that, when given a module, will execute the tests therein. Exceptions
+are allowed to raise normally.
 """
-import os
-import sys
 import gc
-import importlib
-import contextlib
 import operator
 import functools
-import types
-
-from . import libcore
-from . import libmeta
-
-from ..routes import lib as routeslib # fault incorporated
-from ..txt import libint # fault incorporated
-
-def color(color, text, _model = "∫text xterm.fg.%s∫"):
-	return libint.Model(_model % (color,)).argformat(text)
-
-open_fate_message = color('0x1c1c1c', '|')
-close_fate_message = color('0x1c1c1c', '|')
-top_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+')
-bottom_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+')
 
 def get_test_index(tester):
 	"""
@@ -45,6 +31,7 @@ def get_test_index(tester):
 			if tester in visited:
 				# XXX: recursive wrappers? warn?
 				return None
+
 	try:
 		return int(tester.__code__.co_firstlineno)
 	except AttributeError:
@@ -69,8 +56,18 @@ def gather(container, prefix = 'test_'):
 	tests.sort(key = test_order)
 	return tests
 
+class Defect(Exception):
+	"""
+	Exception raised by :py:class:`.Contention` instances to describe a Failure inducing
+	defect--assertion failure.
+	"""
+	pass
+
 # Exposes an assert like interface to Test objects.
-class Subject(object):
+class Contention(object):
+	"""
+	Contention is an object used by :py:class:`Test` objects to provide assertions.
+	"""
 	__slots__ = ('test', 'object', 'storage', 'inverse')
 
 	def __init__(self, test, object, inverse = False):
@@ -82,6 +79,7 @@ class Subject(object):
 	_override = {
 		'__truediv__' : ('isinstance', isinstance),
 		'__sub__' : ('issubclass', issubclass),
+		'__mod__' : ('is', lambda x,y: x is y)
 	}
 	for k, v in operator.__dict__.items():
 		if k.startswith('__get') or k.startswith('__set'):
@@ -95,9 +93,9 @@ class Subject(object):
 			def check(self, ob, opname = opname, operator = v):
 				test, x, y = self.test, self.object, ob
 				if self.inverse:
-					if operator(x, y): test.fail(opname)
+					if operator(x, y): raise self.test.Defect(opname)
 				else:
-					if not operator(x, y): test.fail(opname)
+					if not operator(x, y): raise self.test.Defect(opname)
 			locals()[k] = check
 
 	##
@@ -115,14 +113,102 @@ class Subject(object):
 			# other effect is desired.
 			return
 
-		if not isinstance(y, x): test.fail("unexpected exception")
+		if not isinstance(y, x): raise self.test.Defect("unexpected exception")
 		return True # !!! Inhibiting raise.
 
 	def __xor__(self, subject):
+		"""
+		Call the subject while trapping the configured exception::
+
+			test/Exception ^ subject
+
+		Reads: "Test that 'Exception' is raised by 'subject'".
+		"""
 		with self as exc:
 			subject()
 		return exc()
 	__rxor__ = __xor__
+
+##
+# Fate exceptions are used to manage the exception
+# and the completion state of a test. Fate is a Control exception (BaseException).
+class Fate(BaseException):
+	"""
+	The Fate of a test. Sealed by :py:meth:`.Test.seal`.
+	"""
+	name = 'fate'
+	content = None
+	impact = None
+	line = None
+	color = 'white'
+
+	def __init__(self, content):
+		self.content = content
+
+class Pass(Fate):
+	abstract = 'the test was explicitly passed'
+	impact = 1
+	name = 'pass'
+	code = 0
+	color = 'green'
+
+class Return(Pass):
+	abstract = 'the test returned'
+	impact = 1
+	name = 'return'
+	code = 1
+	color = 'green'
+
+class Explicit(Pass):
+	abstract = 'the test cannot be implicitly invoked'
+	impact = 0
+	name = 'explicit'
+	code = 2
+	color = 'magenta'
+
+class Skip(Pass):
+	abstract = 'the test was skipped'
+	impact = 0
+	name = 'skip'
+	code = 3
+	color = 'cyan'
+
+class Divide(Fate):
+	abstract = 'the test consisted of a set of tests'
+	impact = 0
+	name = 'divide'
+	code = 4
+	color = 'blue'
+
+	def __init__(self, container, limit = 1):
+		self.content = container
+		self.tests = []
+		self.limit = limit
+
+class Fail(Fate):
+	abstract = 'the test raised an exception or contended an absurdity'
+	impact = -1
+	name = 'fail'
+	code = 5
+	color = 'red'
+
+class Void(Fail):
+	abstract = 'the coverage data of the test does not meet expectations'
+	name = 'void'
+	code = 6
+	color = 'red'
+
+class Expire(Fail):
+	abstract = 'the test did not finish in the allowed time'
+	name = 'expire'
+	code = 8
+	color = 'yellow'
+
+class Core(Fail):
+	abstract = 'the test caused a core dumped or segmentation violation'
+	name = 'core'
+	code = 9
+	color = 'orange'
 
 class Test(object):
 	"""
@@ -141,86 +227,20 @@ class Test(object):
 	"""
 	__slots__ = ('focus', 'identity', 'constraints', 'fate', 'proceeding',)
 
-	##
-	# Fate exceptions are used to manage the exception
-	# and the completion state of a test. Fate is a Control exception (BaseException).
-	class Fate(BaseException):
-		"""
-		The Fate of a test. Sealed by :py:meth:`.Test.seal`.
-		"""
-		name = 'fate'
-		content = None
-		impact = None
-		line = None
-		color = 'white'
-
-		def __init__(self, content):
-			self.content = content
-
-	class Pass(Fate):
-		'the test explicitly passed'
-		impact = 1
-		name = 'pass'
-		code = 0
-		color = 'green'
-
-	class Return(Pass):
-		'the test returned'
-		impact = 1
-		name = 'return'
-		code = 1
-		color = 'green'
-
-	class Explicit(Pass):
-		'the test cannot be implicitly invoked'
-		impact = 0
-		name = 'explicit'
-		code = 2
-		color = 'magenta'
-
-	class Skip(Pass):
-		'the test was skipped'
-		impact = 0
-		name = 'skip'
-		code = 3
-		color = 'cyan'
-
-	class Divide(Fate):
-		'the test consisted of a set of tests'
-		impact = 0
-		name = 'divide'
-		code = 4
-		color = 'blue'
-
-		def __init__(self, container, limit = 1):
-			self.content = container
-			self.tests = []
-			self.limit = limit
-
-	class Fail(Fate):
-		'the test failed'
-		impact = -1
-		name = 'fail'
-		code = 5
-		color = 'yellow'
-
-	class Core(Fail):
-		'the test caused a core dumped'
-		name = 'core'
-		code = 6
-		color = 'orange'
-
-	class Error(Fail):
-		'the test raised an exception'
-		name = 'error'
-		code = 7
-		color = 'red'
-
-	class Expire(Fail):
-		'the test did not finish in the allowed time'
-		name = 'expire'
-		code = 8
-		color = 'yellow'
+	# These referenced via Test instances to allow subclasses to override
+	# the implementations.
+	Defect = Defect
+	Contention = Contention
+	Fate = Fate
+	Pass = Pass
+	Return = Return
+	Explicit = Explicit
+	Skip = Skip
+	Divide = Divide
+	Fail = Fail
+	Void = Void
+	Core = Core
+	Expire = Expire
 
 	def __init__(self, proceeding, identity, focus, *constraints):
 		# allow explicit identity as the callable may be a wrapped function
@@ -230,16 +250,16 @@ class Test(object):
 		self.constraints = constraints
 
 	def __truediv__(self, object):
-		return Subject(self, object)
+		return self.Contention(self, object)
 
 	def __rtruediv__(self, object):
-		return Subject(self, object)
+		return self.Contention(self, object)
 
 	def __floordiv__(self, object):
-		return Subject(self, object, True)
+		return self.Contention(self, object, True)
 
 	def __rfloordiv__(self, object):
-		return Subject(self, object, True)
+		return self.Contention(self, object, True)
 
 	def seal(self):
 		"""
@@ -255,13 +275,13 @@ class Test(object):
 				self.fate = self.Return(r)
 			else:
 				self.fate = r
-		except self.Fate as exc:
+		except (self.Pass, self.Divide) as exc:
 			tb = exc.__traceback__ = exc.__traceback__.tb_next
 			self.fate = exc
 		except BaseException as err:
 			# place error out
 			tb = err.__traceback__ = err.__traceback__.tb_next
-			self.fate = self.Error('test raised exception')
+			self.fate = self.Fail('test raised exception')
 			self.fate.__cause__ = err
 
 		if tb is not None:
@@ -291,6 +311,17 @@ class Test(object):
 		"""
 		return (self / None.__class__)
 
+	try:
+		from gc import collect
+		def garbage(self, minimum = 0, collect = collect, **kw):
+			'Request collection with the expectation of a minimum unreachable.'
+			unreachable = collect()
+			if unreachable < minimum: raise test.Fail('missed garbage collection expectation')
+	except ImportError:
+		def garbage(self, *args, **kw):
+			'Garbage collection not available'
+			pass
+
 def execute(module):
 	"""
 	Execute the tests contained in the given container. Usually given a module object.
@@ -306,171 +337,3 @@ def execute(module):
 		test.seal()
 		if test.fate.impact < 0:
 			raise test.fate
-
-class Proceeding(object):
-	"""
-	The collection and execution of a series of tests.
-	"""
-	def __init__(self, package, Test = Test):
-		self.package = package
-		self.selectors = []
-		self.Test = Test
-		self.cextensions = []
-
-	def module_test(self, test):
-		"""
-		Fork for each test. The actual execution of the module tests may not be in forked
-		subprocesses. The *test* forks, which may or may not result in a process fork.
-		"""
-		module = importlib.import_module(test.identity)
-		module.__tests__ = gather(module)
-		if '__test__' in dir(module):
-			# allow module to skip the entire set
-			module.__test__(test)
-		return test.Divide(module)
-
-	def package_test(self, test):
-		"""
-		Fork for each test module. The actual execution of the module tests may not be in forked
-		subprocesses. The *test* forks, which may or may not result in a process fork.
-		"""
-		# The package module
-		module = importlib.import_module(test.identity)
-		test/module.__name__ == test.identity
-		if 'context' in dir(module):
-			module.context() # XXX: manage package context for dependency maanagement
-
-		ir = routeslib.Import.from_fullname(module.__name__)
-		module.__tests__ = [
-			(x.fullname, self.module_test) for x in ir.subnodes()[1]
-			if x.identity.startswith('test_') and (not test.constraints or x.identity in test.constraints)
-		]
-		return test.Divide(module)
-
-	##
-	# XXX: This is a mess. It will be getting cleaned up soon.
-
-	def _print_tb(self, fate):
-		import traceback
-		try:
-			# dev.libtraceback por favor
-			from IPython.core import ultratb
-			x = ultratb.VerboseTB(ostream = sys.stderr)
-			# doesn't support chains yet, so fallback to cause traceback.
-			if fate.__cause__:
-				exc = fate.__cause__
-			else:
-				exc = fate
-			x(exc.__class__, exc, exc.__traceback__)
-		except ImportError:
-			tb = traceback.format_exception(fate.__class__, fate, fate.__traceback__)
-			tb = ''.join(tb)
-			sys.stderr.write(tb)
-
-	def _run(self, test):
-		sys.stderr.write('\b\b\b' + color('red', str(os.getpid())))
-		sys.stderr.flush() # want to see the test being ran
-
-		test.seal()
-
-		faten = test.fate.__class__.__name__.lower()
-		parts = test.identity.split('.')
-		parts[0] = color('0x1c1c1c', parts[0])
-		if test.fate.impact >= 0:
-			parts[1:] = [color('gray', x) for x in parts[1:]]
-		else:
-			parts[1:-1] = [color('gray', x) for x in parts[1:-1]]
-
-		ident = color('red', '.').join(parts)
-		sys.stderr.write('\r{start} {fate!s} {stop} {tid}                \n'.format(
-			fate = color(test.fate.color, faten.ljust(8)),
-			tid = ident,
-			start = open_fate_message,
-			stop = close_fate_message
-		))
-
-		report = {
-			'test': test.identity,
-			'impact': test.fate.impact,
-			'fate': faten,
-		}
-
-		if isinstance(test.fate, test.Divide):
-			self._dispatch(test.fate.content, ())
-		elif isinstance(test.fate, test.Error):
-			self._print_tb(test.fate)
-			import pdb
-			# error cases chain the exception
-			pdb.post_mortem(test.fate.__cause__.__traceback__)
-
-		return report
-
-	def _handle_core(self, corefile):
-		if corefile is None:
-			return
-		import subprocess
-		import shutil
-
-		if os.path.exists(corefile):
-			sys.stderr.write("CORE: Identified, {0!r}, loading debugger.\n".format(corefile))
-			libcore.debug(corefile)
-			sys.stderr.write("CORE: Removed file.\n".format(corefile))
-			os.remove(corefile)
-		else:
-			sys.stderr.write('CORE: File does not exist: ' + repr(corefile) + '\n')
-
-	def _complete(self, test, report):
-		rpid, status
-
-		if os.WCOREDUMP(status):
-			faten = 'core'
-			report['fate'] = 'core'
-			parts = test.identity.split('.')
-			parts[0] = color('0x1c1c1c', parts[0])
-			parts[:-1] = [color('gray', x) for x in parts[:-1]]
-			ident = color('red', '.').join(parts)
-			sys.stderr.write('\r{start} {fate!s} {stop} {tid}                \n'.format(
-				fate = color(test.fate.color, faten.ljust(8)), tid = ident,
-				start = open_fate_message,
-				stop = close_fate_message
-			))
-			self._handle_core(libcore.corelocation(rpid))
-		elif not os.WIFEXITED(status):
-			# redrum
-			import signal
-			try:
-				os.kill(pid, signal.SIGKILL)
-			except OSError:
-				pass
-
-		report['exitstatus'] = os.WEXITSTATUS(status)
-		return report
-
-	def _dispatch(self, container, constraints):
-		for id, tcall in container.__tests__:
-			test = self.Test(self, id, tcall, *constraints)
-
-			parts = test.identity.split('.')
-			parts[0] = color('0x1c1c1c', parts[0])
-			parts[:-1] = [color('gray', x) for x in parts[:-1]]
-			ident = color('red', '.').join(parts)
-			sys.stderr.write('{bottom} {tid} ...'.format(
-				bottom = bottom_fate_messages,
-				tid = ident,
-			))
-			sys.stderr.flush() # want to see the test being ran
-
-			rsrc = spawn('clone', functools.partial(enqueue, self._run, test))
-			graph(rsrc, crossmethod)
-
-			report = {'fate': 'unknown', 'impact': -1}
-			self._complete(test, report)
-			if report['impact'] < 0:
-				sys.exit(report['exitstatus'])
-
-	def execute(self, modules):
-		m = types.ModuleType("testing")
-		m.__tests__ = [(self.package + '.test', self.package_test)]
-		sys.stderr.write(top_fate_messages + '\n')
-		self._dispatch(m, modules)
-		sys.stderr.write(bottom_fate_messages + '\n')
