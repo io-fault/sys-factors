@@ -21,7 +21,7 @@ except ImportError:
 
 import routes.lib
 import rhythm.kernel
-import fork.lib
+import nucleus.lib
 
 from . import libmeta
 from . import trace
@@ -90,13 +90,13 @@ class Tracing(object):
 		self._orig_start_new_threads = (thread.start_new_thread, threading._start_new_thread)
 		thread.start_new_thread = threading._start_new_thread = self._start_new_thread_override
 
-		fork.lib.fork_child_callset.add(self.truncate)
+		nucleus.lib.fork_child_callset.add(self.truncate)
 		self.trace()
 
 	def __exit__(self, typ, val, tb):
 		sys.settrace(None)
 		del __builtins__['TRACE']
-		fork.lib.fork_child_callset.remove(self.truncate)
+		nucleus.lib.fork_child_callset.remove(self.truncate)
 
 		thread.start_new_thread, threading._start_new_thread = self._orig_start_new_threads
 
