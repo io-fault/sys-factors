@@ -7,10 +7,14 @@ dot-meta directories that populate the package after a developer test run.
 from . import libpython
 
 from ..routes import lib as routeslib
+from ..meta import lib as metalib
 
 meta_name = '.meta'
-crossed_name = 'xlines'
-crossable_name = 'lines'
+meta_type = 'fault-dev-coverage'
+crossed_name = 'crossed-lines'
+crossable_name = 'possible-lines'
+
+cmeta = metalib.Meta(meta_type)
 
 def route(filepath, meta_records_name = None, from_abs = routeslib.File.from_absolute):
 	"""
