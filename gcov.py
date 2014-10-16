@@ -3,6 +3,7 @@ Tools for generating and extracting coverage data from gcov.
 """
 import subprocess
 import routes.lib
+
 from . import libmeta
 
 def _pipeline(inputfile, seq, popen = subprocess.Popen, pipe = subprocess.PIPE):

@@ -2,10 +2,10 @@
 A testing library that minimizes the distance between the test runner, and
 the actual tests for the purpose of keeping the execution machinary as simple as possible.
 
-libtest provides the very basics for testing in Python. Test runners are implemented else
+libtest provides the very basics for testing in Python. Test runners are implemented else-
 where as they tend to be significant pieces of code. However, a trivial :py:func:`execute`
 function is provided that, when given a module, will execute the tests therein. Exceptions
-are allowed to raise normally.
+are allowed to raise normally in order to report failures of any kind.
 """
 import gc
 import operator
@@ -56,10 +56,9 @@ def gather(container, prefix = 'test_'):
 	tests.sort(key = test_order)
 	return tests
 
-class Defect(Exception):
+class Absurdity(Exception):
 	"""
-	Exception raised by :py:class:`.Contention` instances to describe a Failure inducing
-	defect--assertion failure.
+	Exception raised by :py:class:`.Contention` instances.
 	"""
 	pass
 
@@ -93,9 +92,9 @@ class Contention(object):
 			def check(self, ob, opname = opname, operator = v):
 				test, x, y = self.test, self.object, ob
 				if self.inverse:
-					if operator(x, y): raise self.test.Defect(opname)
+					if operator(x, y): raise self.test.Absurdity(opname)
 				else:
-					if not operator(x, y): raise self.test.Defect(opname)
+					if not operator(x, y): raise self.test.Absurdity(opname)
 			locals()[k] = check
 
 	##
@@ -113,7 +112,7 @@ class Contention(object):
 			# other effect is desired.
 			return
 
-		if not isinstance(y, x): raise self.test.Defect("unexpected exception")
+		if not isinstance(y, x): raise self.test.Absurdity("unexpected exception")
 		return True # !!! Inhibiting raise.
 
 	def __xor__(self, subject):
@@ -128,6 +127,17 @@ class Contention(object):
 			subject()
 		return exc()
 	__rxor__ = __xor__
+
+	def __lshift__(self, subject):
+		"""
+		Contend that the parameter is contained by the object, `Container`::
+
+			test/Container << subject
+
+		Reads: "Test that 'Container' contains 'subject'".
+		"""
+		return subject in self.object
+	__rlshift__ = __lshift__
 
 ##
 # Fate exceptions are used to manage the exception
@@ -204,10 +214,22 @@ class Expire(Fail):
 	code = 8
 	color = 'yellow'
 
-class Core(Fail):
-	abstract = 'the test caused a core dumped or segmentation violation'
-	name = 'core'
+class Interrupt(Fail):
+	abstract = 'the test was interrupted by a control exception'
+	name = 'interrupt'
 	code = 9
+	color = 'orange'
+
+class Core(Fail):
+	"""
+	Failure cause by a process dumping a core image.
+
+	This exception is used by advanced test runners that execute tests in subprocesses to
+	protect subsequent tests.
+	"""
+	abstract = 'the test caused a core dump or segmentation violation'
+	name = 'core'
+	code = 90
 	color = 'orange'
 
 class Test(object):
@@ -225,26 +247,32 @@ class Test(object):
 	 `fate`
 	  The conclusion of the Test; pass, fail, error, skip.
 	"""
-	__slots__ = ('focus', 'identity', 'constraints', 'fate', 'proceeding',)
+	__slots__ = ('focus', 'identity', 'constraints', 'fate',)
 
 	# These referenced via Test instances to allow subclasses to override
 	# the implementations.
-	Defect = Defect
+	Absurdity = Absurdity
 	Contention = Contention
+
 	Fate = Fate
+
 	Pass = Pass
 	Return = Return
+
 	Explicit = Explicit
 	Skip = Skip
 	Divide = Divide
+
 	Fail = Fail
 	Void = Void
-	Core = Core
 	Expire = Expire
 
-	def __init__(self, proceeding, identity, focus, *constraints):
+	# criticals
+	Interrupt = Interrupt
+	Core = Core
+
+	def __init__(self, identity, focus, *constraints):
 		# allow explicit identity as the callable may be a wrapped function
-		self.proceeding = proceeding
 		self.identity = identity
 		self.focus = focus
 		self.constraints = constraints
@@ -279,20 +307,28 @@ class Test(object):
 			tb = exc.__traceback__ = exc.__traceback__.tb_next
 			self.fate = exc
 		except BaseException as err:
-			# place error out
-			tb = err.__traceback__ = err.__traceback__.tb_next
-			self.fate = self.Fail('test raised exception')
-			self.fate.__cause__ = err
+			# libtest traps any exception raised by a particular test.
+
+			if not isinstance(err, Exception):
+				# a "control" exception.
+				# explicitly note as interrupt to consolidate identification
+				self.fate = self.Interrupt('test raised interrupt')
+				self.fate.__cause__ = err
+				raise err # e.g. kb interrupt
+			else:
+				# regular exception; a failure
+				tb = err.__traceback__ = err.__traceback__.tb_next
+				self.fate = self.Fail('test raised exception')
+				self.fate.__cause__ = err
 
 		if tb is not None:
 			self.fate.line = tb.tb_lineno
 
 	def explicit(self):
-		raise self.Explicit("must be explicitly invoked")
+		raise self.Explicit("test must be explicitly invoked in order to run")
 
 	def skip(self, condition):
-		if condition:
-			raise self.Skip(condition)
+		if condition: raise self.Skip(condition)
 
 	def fail(self, cause):
 		raise self.Fail(cause)
@@ -311,12 +347,14 @@ class Test(object):
 		"""
 		return (self / None.__class__)
 
+	# gc collect() interface. no-op if nothing
 	try:
 		from gc import collect
-		def garbage(self, minimum = 0, collect = collect, **kw):
+		def garbage(self, minimum = None, collect = collect, **kw):
 			'Request collection with the expectation of a minimum unreachable.'
 			unreachable = collect()
-			if unreachable < minimum: raise test.Fail('missed garbage collection expectation')
+			if minimum is not None and unreachable < minimum: raise test.Fail('missed garbage collection expectation')
+		del collect
 	except ImportError:
 		def garbage(self, *args, **kw):
 			'Garbage collection not available'
@@ -326,14 +364,10 @@ def execute(module):
 	"""
 	Execute the tests contained in the given container. Usually given a module object.
 
-	This test runner exists primarily for initial dev.bin.test dependency testing.
-	Proceeding has a fair amount of complexity that presumes much about the
-	structure of the package being tested.
-
 	.. warning:: No status information is printed. Raises the first negative impact Test.
 	"""
 	for id, func in gather(module):
-		test = Test(None, id, func)
+		test = Test(id, func)
 		test.seal()
 		if test.fate.impact < 0:
 			raise test.fate
