@@ -6,6 +6,7 @@ import routes.lib
 
 from . import libmeta
 
+# utility function for running processing commands
 def _pipeline(inputfile, seq, popen = subprocess.Popen, pipe = subprocess.PIPE):
 	with open(inputfile) as f:
 		pipeline = [popen(seq[0], stdin = f, stdout = pipe, stderr = pipe)]
@@ -84,7 +85,7 @@ def gcov(data, *sources):
 
 def render(route, proc = crossed):
 	"""
-	Update the coverage meta data for the module.
+	Create the coverage meta data for the module.
 	"""
 	# get paths
 	ir = route

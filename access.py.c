@@ -22,7 +22,7 @@ METHODS() = {
 	{NULL},
 };
 
-INIT("")
+INIT("access to coverage controls")
 {
 	PyObj mod;
 	CREATE_MODULE(&mod);
