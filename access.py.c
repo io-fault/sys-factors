@@ -5,7 +5,8 @@ static PyObj
 flush_measurements(PyObj self)
 {
 	__gcov_flush();
-	Py_RETURN_NONE;
+	Py_INCREF(Py_True);
+	return(Py_True);
 }
 #else
 static PyObj
@@ -18,7 +19,7 @@ flush_measurements(PyObj self)
 METHODS() = {
 	{"flush_measurements",
 		(PyCFunction) flush_measurements, METH_NOARGS,
-		PyDoc_STR("call to flush any collected test related data")},
+		PyDoc_STR("call to flush any collected coverage and profiling data")},
 	{NULL},
 };
 
