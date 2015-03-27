@@ -4,6 +4,9 @@
 name = 'skeleton'
 abstract = 'single sentence description of project'
 
+#: The particular study or subject that the package is related to.
+study = {}
+
 #: Relevant emoji or reference--URL or relative file path--to an image file.
 icon = '👻'
 
