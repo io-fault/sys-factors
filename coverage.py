@@ -1,9 +1,8 @@
 """
-Tools for generating and extracting coverage data from gcov.
+Tools for generating and extracting coverage data from C coverage tools.
 """
 import subprocess
-import routes.lib
-
+from ..routes import lib as routeslib
 from . import libmeta
 
 # utility function for running processing commands
@@ -71,6 +70,18 @@ def ignored(filepath,
 	"""
 	return _pipeline(filepath, sequence)
 
+def llvmcov(data, *sources):
+	"""
+	:param data: Path prefix of the '.gcno' and '.gcda' files.
+	:param sources: The list of sources.
+
+	Return the command tuple for running gcov.
+	"""
+	return (
+		'llvm-cov',
+		'--object-file', data
+	) + sources
+
 def gcov(data, *sources):
 	"""
 	:param data: Path prefix of the '.gcno' and '.gcda' files.
@@ -95,10 +106,10 @@ def render(route, proc = crossed):
 	l = ir.loader
 	src = l.path
 
-	cached = routes.lib.File.from_absolute(l.cprefix)
+	cached = routeslib.File.from_absolute(l.cprefix)
 	dir = cached.container.fullpath
 
-	with routes.lib.File.temporary() as tr:
+	with routeslib.File.temporary() as tr:
 		# render the gcov output in a temp directory
 		filename = srcr.identity
 		command = gcov(cached.suffix('.gcno').fullpath, src)
@@ -113,7 +124,7 @@ def record(cause, fullname, metatype = 'xlines', proc = crossed):
 	"""
 	Update the coverage meta data for the module.
 	"""
-	coverage = render(routes.lib.Import.from_fullname(fullname), proc = proc)
+	coverage = render(routeslib.Import.from_fullname(fullname), proc = proc)
 	if coverage:
 		path, lines = coverage
 		settings = [tuple(map(int, x.split(b':', 1)))[2::-1] for x in lines.split(b'\n') if x]
