@@ -2,52 +2,16 @@
 Package files metadata interface.
 
 This module provides easy access to updating and getting test metadata out of the
-dot-meta directories that populate the package after a developer test run.
+meta directories that populate the package after a project integrity run.
 """
 from . import libpython
+from . import slot
 
 from ..routes import lib as routeslib
-from ..meta import lib as metalib
 
-meta_name = '.meta'
 meta_type = 'fault-dev-coverage'
 crossed_name = 'crossed-lines'
 crossable_name = 'possible-lines'
-
-cmeta = metalib.Meta(meta_type)
-
-def route(filepath, meta_records_name = None, from_abs = routeslib.File.from_absolute):
-	"""
-	route(filepath, meta_records_name = None)
-
-	Return the Route to the file's meta entry of `meta_records_name` or the route
-	to the meta directory for the given file.
-	"""
-	f = from_abs(filepath)
-	metadir = f.container/meta_name/f.identity
-	if meta_records_name is None:
-		return metadir
-	meta = metadir/meta_records_name
-	return meta
-
-def void(route):
-	"""
-	Destroy all the .__meta__ directories in the tree of the given path.
-	"""
-	meta = route/meta_name
-	assert meta.fullpath.endswith(meta_name)
-	meta.void()
-
-	for fr in route.subnodes()[0]:
-		void(fr)
-
-def void_package(package):
-	ir = routeslib.Import.from_fullname(package)
-	void(ir.package.file().container)
-
-def void_path(path):
-	fr = routeslib.File.from_path(path)
-	void(fr)
 
 def coverage(package):
 	ir = routeslib.Import.from_fullname(package)
@@ -59,8 +23,8 @@ def coverage(package):
 	for x in pkg + mods:
 		f = x.file()
 		path = f.fullpath
-		xl = route(path, crossed_name)
-		xb = route(path, crossable_name)
+		xl = slot.route(path) / crossed_name
+		xb = slot.route(path) / crossable_name
 
 		# crossable
 		if xb.exists():
@@ -99,8 +63,7 @@ def append(type, filepath, settings, from_abs = routeslib.File.from_absolute):
 	"""
 	append(type, filepath, settings)
 	"""
-	f = from_abs(filepath)
-	metadir = f.container/meta_name/f.identity
+	metadir = slot.route(filepath)
 	meta = metadir/type
 
 	with meta.open(mode='a') as f:

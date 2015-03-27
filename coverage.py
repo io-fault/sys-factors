@@ -55,7 +55,7 @@ def crossable(filepath,
 
 	:param filepath: Path to the .gcov file.
 
-	Run the gcov output, '.gcov', through a pipeline that renders coverable lines.
+	Run the coverage output, '.gcov', through a pipeline that renders coverable lines.
 	"""
 	return _pipeline(filepath, sequence)
 
@@ -70,7 +70,7 @@ def ignored(filepath,
 	"""
 	return _pipeline(filepath, sequence)
 
-def llvmcov(data, *sources):
+def llvm(data, *sources):
 	"""
 	:param data: Path prefix of the '.gcno' and '.gcda' files.
 	:param sources: The list of sources.
@@ -82,7 +82,7 @@ def llvmcov(data, *sources):
 		'--object-file', data
 	) + sources
 
-def gcov(data, *sources):
+def garbage(data, *sources):
 	"""
 	:param data: Path prefix of the '.gcno' and '.gcda' files.
 	:param sources: The list of sources.
@@ -110,9 +110,9 @@ def render(route, proc = crossed):
 	dir = cached.container.fullpath
 
 	with routeslib.File.temporary() as tr:
-		# render the gcov output in a temp directory
+		# render the coverage output in a temp directory
 		filename = srcr.identity
-		command = gcov(cached.suffix('.gcno').fullpath, src)
+		command = garbage(cached.suffix('.gcno').fullpath, src)
 		p = subprocess.Popen(command, cwd = tr.fullpath, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
 		p.stdout.close() # yeah if there's a problem... good luck =\
 		p.wait()

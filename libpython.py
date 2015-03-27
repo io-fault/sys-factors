@@ -1,3 +1,6 @@
+"""
+Functions for working with Python syntax.
+"""
 import ast
 
 def lines(path):
