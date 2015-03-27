@@ -4,6 +4,9 @@
 name = 'skeleton'
 abstract = 'single sentence description of project'
 
+#: The name of the conceptual branch of development.
+fork = 'spam' # Explicit branch name and a codename for the major version of the project.
+
 #: The particular study or subject that the package is related to.
 study = {}
 
@@ -14,14 +17,10 @@ icon = '👻'
 identity = 'URL uniquely identifying the project.'
 
 #: Responsible Party
-meaculpa = 'Your Name or Organization'
+controller = 'Your Name or Organization'
 
 #: Contact point for the Responsible Party
 contact = 'mailto:x'
-
-#: The name of the conceptual branch of development.
-#: Essentially, a codename for the major version of the project.
-fork = 'spam'
 
 #: Version tuple: (major, minor, patch)
 version_info = (0, 1, 0)

@@ -1,15 +1,15 @@
 'project information'
 
 #: Project name.
-name = 'dev'
+name = 'development'
 abstract = 'libraries and tools for Python development'
 icon = '🐜'
 
 #: IRI based project identity. (project homepage)
-identity = 'http://fault.io/case/python/dev'
+identity = 'https://fault.io/project/development'
 
 #: Responsible Party
-meaculpa = 'fault.io'
+controller = 'fault.io'
 
 #: Contact point for the Responsible Party
 contact = 'mailto:critical@fault.io'
