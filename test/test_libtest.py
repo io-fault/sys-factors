@@ -116,3 +116,7 @@ def test_Subject(test, partial = functools.partial):
 	t/B - A
 	t/B() / B
 	t/B() / A
+
+if __name__ == '__main__':
+	import sys; from .. import libtest
+	libtest.execute(sys.modules['__main__'])
