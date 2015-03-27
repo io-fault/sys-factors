@@ -4,7 +4,7 @@ and writing a detailed report.
 
 Finals runs all tests.
 """
-import xeno.lib
+from .. import libloader as cxnlib
 from .. import libtest
 
 class Test(libtest.Test):
@@ -14,8 +14,8 @@ class Test(libtest.Test):
 def main(package):
 	# promote to test, but iff the role was unchanged.
 	# in cases where finals are ran, this will be 'factor'.
-	if xeno.lib.role is None:
-		xeno.lib.role = 'factor'
+	if cxnlib.role is None:
+		cxnlib.role = 'factor'
 	libtest.execute(package, (), (contextlib.ExitStack, contextlib.ExitStack), Test = Test)
 
 if __name__ == '__main__':
