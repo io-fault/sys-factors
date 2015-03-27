@@ -3,7 +3,7 @@ A testing library that minimizes the distance between the test runner, and
 the actual tests for the purpose of keeping the execution machinary as simple as possible.
 
 libtest provides the very basics for testing in Python. Test runners are implemented else-
-where as they tend to be significant pieces of code. However, a trivial :py:func:`execute`
+where as they tend to be significant pieces of code. However, a trivial @execute
 function is provided that, when given a module, will execute the tests therein. Exceptions
 are allowed to raise normally in order to report failures of any kind.
 """
@@ -39,7 +39,7 @@ def get_test_index(tester):
 
 def test_order(kv):
 	"""
-	Key function used by :py:func:`gather` that uses :py:func:`get_test_index` in
+	Key function used by @gather that uses @get_test_index in
 	order to elevate a test's position given that it was explicitly listed.
 	"""
 	return get_test_index(kv[1])
@@ -50,7 +50,7 @@ def gather(container, prefix = 'test_'):
 	:rtype: {k : Test(v, k) for k, v in container.items()}
 
 	Collect the objects in the container whose name starts with "test_".
-	The ordered is defined by the :py:func:`get_test_index` function.
+	The ordered is defined by the @get_test_index function.
 	"""
 	tests = [('.'.join((container.__name__, name)), getattr(container, name)) for name in dir(container) if name.startswith(prefix)]
 	tests.sort(key = test_order)
@@ -58,14 +58,29 @@ def gather(container, prefix = 'test_'):
 
 class Absurdity(Exception):
 	"""
-	Exception raised by :py:class:`.Contention` instances.
+	Exception raised by @Contention instances.
 	"""
 	pass
 
 # Exposes an assert like interface to Test objects.
 class Contention(object):
 	"""
-	Contention is an object used by :py:class:`Test` objects to provide assertions.
+	Contentions are objects used by @Test objects to provide assertions.
+	Usually, contention instances are made by the true division operator of
+	@Test instances passed into unit test subjects.
+
+		import featurelib
+
+		def test_feature(test):
+			expectation = ...
+			test/featurelib.functionality() == expectation
+
+	True division, "/", is used as it has high operator precedance that allows assertion
+	expresssions to be constructed using minimal syntax that lends to readable failure
+	conditions.
+
+	All of the comparison operations are supported by Contention and are passed on to the
+	underlying objects being examined.
 	"""
 	__slots__ = ('test', 'object', 'storage', 'inverse')
 
@@ -117,7 +132,7 @@ class Contention(object):
 
 	def __xor__(self, subject):
 		"""
-		Call the subject while trapping the configured exception::
+		Contend that the @subject raises the given exception when it is called::
 
 			test/Exception ^ subject
 
@@ -130,7 +145,7 @@ class Contention(object):
 
 	def __lshift__(self, subject):
 		"""
-		Contend that the parameter is contained by the object, `Container`::
+		Contend that the parameter is contained by the object, @Container::
 
 			test/Container << subject
 
@@ -139,12 +154,9 @@ class Contention(object):
 		return subject in self.object
 	__rlshift__ = __lshift__
 
-##
-# Fate exceptions are used to manage the exception
-# and the completion state of a test. Fate is a Control exception (BaseException).
 class Fate(BaseException):
 	"""
-	The Fate of a test. Sealed by :py:meth:`.Test.seal`.
+	The Fate of a test. @Test.seal uses @Fate exception to describe the result of a unit test.
 	"""
 	name = 'fate'
 	content = None
@@ -234,18 +246,23 @@ class Core(Fail):
 
 class Test(object):
 	"""
-	An object that manages an individual test unit.
+	An object that manages an individual test unit and it's execution.
 
-	A test unit consists of a `focus`, `identity`, and `fate`:
+	Fields:
 
-	 `identity`
-	  A unique identifier for the `Test`. Usually, a qualified name that can be used to
-	  locate the `focus`.
-	 `focus`
-	  The callable that performs a series of checks--using the `Test` instance--that
-	  determines the `fate`.
-	 `fate`
-	  The conclusion of the Test; pass, fail, error, skip.
+	 & identity
+	  A unique identifier for the @Test. Usually, a qualified name that can be used to
+	  locate @focus without having the actual object.
+
+	 & focus
+	  The callable that performs a series of checks--using the @Test instance--that
+	  determines the @fate.
+
+	 & fate
+	  The conclusion of the Test; pass, fail, error, skip. An instance of @BaseException
+	  subclass.
+
+	&fields
 	"""
 	__slots__ = ('focus', 'identity', 'constraints', 'fate',)
 
@@ -291,7 +308,11 @@ class Test(object):
 
 	def seal(self):
 		"""
-		Seal the fate of the Test. This should only be called once.
+		Seal the fate of the Test by executing the subject-callable with the Test
+		instance as the only parameter.
+
+		Any exception that occurs is trapped and assigned to the @fate attribute
+		on the Test instance. @None is always returned by @seal.
 		"""
 		tb = None
 
@@ -325,9 +346,16 @@ class Test(object):
 			self.fate.line = tb.tb_lineno
 
 	def explicit(self):
+		"""
+		Used by test subjects to inhibit runs of a particular test in aggregate runs.
+		"""
 		raise self.Explicit("test must be explicitly invoked in order to run")
 
 	def skip(self, condition):
+		"""
+		Used by test subjects to skip the test given that the provided @condition is
+		@True.
+		"""
 		if condition: raise self.Skip(condition)
 
 	def fail(self, cause):
@@ -335,15 +363,15 @@ class Test(object):
 
 	def trap(self):
 		"""
-		Set a Trap for exceptions converting the Error fate to a Failure::
+		Set a trap for exceptions converting an would-be @Error fate on exit to a @Failure.
 
 			with test.trap():
 				...
 
-		This allows :py:meth:`fail` implementations set a trace prior to exiting
-		the test :term:`focus`.
+		This allows @fail implementations set a trace prior to exiting
+		the test's @focus.
 
-		:py:class:`Fate` exceptions are not trapped.
+		@Fate exceptions are not trapped.
 		"""
 		return (self / None.__class__)
 
@@ -353,7 +381,10 @@ class Test(object):
 		def garbage(self, minimum = None, collect = collect, **kw):
 			'Request collection with the expectation of a minimum unreachable.'
 			unreachable = collect()
-			if minimum is not None and unreachable < minimum: raise test.Fail('missed garbage collection expectation')
+			if minimum is not None and (
+				unreachable < minimum
+			):
+				raise test.Fail('missed garbage collection expectation')
 		del collect
 	except ImportError:
 		def garbage(self, *args, **kw):
