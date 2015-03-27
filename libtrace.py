@@ -19,18 +19,22 @@ try:
 except ImportError:
 	pass
 
-import routes.lib
-import rhythm.kernel
-import nucleus.lib
+from ..routes import lib as routeslib
+from ..chronometry import kernel as timekernel
+from ..fork import lib as forklib
 
 from . import libmeta
 from . import trace
+
+def exopath(route):
+	return (route / '__pycache__' / '__exosource__')
 
 class Collector(object):
 	def __init__(self, endpoint, time_delta):
 		self.endpoint = endpoint
 		self.delta = time_delta
 		self._partial = functools.partial(self._collect, endpoint, self.delta)
+		# The C @trace module is used.
 		raise Exception("python collector needs an event-id mapping")
 
 	def _collect(self, append, time_delta, frame, event, arg, event_map = None):
@@ -68,8 +72,6 @@ class Collector(object):
 	def install(self):
 		sys.settrace(self)
 
-crealpath = functools.lru_cache(1024)(os.path.realpath)
-
 class Tracing(object):
 	"""
 	Manage the tracing of a Python process.
@@ -79,9 +81,10 @@ class Tracing(object):
 		self.package = package
 		self.cause = cause
 		self.tracing = False
-		self.pkgroute = routes.lib.Import.from_fullname(self.package).file().container
+		self.pkgroute = routeslib.Import.from_fullname(self.package).file().container
 		self.directory = self.pkgroute.fullpath
-		self.exopath = (self.pkgroute / '__exosource__').fullpath
+		self.exopath = exopath(self.pkgroute).fullpath
+		self.cached_realpath = functools.lru_cache(512)(os.path.realpath)
 
 	def __enter__(self):
 		self.collections = collections.deque()
@@ -90,13 +93,13 @@ class Tracing(object):
 		self._orig_start_new_threads = (thread.start_new_thread, threading._start_new_thread)
 		thread.start_new_thread = threading._start_new_thread = self._start_new_thread_override
 
-		nucleus.lib.fork_child_callset.add(self.truncate)
+		forklib.fork_child_callset.add(self.truncate)
 		self.trace()
 
 	def __exit__(self, typ, val, tb):
 		sys.settrace(None)
 		del __builtins__['TRACE']
-		nucleus.lib.fork_child_callset.remove(self.truncate)
+		forklib.fork_child_callset.remove(self.truncate)
 
 		thread.start_new_thread, threading._start_new_thread = self._orig_start_new_threads
 
@@ -120,7 +123,8 @@ class Tracing(object):
 		Usually this should be called after :manpage:`fork(2)` when tracing.
 		"""
 		if self.collections is not None:
-			list(map(_truncate, self.collections))
+			for x in self.collections:
+				_truncate(x)
 
 	@staticmethod
 	def _start_new_thread_override(f, args, *kwargs, _notrace = thread.start_new_thread):
@@ -131,8 +135,11 @@ class Tracing(object):
 			return _notrace(f, args, *kwargs)
 
 	@functools.lru_cache(512)
-	def relevant(self, path, crealpath = crealpath):
-		return crealpath(path).startswith(self.directory)
+	def relevant(self, path):
+		"""
+		Determines whether the given path is relavent to the Tracing instance.
+		"""
+		return self.cached_realpath(path).startswith(self.directory)
 
 	def aggregate(self, events,
 		TRACE_LINE = trace.TRACE_LINE,
@@ -144,7 +151,7 @@ class Tracing(object):
 		TRACE_C_CALL = trace.TRACE_C_CALL,
 		TRACE_C_RETURN = trace.TRACE_C_RETURN,
 		TRACE_C_EXCEPTION = trace.TRACE_C_EXCEPTION,
-		crealpath = crealpath
+		getitem = operator.itemgetter(0)
 	):
 		"""
 		aggregate()
@@ -163,7 +170,7 @@ class Tracing(object):
 		# Do everything here.
 		# It's a bit complicated because we are actually doing a few things:
 		# 1. Line counts
-		# 2. N-Function Calls, Cumulative Time and resident time.
+		# 2. N-Function Calls, Cumulative Time and resident time of said calls.
 		get = events.popleft
 		while events:
 			x = get()
@@ -201,7 +208,7 @@ class Tracing(object):
 				exact_call_times[(modname, filename, func_lineno, func_name)].append((sum, inner))
 
 		for filename, lines in line_counts.items():
-			evpath = crealpath(filename)
+			evpath = self.cached_realpath(filename)
 			if evpath.startswith(pkgdir):
 				counts = list(lines.items())
 				counts.sort()
@@ -217,21 +224,21 @@ class Tracing(object):
 			n = quantities['count']
 
 			# applies to package?
-			evpath = crealpath(filename)
+			evpath = self.cached_realpath(filename)
 			if not evpath.startswith(pkgdir):
 				# data regarding a file that is not in the package.
 				evpath = self.exopath
 
+			# {module}.{function}.L{line_number}
 			key = modname + '.' + func_name + '.L' + str(func_lineno)
 			d[evpath].append((key, ','.join(map(str, (n, r, c)))))
 
-		getitem = operator.itemgetter(0)
 		# write
 		for path, seq in d.items():
 			seq.sort(key = getitem)
 			libmeta.append('functions', path, [(self.cause, seq)])
 
-	def trace(self, Queue = collections.deque, Collector = trace.Collector, Chronometer = rhythm.kernel.Chronometer):
+	def trace(self, Queue = collections.deque, Collector = trace.Collector, Chronometer = timekernel.Chronometer):
 		"""
 		Construct event collection, add to the collections set, and set the trace.
 		"""
