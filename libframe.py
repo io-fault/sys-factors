@@ -17,7 +17,7 @@ from . import libcore
 
 class OrderedSet(object):
 	"""
-	Class used to Filter duplicates
+	Set container for filtering duplicate options.
 	"""
 	__slots__ = ('sequence', 'positions')
 

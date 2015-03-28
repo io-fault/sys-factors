@@ -8,14 +8,45 @@ import importlib.abc
 import importlib.machinery
 import contextlib
 import platform
-from . import libloader
+from . import lib
 from . import include # loader includes
 from . import sysconfig
 
+if hasattr(imp, 'cache_from_source'):
+	def cache_path(path):
+		"""
+		Given a module path, retrieve the basename of the bytecode file.
+		"""
+		return imp.cache_from_source(path)[:-len('.pyc')]
+else:
+	def cache_path(path):
+		return path[:path.rfind('.py.')]
+
+# Suffixes used to identify modules.
+module_suffixes = set(importlib.machinery.all_suffixes() + [
+	'.py.c', '.py.cxx', '.py.m', '.py.hs'
+])
+
 class CLoader(importlib.abc.InspectLoader, importlib.abc.Finder):
 	"""
-	Compile and Link C-API modules with import statements.
+	Compile and Link C-API modules from C, C++, Objective-C, and Haskell.
 	"""
+	def get_code(self, module):
+		pass
+
+	def get_data(self, module):
+		pass
+
+	def get_filename(self, name):
+		return self.source
+
+	def get_source(self, name):
+		with open(self.source) as f:
+			return f.read()
+
+	def is_package(self, *args, **kw):
+		'CLoader does not handle packages. Always returns :py:obj:`False`'
+		return False
 
 	#: Call each object in this set upon a successful load of a C-API module.
 	#: Normally, these callables should merely record the CLoader() instance
@@ -170,7 +201,7 @@ class CLoader(importlib.abc.InspectLoader, importlib.abc.Finder):
 			self.fullname = '.'.join((pkg,name))
 
 		self.path = self.source = source
-		self.cprefix = libloader.cache_path(source) + sys.__dict__.get('abiflags', '')
+		self.cprefix = cache_path(source) + sys.__dict__.get('abiflags', '')
 
 		self.cprefix += '.' + self.platform
 		self.cprefix += ('.' + self.tools.role)
@@ -194,8 +225,8 @@ class CLoader(importlib.abc.InspectLoader, importlib.abc.Finder):
 			suffix = modname
 
 		# XXX: per-module and package-prefix overrides for roles and options.
-		role = libloader.role
-		role_options = list(libloader.role_options)
+		role = lib.role
+		role_options = list(lib.role_options)
 
 		for f in paths:
 			path = join(realpath(f), suffix)
@@ -208,23 +239,6 @@ class CLoader(importlib.abc.InspectLoader, importlib.abc.Finder):
 						type = type, role = role,
 						options = role_options
 					)
-
-	def get_code(self, module):
-		pass
-
-	def get_data(self, module):
-		pass
-
-	def get_filename(self, name):
-		return self.source
-
-	def get_source(self, name):
-		with open(self.source) as f:
-			return f.read()
-
-	def is_package(self, *args, **kw):
-		'CLoader does not handle packages. Always returns :py:obj:`False`'
-		return False
 
 	def build(self, context = None):
 		dir = os.path.dirname(self.cprefix)
@@ -311,15 +325,15 @@ def install(role = None):
 	"""
 	Install the meta path hook for importing [foreign] C-API modules.
 	"""
-	if 'xeno-role' in sys._xoptions:
-		libloader.role = sys._xoptions['xeno-role']
+	if 'development-role' in sys._xoptions:
+		lib.role = sys._xoptions['development-role']
 
 	if role is not None:
-		libloader.role = role
+		lib.role = role
 
 	if 'croptions' in sys._xoptions:
 		opts = sys._xoptions['croptions']
-		libloader.role_options.extend([
+		lib.role_options.extend([
 			(k, list(v.split('|'))) for (k, v) in
 			[x.split(':') for x in opts.split(',') if ':' in x]
 		])
@@ -327,7 +341,7 @@ def install(role = None):
 	if CLoader not in sys.meta_path:
 		sys.meta_path.append(CLoader)
 
-	importlib.machinery.all_suffixes = lambda: list(libloader.module_suffixes)
+	importlib.machinery.all_suffixes = lambda: list(module_suffixes)
 
 def remove():
 	'Remove the meta path hook.'

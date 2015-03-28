@@ -4,7 +4,7 @@ and writing a detailed report.
 
 Finals runs all tests.
 """
-from .. import libloader as cxnlib
+from .. import lib as cxnlib
 from .. import libtest
 
 class Test(libtest.Test):

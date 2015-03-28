@@ -11,7 +11,7 @@ import functools
 import types
 import importlib
 
-from .. import libloader as buildlib
+from .. import lib as buildlib
 from .. import loader as loader
 
 from ...routes import lib as routeslib
