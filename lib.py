@@ -1,3 +1,4 @@
+import contextlib
 from .abstract import ToolError
 
 #: Default Role used by the loader.
