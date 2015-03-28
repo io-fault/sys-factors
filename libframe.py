@@ -13,7 +13,7 @@ import collections
 import itertools
 import contextlib
 
-from . import core
+from . import libcore
 
 class OrderedSet(object):
 	"""
@@ -271,7 +271,8 @@ class Context(object):
 		"""
 		Deploy the Probe allowing queries against the C environment to be performed.
 		"""
-		with tempfile.TemporaryDirectory() as d, core.inhibit():
+		with tempfile.TemporaryDirectory() as d, \
+		libcore.dumping(0):
 			yield d
 
 	def __enter__(self):
