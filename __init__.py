@@ -1,12 +1,5 @@
 """
-
-🐜 About
---------
-
-dev is a collection of Python developer tools presented as a
-modest alternative to the standard library's offering.
-
-.. warning:: dev is a work in progress.
+Development tools for constructing, debugging, profiling, testing and deploying software.
 
 Testing
 -------

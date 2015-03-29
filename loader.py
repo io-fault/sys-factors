@@ -8,9 +8,12 @@ import importlib.abc
 import importlib.machinery
 import contextlib
 import platform
-from . import lib
+
 from . import include # loader includes
 from . import sysconfig
+
+role = None
+role_options = []
 
 if hasattr(imp, 'cache_from_source'):
 	def cache_path(path):
@@ -225,8 +228,8 @@ class CLoader(importlib.abc.InspectLoader, importlib.abc.Finder):
 			suffix = modname
 
 		# XXX: per-module and package-prefix overrides for roles and options.
-		role = lib.role
-		role_options = list(lib.role_options)
+		lrole = role
+		lrole_options = list(role_options)
 
 		for f in paths:
 			path = join(realpath(f), suffix)
@@ -236,8 +239,8 @@ class CLoader(importlib.abc.InspectLoader, importlib.abc.Finder):
 					prefix = '.'.join(names[:-1])
 					return typ(
 						prefix, modname, source,
-						type = type, role = role,
-						options = role_options
+						type = type, role = lrole,
+						options = lrole_options
 					)
 
 	def build(self, context = None):
@@ -321,19 +324,21 @@ class CLoader(importlib.abc.InspectLoader, importlib.abc.Finder):
 	def module_repr(self, module):
 		return object.__repr__(module)
 
-def install(role = None):
+def install(role_override = None):
 	"""
 	Install the meta path hook for importing [foreign] C-API modules.
 	"""
+	global role
+	global role_options
 	if 'development-role' in sys._xoptions:
-		lib.role = sys._xoptions['development-role']
+		role = sys._xoptions['development-role']
 
 	if role is not None:
-		lib.role = role
+		role = role
 
 	if 'croptions' in sys._xoptions:
 		opts = sys._xoptions['croptions']
-		lib.role_options.extend([
+		role_options.extend([
 			(k, list(v.split('|'))) for (k, v) in
 			[x.split(':') for x in opts.split(',') if ':' in x]
 		])

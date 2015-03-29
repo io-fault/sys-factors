@@ -1,11 +1,29 @@
-'project information'
+"""
+Structure
+=
+
+The structure of the project. Prevalent high-level concepts.
+Where such concepts are manifested.
+
+Requirements
+=
+
+Any hidden dependencies or notes about dependencies.
+
+Defense
+=
+
+Defend your project's existence, but only defend modules that are intended for
+external use.
+"""
+abstract = 'single sentence description of project'
 
 #: Project name.
 name = 'skeleton'
-abstract = 'single sentence description of project'
 
 #: The name of the conceptual branch of development.
-fork = 'spam' # Explicit branch name and a codename for the major version of the project.
+fork = 'ghostly' # Explicit branch name and a codename for the major version of the project.
+release = None # A number indicating its position in the releases of a branch. (fork)
 
 #: The particular study or subject that the package is related to.
 study = {}

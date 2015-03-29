@@ -3,5 +3,5 @@ Primary project access. High-level concepts or common practices may be discussed
 easy reference.
 """
 
-def bar():
-	return 'foo'
+def function(arg):
+	return 'value'

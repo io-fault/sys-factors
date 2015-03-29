@@ -1,9 +1,6 @@
 import contextlib
 from .abstract import ToolError
 
-role = None
-role_options = []
-
 class Project(object):
 	"""
 	A unit containing targets to be constructed or processed.
