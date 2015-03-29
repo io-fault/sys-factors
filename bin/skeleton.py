@@ -1,5 +1,5 @@
 """
-.bin.rattle - initialize a new project package skeleton
+initialize a new project package using the @skeleton package directory.
 """
 import os.path
 
