@@ -1,17 +1,12 @@
-import contextlib
-from .abstract import ToolError
+"""
 
-class Context(object):
-	"""
-	Context used to manage and control development build and testing processes.
-	"""
-	standard_roles = set([
-		'test',
-		'debug',
-		'profile',
-		'coverage',
-		'factor',
-	])
+"""
+from . import abstract
+from ..routes import lib as routeslib
 
-	def __init__(self, role):
-		self.role = role
+class Execution(object, metaclass = abstract.Execution):
+	"""
+	Tool chain execution process management.
+	"""
+	def __init__(self):
+		self.contexts = list()

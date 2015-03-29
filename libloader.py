@@ -1,3 +1,0 @@
-"""
-Compilation and linkage basics.
-"""

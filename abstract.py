@@ -3,7 +3,21 @@ Abstract Base Classes
 """
 import abc
 
+# New Solution WIP
+roles = set([
+	'bootstrap',
+	'debug',
+	'profile',
+	'coverage',
+	'factor',
+	'test',
+	'documentation',
+])
+
 class ToolError(Exception):
+	"""
+	Exception raised by construction Tools.
+	"""
 	def __init__(self, stage, target, log):
 		self.stage = stage
 		self.target = target
@@ -15,6 +29,29 @@ class ToolError(Exception):
 		msg += '  '.join(self.log.splitlines(True))
 		msg += '\n***'
 		return msg
+
+class Tool(object, metaclass = abc.ABCMeta):
+	"""
+	Tool interface. An object used to construct and process targets in a Project.
+	"""
+
+class Execution(object, metaclass = abc.ABCMeta):
+	"""
+	Tool interface. An object used to construct and process targets in a Project.
+	"""
+
+	@property
+	@abc.abstractmethod
+	def role(self):
+		"""
+		The configured role of the Toolset.
+		"""
+
+class Sensor(object, metaclass = abc.ABCMeta):
+	pass
+
+class Probe(object, metaclass = abc.ABCMeta):
+	pass
 
 class Toolset(object, metaclass = abc.ABCMeta):
 	"""
