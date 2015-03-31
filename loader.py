@@ -186,6 +186,7 @@ class CLoader(importlib.abc.InspectLoader, importlib.abc.Finder):
 	def __init__(self, pkg, name, source, type = 'c', role = None, options = ()):
 		role = role or ('debug' if __debug__ else 'factor')
 		self.tools = sysconfig.Toolset(role)
+		self.role = role
 
 		self.role_options = options
 		if self.role_options:

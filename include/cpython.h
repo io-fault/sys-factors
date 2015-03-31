@@ -198,7 +198,7 @@ do { \
 \
 			if (_er_override == Py_False) \
 			{ \
-				/* dont override and perform syscall */
+				/* dont override and perform syscall */ \
 				*(RETURN) = SYSCALL(__VA_ARGS__); \
 			} \
 			else \

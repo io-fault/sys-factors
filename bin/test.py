@@ -12,6 +12,7 @@ import types
 import importlib
 
 from .. import loader as loader
+from .. import slot
 
 from ...routes import library as routeslib
 from ...fork import library as forklib
@@ -218,7 +219,7 @@ class Proceeding(object):
 		if loader.role == 'test':
 			for fullname, source in report.get('fimports', ()):
 				coverage.record(test.identity, fullname)
-				if not libmeta.route(source, "lines").exists():
+				if not (slot.route(source)/"lines").exists():
 					# Fill out crossable and ignored records for the module
 					# Python modules should do this at some point.
 					coverage.record('crossable', fullname, metatype = "lines", proc = coverage.crossable)
