@@ -9,7 +9,7 @@ import tempfile
 import contextlib
 import pickle
 
-from .abstract import ToolError
+from .sysconfig import Toolset
 
 include_template = """
 #ifndef {1}
@@ -261,7 +261,7 @@ class Probe(object):
 				try:
 					loader.build()
 					removals.append(n)
-				except ToolError as exc:
+				except Toolset.ToolError as exc:
 					# failed
 					if len(headers) == 1:
 						missing_headers.add(headers[0])

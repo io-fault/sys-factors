@@ -7,13 +7,28 @@ import os.path
 import functools
 import subprocess
 
-from . import abstract
-
-class Toolset(abstract.Linked):
+class Toolset(object):
 	"""
 	Toolset implementation that uses sysconfig information in order to compile and link
 	C-API extensions.
 	"""
+
+	class ToolError(Exception):
+		"""
+		Exception raised by construction Tools.
+		"""
+		def __init__(self, stage, target, log):
+			self.stage = stage
+			self.target = target
+			self.log = log
+
+		def __str__(self):
+			msg = "could not {0.stage} '{0.target}'\n".format(self)
+			msg += "***\n  ".format(self)
+			msg += '  '.join(self.log.splitlines(True))
+			msg += '\n***'
+			return msg
+
 	role = None
 
 	role_compile_flags = {

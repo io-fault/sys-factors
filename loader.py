@@ -74,7 +74,7 @@ class CLoader(importlib.abc.InspectLoader, importlib.abc.Finder):
 	target = platform
 
 	stages = (
-		'probe',
+		'prepare',
 		'compile',
 		'link',
 	)
