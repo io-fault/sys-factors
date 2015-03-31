@@ -8,8 +8,8 @@ overwriting old data, a new slot identifier can be rendered for every run.
 import os
 import functools
 
-from ..chronometry import lib as timelib
-from ..routes import lib as routeslib
+from ..chronometry import library as timelib
+from ..routes import library as routeslib
 
 slot_environment = 'FAULT_DEV_SLOT'
 

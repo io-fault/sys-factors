@@ -2,7 +2,7 @@
 Usage
 =====
 
-This chapter describes how to use `dev`.
+This chapter describes some of the high-level concepts employed by fault.development.
 
 Project Initialization
 ======================
@@ -11,7 +11,7 @@ Skeleton Python packages can be initialized using the :py:mod:`.bin.init`
 module. It's an executable module and should be used with the "-m" option to the
 interpreter::
 
-	python3 -m fault.dev.bin.init mywork
+	python3 -m fault.development.bin.skeleton mywork
 
 Testing
 =======
@@ -24,9 +24,9 @@ objects that performs tests that validate that a set of expectations are met.
 The usual layout::
 
 	project/
-	|-lib.py
+	|-library.py
 	|-test/
-	  |-test_lib.py
+	  |-test_library.py
 
 Where `test_lib.py` contains a set of functions prefixed with ``test_``::
 
@@ -48,8 +48,9 @@ Currently, :py:mod:`.libtest` only supports *developer execution*. This is
 simply making the test module executable using::
 
    if __name__ == '__main__':
-      from dev import libtest; libtest.execmodule()
+      from dev import libtest
+      import sys; libtest.execute(sys.modules[__name__])
 
-:py:func:`.libtest.execmodule` is a bare-metal means to perform test
+@libtest.execute is a bare-metal means to perform test
 execution, and failures unconditionally trigger the debugger. It is intended
 strictly for interactive use during the development of a module.

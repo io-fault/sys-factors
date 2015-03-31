@@ -19,9 +19,9 @@ try:
 except ImportError:
 	pass
 
-from ..routes import lib as routeslib
+from ..routes import library as routeslib
 from ..chronometry import kernel as timekernel
-from ..fork import lib as forklib
+from ..fork import library as forklib
 
 from . import libmeta
 from . import trace

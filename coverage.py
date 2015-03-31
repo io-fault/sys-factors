@@ -2,7 +2,7 @@
 Tools for generating and extracting coverage data from C coverage tools.
 """
 import subprocess
-from ..routes import lib as routeslib
+from ..routes import library as routeslib
 from . import libmeta
 
 # utility function for running processing commands

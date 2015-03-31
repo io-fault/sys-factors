@@ -7,7 +7,7 @@ meta directories that populate the package after a project integrity run.
 from . import libpython
 from . import slot
 
-from ..routes import lib as routeslib
+from ..routes import library as routeslib
 
 meta_type = 'fault-dev-coverage'
 crossed_name = 'crossed-lines'

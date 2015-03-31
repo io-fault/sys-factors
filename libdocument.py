@@ -15,7 +15,7 @@ import functools
 import hashlib
 import types
 
-from ..routes import lib as routes
+from ..routes import library as routes
 
 # If pkg_resources is available, use it to identify explicit namespace packages.
 try:

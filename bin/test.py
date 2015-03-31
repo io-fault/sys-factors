@@ -11,11 +11,10 @@ import functools
 import types
 import importlib
 
-from .. import lib as buildlib
 from .. import loader as loader
 
-from ...routes import lib as routeslib
-from ...fork import lib as forklib
+from ...routes import library as routeslib
+from ...fork import library as forklib
 from ...txt import libint
 
 from .. import libtest
@@ -216,7 +215,7 @@ class Proceeding(object):
 
 		report['exitstatus'] = os.WEXITSTATUS(status)
 
-		if buildlib.role == 'test':
+		if loader.role == 'test':
 			for fullname, source in report.get('fimports', ()):
 				coverage.record(test.identity, fullname)
 				if not libmeta.route(source, "lines").exists():
@@ -248,8 +247,8 @@ class Proceeding(object):
 def main(package, modules):
 	# promote to test, but iff the role was unchanged.
 	# in cases where finals are ran, this will be 'factor'.
-	if buildlib.role is None:
-		buildlib.role = 'test'
+	if loader.role is None:
+		loader.role = 'test'
 
 	# enable core dumps
 	p = Proceeding(package)

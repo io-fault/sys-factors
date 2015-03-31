@@ -6,7 +6,7 @@ class Project(object):
 	A unit containing targets to be constructed or processed.
 	Provides access to project information.
 	"""
-	from ..routes import lib as routeslib
+	from ..routes import library as routeslib
 
 	def __init__(self, route):
 		self.route = route

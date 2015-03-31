@@ -13,7 +13,7 @@ from . import abstract
 from . import libprobe
 from . import libframe
 
-from ..routes import lib as routeslib
+from ..routes import library as routeslib
 
 assemblers = set((
 	shutil.which('nasm'),
