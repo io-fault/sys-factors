@@ -17,6 +17,14 @@
 #define DEBUG(y)		xxROLE(DEBUG, y)
 #define FACTOR(y)		xxROLE(FACTOR, y)
 #define INSPECT(y)	xxROLE(INSPECT, y)
+#define BOOTSTRAP(y)	xxROLE(BOOTSTRAP, y)
+
+#define ROLE_OPTION(r, x) (xxx##r##xxx & xxx##r##x##OPT)
+#define FACTOR_ROLE(r) xxROLE(r)
+
+#define F_ROLE(N)
+#define F_FEATURE(F) (xXx##F##xXx & xxxF_##O##FEATURE)
+#define F_OPTION(O) (xxx##O##xxx & xxxF_##O##OPT)
 
 #if TEST()
 #define ROLE TEST
@@ -26,6 +34,8 @@
 #define ROLE FACTOR
 #elif INSPECT()
 #define ROLE INSPECT
+#elif BOOTSTRAP()
+#define ROLE BOOTSTRAP
 #else
 #error unknown role
 #endif

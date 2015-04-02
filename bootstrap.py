@@ -17,9 +17,6 @@ from . import include # foundation includes
 from . import sysconfig
 from . import libcore # disabling core dumps when in Frame code
 
-role = None
-role_options = []
-
 extensions = {
 	'c': ('c',),
 	'c++': ('c++', 'cxx', 'cpp'),
@@ -469,47 +466,13 @@ class Compilation(object):
 		return dirname(self.source)
 
 	@property
-	def probename(self):
-		"""
-		Qualified Path to the module managing the necessary probes for compilation and
-		linkage.
-
-		Extension modules with Probes must be nested inside a package module.
-		"""
-		if self.package is not None:
-			return '.'.join((self.package, 'xprobe', self.name))
-		return None
-
-	@property
-	def probe_module(self):
-		"""
-		The module used to probe the system for compilation information.
-		"""
-		if self.package is None:
-			return None
-
-		try:
-			mod = importlib.import_module(self.probename)
-			del sys.modules[mod.__name__]
-			return mod
-		except ImportError:
-			return None
-
-	@property
 	def defines(self):
 		"""
 		Loader-level defines given to the compiler.
 		"""
-		if self.package is not None:
-			package = [
-				('MODULE_PACKAGE', '"' + self.package + '"'),
-			]
-		else:
-			package = []
-
-		role = self.tools.role
+		role = 'bootstrap'
 		# And the individual bits.
-		roptions = dict(self.role_options)
+		roptions = dict()
 		roptions.setdefault(role, ())
 
 		# Define the role's value.
@@ -528,6 +491,13 @@ class Compilation(object):
 				for x, y in zip(roptions[role], range(30))
 			])
 
+		if self.package is not None:
+			package = [
+				('MODULE_PACKAGE', '"' + self.package + '"'),
+			]
+		else:
+			package = []
+
 		return package + [
 			('MODULE_BASENAME', self.name),
 			('MODULE_QNAME', '"' + self.fullname + '"'),
@@ -536,32 +506,9 @@ class Compilation(object):
 			('INIT_FUNCTION_COMPAT', 'init' + self.name),
 		] + role_options
 
-	def crofile(self):
-		'C Role Options file'
-		return self.target + '.cro'
-
-	def croptions(self):
-		'String Represention of configured Croptions'
-		return '\n'.join([
-			x + '=' + '|'.join(y) for (x,y) in self.role_options
-		])
-
-	def cropdate(self):
-		'Whether or not the configured croptions match the current build.'
-		with open(self.crofile(), 'r') as crofile:
-			return self.croptions() == crofile.read()
-
 	def __init__(self, pkg, name, target, subjects, sources, role = None, options = ()):
 		self.tools = sysconfig.Toolset(role)
 		self.role = role
-
-		self.role_options = options
-		if self.role_options:
-			# for consistent .cro file representation
-			self.role_options.sort()
-			for v in self.role_options:
-				v[1].sort()
-
 		self.sources = sources
 		self.package = pkg
 		self.name = name
@@ -579,9 +526,6 @@ class Compilation(object):
 
 		defines = self.defines
 		defines.extend(copts['defines'])
-
-		with open(self.crofile(), 'w') as crofile:
-			crofile.write(self.croptions())
 
 		cofs = []
 		for lang, src, cof in self.subjects:
@@ -609,7 +553,7 @@ class Compilation(object):
 
 	def load(self, load_dynamic = imp.load_dynamic, exists = os.path.exists, getmtime = os.path.getmtime):
 		fsconditions = (not exists(self.target) or getmtime(self.target) < getmtime(self.sources))
-		if fsconditions or not self.cropdate():
+		if fsconditions:
 			exc = self.build()
 			if exc is not None:
 				raise ImportError(self.fullname) from exc
@@ -654,13 +598,7 @@ def config(role, module_dict, source_directory):
 		'target': os.path.join(objdir, 'module.pyd')
 	}
 
-def construct(foundation = None, role = None, source_directory = 'src'):
-	"""
-	Execute within a package module containing a 'src' directory to build the C-API
-	module using bootstrap's @Compilation.
-	"""
-	ctx = outerlocals()
-
+def select_role():
 	# use override if available; otherwise, use global role in this module
 	if role is None:
 		default_role = sys.modules[__name__].role
@@ -670,8 +608,15 @@ def construct(foundation = None, role = None, source_directory = 'src'):
 			role = default_role
 	ctx['__role__'] = role
 
-	cfg = config(role, ctx, source_directory = source_directory)
-	cl = Compilation(cfg['package'], cfg['name'], cfg['target'], cfg['subject'], cfg['src'], role = role)
+def construct(foundation = None, source_directory = 'src'):
+	"""
+	Execute within a package module containing a 'src' directory to build the C-API
+	module using bootstrap's @Compilation.
+	"""
+	ctx = outerlocals()
+
+	cfg = config('bootstrap', ctx, source_directory = source_directory)
+	cl = Compilation(cfg['package'], cfg['name'], cfg['target'], cfg['subject'], cfg['src'], role = 'bootstrap')
 
 	# rewrite the package module contents with that of the extension module
 	m = cl.load()

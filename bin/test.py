@@ -62,9 +62,8 @@ class Proceeding(object):
 		self.package = package
 		self.selectors = []
 		self.cextensions = []
-		self.fimports = set()
+		self.fimports = {}
 		self.tracing = libtrace.Tracing
-		bootstrap.Compilation.traceset.add(self.track_imports)
 
 	def module_test(self, test):
 		"""
@@ -182,7 +181,7 @@ class Proceeding(object):
 			# error cases chain the exception
 			pdb.post_mortem(test.fate.__cause__.__traceback__)
 
-		report['fimports'] = list(self.fimports)
+		report['fimports'] = list(self.fimports.items())
 		self.fimports.clear()
 
 		return report
@@ -216,14 +215,7 @@ class Proceeding(object):
 
 		report['exitstatus'] = os.WEXITSTATUS(status)
 
-		if bootstrap.role == 'test':
-			for fullname, source in report.get('fimports', ()):
-				coverage.record(test.identity, fullname)
-				if not (slot.route(source)/"lines").exists():
-					# Fill out crossable and ignored records for the module
-					# Python modules should do this at some point.
-					coverage.record('crossable', fullname, metatype = "lines", proc = coverage.crossable)
-					coverage.record('ignored', fullname, metatype = "lines", proc = coverage.ignored)
+		# C library coverage code
 
 		if report['impact'] < 0:
 			sys.exit(report['exitstatus'])
@@ -242,14 +234,9 @@ class Proceeding(object):
 		if division:
 			sys.stderr.write(bottom_fate_messages + '\n')
 
-	def track_imports(self, imported):
-		self.fimports.add((imported.fullname, imported.source))
-
 def main(package, modules):
-	# promote to test, but iff the role was unchanged.
-	# in cases where finals are ran, this will be 'factor'.
-	if bootstrap.role is None:
-		bootstrap.role = 'test'
+	# Set test role. Per project?
+	# libconstruct.role = 'test'
 
 	# enable core dumps
 	p = Proceeding(package)

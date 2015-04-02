@@ -94,38 +94,56 @@ def garbage(data, *sources):
 		'--object-file', data
 	) + sources
 
-def render(route, proc = crossed):
+# XXX: These functions are broken at the moment due to the changes in bootstrap.
+# XXX: This is waiting on libconstruct's completion.
+
+def render(route, source, proc = crossed):
 	"""
 	Create the coverage meta data for the module.
 	"""
 	# get paths
 	ir = route
-	srcr = ir.file()
+	mod = ir.module()
 
-	# loader tells us where the dll and associated files are.
-	l = ir.module().__bootstrap__
-	src = l.path
-
-	cached = routeslib.File.from_absolute(l.cprefix)
-	dir = cached.container.fullpath
+	libpath = routeslib.File.from_absolute(mod.__bootstrap__.dll)
 
 	with routeslib.File.temporary() as tr:
 		# render the coverage output in a temp directory
-		filename = srcr.identity
-		command = garbage(cached.suffix('.gcno').fullpath, src)
+		filename = source.identity
+		command = garbage(libpath.suffix('.gcno').fullpath, source.fullpath)
 		p = subprocess.Popen(command, cwd = tr.fullpath, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
 		p.stdout.close() # yeah if there's a problem... good luck =\
 		p.wait()
 
 		# extract and write coverage
-		return srcr.fullpath, proc((tr/filename).suffix('.gcov').fullpath)
+		return proc((tr/filename).suffix('.gcov').fullpath)
 
-def record(cause, fullname, metatype = 'xlines', proc = crossed):
+def record(cause, fullname, source, metatype = 'xlines', proc = crossed):
 	"""
 	Update the coverage meta data for the module.
 	"""
-	coverage = render(routeslib.Import.from_fullname(fullname), proc = proc)
+	mr = routeslib.Import.from_fullname(fullname)
+	mod = mr.modules()
+	dll = routelib.File.from_absolute(mod.__dll__)
+
+	coverage = render(dll, source, proc = proc)
 	if coverage:
-		path, lines = coverage
-		settings = [tuple(map(int, x.split(b':', 1)))[2::-1] for x in lines.split(b'\n') if x]
-		libmeta.append(metatype, path, [(cause, settings)])
+		settings = [tuple(map(int, x.split(b':', 1)))[2::-1] for x in coverage.split(b'\n') if x]
+		libmeta.append(metatype, source.fullpath, [(cause, settings)])
+
+def convert(fullname, identity, name = 'lines'):
+	"""
+	Convert the the given module's coverage output to records stored in a slot
+	designated by @identity.
+	"""
+	ir = routeslib.Import.from_fullname(fullname)
+	mod = ir.module()
+	fr = ir.file()
+
+	record(identity, ir, metatype = 'xlines', proc = crossed)
+	if not (slot.route(fr)/name).exists():
+		# Fill out crossable and ignored records for the module
+		# Python modules should do this at some point, but currently the AST scanner is
+		# mostly broken.
+		record('crossable', fullname, metatype = name, proc = crossable)
+		record('ignored', fullname, metatype = name, proc = ignored)

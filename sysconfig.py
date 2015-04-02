@@ -34,7 +34,7 @@ class Toolset(object):
 	role_compile_flags = {
 		'factor': ('-O3', '-g'),
 		'debug': ('-g',),
-		'test': ('--coverage', '-g', '-O0'),
+		'test': ('--coverage', '-g', '-O0', '-ftest-coverage', '-fprofile-arcs'),
 	}
 
 	role_link_flags = {
@@ -61,10 +61,6 @@ class Toolset(object):
 	def python_include_directory(self):
 		import sysconfig
 		return sysconfig.get_config_var('INCLUDEPY')
-
-	@property
-	def gcov(self):
-		return shutil.which('gcov')
 
 	@property
 	@functools.lru_cache(1)
@@ -207,7 +203,8 @@ class Toolset(object):
 
 				r = popen(x, stdout = log, stderr = subprocess.STDOUT, stdin = None)
 				if r.wait() != 0:
-					raise self.ToolError(id, target, log)
+					with open(logfile, 'r') as rlog:
+						raise self.ToolError(id, target, rlog.read())
 
 		if not exists(target):
 			with open(logfile, 'rb') as f:
