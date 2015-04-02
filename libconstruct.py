@@ -1,5 +1,4 @@
 """
-
 """
 from . import abstract
 from ..routes import library as routeslib
@@ -77,37 +76,6 @@ link = ('cl.exe',)
 debug_compile = '/Yd'
 csource = '/Tc'
 cxxsource = '/Tp'
-
-def collect(srcdir, suffixes, suffix_delimiter = '.', join = os.path.join):
-	"""
-	Recursive acquire sources for compilation and build out objects.
-	"""
-	cache = os.path.join(srcdir, '__pycache__')
-	os.makedirs(cache, exist_ok = True)
-	prefix = len(srcdir)
-
-	for path, dirs, files in os.walk(srcdir):
-		if os.path.basename(path) == '__pycache__':
-			continue
-
-		# build out sub-directories for object cache
-		for x in dirs:
-			if x == '__pycache__':
-				continue
-
-		for x in files:
-			suffix_position = x.rfind(suffix_delimiter)
-			if suffix_position != -1:
-				suffix = x[suffix_position+1:]
-				if suffix in languages:
-					yield languages[suffix], join(path, x)
-
-class Execution(object, metaclass = abstract.Execution):
-	"""
-	Tool chain execution process management.
-	"""
-	def __init__(self):
-		self.contexts = list()
 
 class Toolchain(abstract.Linked):
 	"""

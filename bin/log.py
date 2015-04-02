@@ -4,12 +4,12 @@ transcript to standard out.
 """
 import sys
 import pkgutil
-from .. import loader
+from .. import bootstrap
 
 if __name__ == '__main__':
 	modpath = sys.argv[1]
 	mloader = pkgutil.get_loader(modpath)
-	loader.role = sys.argv[2]
+	bootstrap.role = sys.argv[2]
 	for x in mloader.stages:
 		with open(mloader.logfile(x), 'rb') as logfile:
 			sys.stdout.buffer.write(logfile.read())

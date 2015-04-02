@@ -11,7 +11,7 @@ import functools
 import types
 import importlib
 
-from .. import loader as loader
+from .. import bootstrap
 from .. import slot
 
 from ...routes import library as routeslib
@@ -64,7 +64,7 @@ class Proceeding(object):
 		self.cextensions = []
 		self.fimports = set()
 		self.tracing = libtrace.Tracing
-		loader.CLoader.traceset.add(self.track_imports)
+		bootstrap.Compilation.traceset.add(self.track_imports)
 
 	def module_test(self, test):
 		"""
@@ -216,7 +216,7 @@ class Proceeding(object):
 
 		report['exitstatus'] = os.WEXITSTATUS(status)
 
-		if loader.role == 'test':
+		if bootstrap.role == 'test':
 			for fullname, source in report.get('fimports', ()):
 				coverage.record(test.identity, fullname)
 				if not (slot.route(source)/"lines").exists():
@@ -248,8 +248,8 @@ class Proceeding(object):
 def main(package, modules):
 	# promote to test, but iff the role was unchanged.
 	# in cases where finals are ran, this will be 'factor'.
-	if loader.role is None:
-		loader.role = 'test'
+	if bootstrap.role is None:
+		bootstrap.role = 'test'
 
 	# enable core dumps
 	p = Proceeding(package)

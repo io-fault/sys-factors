@@ -1,4 +1,6 @@
 #include <setjmp.h>
+#include <time.h>
+#include <sys/time.h>
 
 METHODS() = {
 	{NULL}
@@ -36,6 +38,12 @@ INT_TYPES()
 
 #define ADD(y, z) PyModule_AddIntConstant(mod, y, sizeof(z))
 
+#define TIME_TYPES() \
+	X(struct timeval, timeval) \
+	X(struct timezone, timezone) \
+	X(struct tm, tm) \
+	X(time_t, time_t) \
+
 INIT("Sizes of the standard C types.")
 {
 	PyObj mod;
@@ -49,6 +57,7 @@ INIT("Sizes of the standard C types.")
 
 #define X(y,x) ADD(#x, y);
 	REAL_TYPES()
+	TIME_TYPES()
 #undef X
 
 #define X(p) ADD(#p, p);

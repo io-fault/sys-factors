@@ -1,14 +1,21 @@
 """
-Development tools for constructing, debugging, profiling, testing and deploying software.
+Tools and libraries for supporting a development environment.
+Constructing, debugging, profiling, testing and deploying software.
+
+Construction
+------------
+
+@libconstruct provides the necessary functionality to process project targets into files
+usable by the host operating system.
 
 Testing
 -------
 
-:py:mod`.libtest` is a protocol driven testing library. Users need not import libtest
+@libtest is a dictionary protocol driven testing library. Users need not import @libtest
 in order to define their tests, only to run them. This means that test modules can be
-imported without `dev` being available.
+imported without @project being available.
 
-:py:mod:`.libtest` attempts to make constructing test runners as simple as possible by
+@libtest attempts to make constructing test runners as simple as possible by
 keeping the interface as simple as possible.
 
 The test object provides an abstraction that allows for checks to be performed using
@@ -22,38 +29,36 @@ standard comparison operators::
 		test/expectation > something.render()
 
 	if __name__ == '__main__':
-		import dev.libtest; dev.libtest.execmodule()
+		import fault.development.libtest as libtest
+		import sys; libtest.execute(sys.modules[__name__])
 
 Skeletons
 ---------
 
-The executable module :py:mod:`.bin.init` initializes a new package directory
+@bin.skeleton initializes a new package directory
 complete with `setup.py` script. The following is the consistency of the
-layout from a `python -m fault.dev.bin.init package` run::
+layout from a `python -m fault.development.bin.skeleton package_name` run::
 
-	package/
+	package_name/
 		__init__.py
 		abstract.py [area for abstract classes and data used across implementations]
-		lib.py [empty primary access module; import entry points here into here]
+		library.py [empty primary access module]
 		test/
 			__init__.py
 			__main__.py
-			test_lib.py
+			test_library.py
 		bin/
 			__init__.py
-			rattle.py
+			exe.py
 		documentation/
+			__init__.py
 			usage.rst
-			project.rst
-			reference.rst
-			index.rst
-			glossary.rst
 
 Documentation
 -------------
 
-:py:mod:`.libsphinx` provides a high-level build function for running a sphinx-build
-command for a project. Given a dev.skeleton conforming project, a sphinx configuration
-file is only useful for customization, which is rarely necessary for small projects.
+API documentation is extracted into an XML format with @libdocument. The XML provides
+significant details about the contents of a module and can be easily converted into a
+display format.
 """
 __pkg_bottom__ = True

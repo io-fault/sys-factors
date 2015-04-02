@@ -20,6 +20,20 @@ from . import libcore # disabling core dumps when in Frame code
 role = None
 role_options = []
 
+extensions = {
+	'c': ('c',),
+	'c++': ('c++', 'cxx', 'cpp'),
+	'objective-c': ('m',),
+	'ada': ('ads', 'ada'),
+	'assembly': ('asm', 'a'),
+	'bc': ('bc',),
+}
+
+languages = {}
+for k, v in extensions.items():
+	for y in v:
+		languages[y] = k
+
 class OrderedSet(object):
 	"""
 	Set container for filtering duplicate options.
@@ -69,6 +83,43 @@ if hasattr(imp, 'cache_from_source'):
 else:
 	def cache_path(path):
 		return path[:path.rfind('.py')]
+
+def collect(objdir, srcdir, suffixes, suffix_delimiter = '.', join = os.path.join):
+	"""
+	Recursive acquire sources for compilation and build out objects.
+	"""
+	os.makedirs(objdir, exist_ok = True)
+	prefix = len(srcdir)
+
+	print(objdir, srcdir)
+
+	for path, dirs, files in os.walk(srcdir):
+		# build out sub-directories for object cache
+		for x in dirs:
+			if x == '__pycache__':
+				# there shouldn't be __pycache__ directories here, but ignore anyways
+				continue
+
+		for x in files:
+			suffix = None
+
+			suffix_position = x.rfind(suffix_delimiter)
+			if suffix_position == -1:
+				# no suffix delimiter
+				continue
+			else:
+				# extract suffix; continue if it's not a recognized language
+				suffix = x[suffix_position+1:]
+				if suffix not in languages:
+					continue
+
+			srcpath = join(srcdir, path, x)
+			src_suffix = srcpath[prefix+1:][:-(len(suffix)+len(suffix_delimiter))]
+			objpath = join(objdir, src_suffix) + '.o'
+			objpathdir = os.path.dirname(objpath)
+			if not os.path.exists(objpathdir):
+				os.makedirs(objpathdir, exist_ok = True)
+			yield languages[suffix], srcpath, objpath
 
 class Frame(tuple):
 	"""
@@ -413,13 +464,6 @@ class Compilation(object):
 
 	platform = platform.system().lower() + '.' + platform.machine().lower()
 	target = platform
-
-	types = [
-		('c', '.py.c'),
-		('objc', '.py.m'),
-		('c++', '.py.cxx'),
-	]
-
 	dll_extension = '.pyd'
 
 	@property
@@ -494,12 +538,9 @@ class Compilation(object):
 			('INIT_FUNCTION_COMPAT', 'init' + self.name),
 		] + role_options
 
-	def logfile(self, stage):
-		return '.'.join((self.cprefix, stage, 'log'))
-
 	def crofile(self):
 		'C Role Options file'
-		return '.'.join((self.cprefix, 'cro'))
+		return self.target + '.cro'
 
 	def croptions(self):
 		'String Represention of configured Croptions'
@@ -512,14 +553,7 @@ class Compilation(object):
 		with open(self.crofile(), 'r') as crofile:
 			return self.croptions() == crofile.read()
 
-	def execute(self, stage, command):
-		logfile = self.logfile(stage)
-		if os.path.exists(logfile):
-			os.unlink(logfile)
-		return self.tools.dispatch(logfile, stage, command).wait()
-
-	def __init__(self, pkg, name, source, type = 'c', role = None, options = ()):
-		role = role or ('debug' if __debug__ else 'factor')
+	def __init__(self, pkg, name, target, subjects, sources, role = None, options = ()):
 		self.tools = sysconfig.Toolset(role)
 		self.role = role
 
@@ -530,42 +564,19 @@ class Compilation(object):
 			for v in self.role_options:
 				v[1].sort()
 
-		self.type = type
+		self.sources = sources
 		self.package = pkg
 		self.name = name
+		self.target = target
+		self.subjects = subjects
 
 		if pkg is None:
 			self.fullname = name
 		else:
 			self.fullname = '.'.join((pkg,name))
 
-		self.path = self.source = source
-		self.cprefix = cache_path(source) + sys.__dict__.get('abiflags', '')
-
-		self.cprefix += '.' + self.platform
-		self.cprefix += ('.' + self.tools.role)
-
-		self.dll = self.cprefix + self.dll_extension
-
 	def build(self, context = None):
-		dir = os.path.dirname(self.cprefix)
-		if not os.path.exists(dir):
-			os.mkdir(dir)
-
-		# get probe module for initializing the context
-		probes = self.probe_module
-		if probes is not None:
-			if context is None:
-				# build out a context for the probes
-				context = Context(self.cprefix + '.h')
-
-			probes.initialize(context)
-			with context:
-				# XXX: hack to force header file write.
-				pass
-		else:
-			context = Context()
-
+		context = Context()
 		copts = context.stack.compile
 
 		defines = self.defines
@@ -574,38 +585,36 @@ class Compilation(object):
 		with open(self.crofile(), 'w') as crofile:
 			crofile.write(self.croptions())
 
-		incs = (include.xpython, include.cpython,) + ((include.objcpython,) if self.type == 'objc' else ()) + copts['includes']
-
-		cof = self.cprefix + self.tools.compile_output_extension
-		compile = self.tools.compile(
-			cof, self.type, self.source,
-			defines = defines,
-			includes = incs,
-			directories = copts['directories'],
-			framework_directories = copts['framework_directories'],
-		)
+		for lang, src, cof in self.subjects:
+			incs = (include.xpython, include.cpython,) + copts['includes']
+			compile = self.tools.compile(
+				cof, lang, src,
+				defines = defines,
+				includes = incs,
+				directories = copts['directories'],
+				framework_directories = copts['framework_directories'],
+			)
+			self.tools.stage('compile', cof, cof + '.log', compile)
 
 		lopts = context.stack.link
 		link = self.tools.link(
-			self.dll, self.type, cof, *lopts['objects'],
+			self.target, cof, *lopts['objects'],
 			directories = lopts['directories'],
 			libraries = lopts['libraries'],
 			frameworks = lopts['frameworks'],
 			framework_directories = lopts['framework_directories']
 		)
-
-		self.tools.stage('compile', cof, self.logfile('compile'), compile)
-		self.tools.stage('link', self.dll, self.logfile('link'), link)
+		self.tools.stage('link', self.target, self.target + '.log', link)
 
 	def load(self, load_dynamic = imp.load_dynamic, exists = os.path.exists, getmtime = os.path.getmtime):
-		fsconditions = (not exists(self.dll) or getmtime(self.dll) < getmtime(self.source))
+		fsconditions = (not exists(self.target) or getmtime(self.target) < getmtime(self.source))
 		if fsconditions or not self.cropdate():
 			exc = self.build()
 			if exc is not None:
 				raise ImportError(self.fullname) from exc
 
 		try:
-			mod = load_dynamic(self.name, self.dll)
+			mod = load_dynamic(self.name, self.target)
 		except Exception:
 			raise ImportError(self.name)
 
@@ -613,29 +622,55 @@ class Compilation(object):
 			x(self)
 		return mod
 
-def config(d, source_directory):
+def config(role, module_dict, source_directory):
 	"""
 	Given a package module's dictionary, build the necessary details for locating
 	source files and storing object files.
 	"""
-	parent = d['__package__']
-	dir = os.path.dirname(os.path.abspath(d['__file__']))
-	sources = os.path.join(dir, source_directory)
-	pkg, name = ctx['__name__'].rsplit('.', 1)
+	parent = module_dict['__package__']
+	dir = os.path.dirname(os.path.abspath(module_dict['__file__']))
+	srcdir = os.path.join(dir, source_directory)
+	pkg, name = module_dict['__name__'].rsplit('.', 1)
+
+	cache_name = '{role}:python-{version}{abiflags}.{platform}'.format(
+		role = role,
+		abiflags = sys.__dict__.get('abiflags', ''),
+		version = ''.join(map(str, sys.version_info[:2])),
+		platform = Compilation.platform,
+	)
+	# For instance, project/pkg/__pycache__/debug:abi.linux/subdir/foo.c
+	objdir = os.path.join(dir, '__pycache__', cache_name)
+
+	# list of (language, source_filepath, object_filepath) tuples.
+	srcobj = list(collect(objdir, srcdir, languages))
+
 	return {
-		'src': sources,
+		'src': srcdir,
+		'obj': objdir,
 		'package': pkg,
 		'name': name,
+		'subject': srcobj,
+		'target': os.path.join(objdir, 'module.pyd')
 	}
 
-def construct(foundation = None, source_directory = 'src'):
+def construct(foundation = None, role = None, source_directory = 'src'):
 	"""
 	Execute within a package module containing a 'src' directory to build the C-API
 	module using bootstrap's @Compilation.
 	"""
 	ctx = outerlocals()
-	cfg = config(ctx, source_directory = source_directory)
-	cl = Compilation(cfg['package'], cfg['name'], cfg['sources'])
+
+	# use override if available; otherwise, use global role in this module
+	if role is None:
+		default_role = sys.modules[__name__].role
+		if default_role is None:
+			role = ('debug' if __debug__ else 'factor')
+		else:
+			role = default_role
+	ctx['__role__'] = role
+
+	cfg = config(role, ctx, source_directory = source_directory)
+	cl = Compilation(cfg['package'], cfg['name'], cfg['target'], cfg['subject'], cfg['src'], role = role)
 
 	# rewrite the package module contents with that of the extension module
 	m = cl.load()

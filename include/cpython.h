@@ -113,7 +113,9 @@ PyMODINIT_FUNC INIT_FUNCTION(void)
 #define CREATE_MODULE(MOD) \
 do { \
 	PyObj _MOD = PyModule_Create(&module); \
-	if (_MOD) \
+	if (_MOD == NULL) \
+		*MOD = NULL; /* error */ \
+	else \
 	{ \
 		__dict__ = PyModule_GetDict(_MOD); \
 		if (__dict__ == NULL) \

@@ -1,5 +1,5 @@
 """
-:py:mod:`sysconfig` inspired toolset.
+@:stdlib.sysconfig inspired toolset.
 """
 import sys
 import shutil
@@ -141,7 +141,8 @@ class Toolset(object):
 			+ ('-o', target, '-c') + filenames]
 
 	def link(self,
-		target, type, *filenames,
+		target,
+		*filenames,
 		libraries = (),
 		directories = (),
 		objects = (),
@@ -161,7 +162,7 @@ class Toolset(object):
 		"""
 		import sysconfig # avoid module overhead unless it's needed.
 
-		if sys.platform == 'darwin' and type == 'objc':
+		if sys.platform == 'darwin' and False:
 			# assume macosx
 			plat = ('-framework', 'Foundation')
 		else:

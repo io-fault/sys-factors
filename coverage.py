@@ -103,7 +103,7 @@ def render(route, proc = crossed):
 	srcr = ir.file()
 
 	# loader tells us where the dll and associated files are.
-	l = ir.loader
+	l = ir.module().__bootstrap__
 	src = l.path
 
 	cached = routeslib.File.from_absolute(l.cprefix)
