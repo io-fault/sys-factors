@@ -1,4 +1,7 @@
 #if TEST()
+/*
+ * Symbol won't be available without TEST()
+ */
 void __gcov_flush(void);
 
 static PyObj

@@ -91,8 +91,6 @@ def collect(objdir, srcdir, suffixes, suffix_delimiter = '.', join = os.path.joi
 	os.makedirs(objdir, exist_ok = True)
 	prefix = len(srcdir)
 
-	print(objdir, srcdir)
-
 	for path, dirs, files in os.walk(srcdir):
 		# build out sub-directories for object cache
 		for x in dirs:
@@ -585,6 +583,7 @@ class Compilation(object):
 		with open(self.crofile(), 'w') as crofile:
 			crofile.write(self.croptions())
 
+		cofs = []
 		for lang, src, cof in self.subjects:
 			incs = (include.xpython, include.cpython,) + copts['includes']
 			compile = self.tools.compile(
@@ -595,10 +594,12 @@ class Compilation(object):
 				framework_directories = copts['framework_directories'],
 			)
 			self.tools.stage('compile', cof, cof + '.log', compile)
+			cofs.append(cof)
 
 		lopts = context.stack.link
+		cofs.extend(lopts['objects'])
 		link = self.tools.link(
-			self.target, cof, *lopts['objects'],
+			self.target, *cofs,
 			directories = lopts['directories'],
 			libraries = lopts['libraries'],
 			frameworks = lopts['frameworks'],
@@ -607,7 +608,7 @@ class Compilation(object):
 		self.tools.stage('link', self.target, self.target + '.log', link)
 
 	def load(self, load_dynamic = imp.load_dynamic, exists = os.path.exists, getmtime = os.path.getmtime):
-		fsconditions = (not exists(self.target) or getmtime(self.target) < getmtime(self.source))
+		fsconditions = (not exists(self.target) or getmtime(self.target) < getmtime(self.sources))
 		if fsconditions or not self.cropdate():
 			exc = self.build()
 			if exc is not None:
