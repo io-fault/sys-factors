@@ -407,10 +407,10 @@ def python(route):
 	project_package = bottom.basename
 
 	yield b''.join((
-		b'<unit xmlns="https://fault.io/xml/documentation"',
-		b' language="python"',
+		b'<factor domain="python" xmlns="https://fault.io/xml/documentation">',
+		b'<module',
 		b' identifier="', route.basename.encode('utf-8'), b'"',
-		b' xml:id="', module.__name__.encode('utf-8'), b'."',
+		b' xml:id="', module.__name__.encode('utf-8'), b'"',
 		b'>'
 	))
 
@@ -474,7 +474,7 @@ def python(route):
 			yield from _xml_object(v)
 			yield b'</data>'
 
-	yield b'</unit>'
+	yield b'</module></factor>'
 
 def document(path):
 	"""
