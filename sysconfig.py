@@ -102,6 +102,8 @@ class Toolset(object):
 
 		if compiler is None:
 			cc = self.compiler
+			if cc is None:
+				cc = 'clang'
 		else:
 			cc = compiler
 

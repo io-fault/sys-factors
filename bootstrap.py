@@ -535,7 +535,7 @@ class Compilation(object):
 				defines = defines,
 				includes = incs,
 				directories = copts['directories'],
-				framework_directories = copts['framework_directories'],
+				framework_directories = copts.get('framework_directories', ()),
 			)
 			self.tools.stage('compile', cof, cof + '.log', compile)
 			cofs.append(cof)
@@ -547,7 +547,7 @@ class Compilation(object):
 			directories = lopts['directories'],
 			libraries = lopts['libraries'],
 			frameworks = lopts['frameworks'],
-			framework_directories = lopts['framework_directories']
+			framework_directories = lopts.get('framework_directories', ())
 		)
 		self.tools.stage('link', self.target, self.target + '.log', link)
 
