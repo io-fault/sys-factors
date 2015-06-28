@@ -330,17 +330,20 @@ class Test(object):
 		except BaseException as err:
 			# libtest traps any exception raised by a particular test.
 
-			if not isinstance(err, Exception):
+			if not isinstance(err, Exception) and not isinstance(err, Fate):
 				# a "control" exception.
 				# explicitly note as interrupt to consolidate identification
 				self.fate = self.Interrupt('test raised interrupt')
 				self.fate.__cause__ = err
 				raise err # e.g. kb interrupt
-			else:
+			elif not isinstance(err, Fate):
 				# regular exception; a failure
 				tb = err.__traceback__ = err.__traceback__.tb_next
 				self.fate = self.Fail('test raised exception')
 				self.fate.__cause__ = err
+			else:
+				tb = err.__traceback__ = err.__traceback__.tb_next
+				self.fate = err
 
 		if tb is not None:
 			self.fate.line = tb.tb_lineno
