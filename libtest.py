@@ -11,7 +11,7 @@ import gc
 import operator
 import functools
 
-def get_test_index(tester):
+def get_test_index(tester, int=int, set=set, AttributeError=AttributeError):
 	"Returns the first line number of the underlying code object."
 
 	try:
