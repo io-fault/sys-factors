@@ -25,7 +25,8 @@ from .. import libtrace
 from .. import coverage
 
 def color(color, text, _model = "∫text xterm.fg.%s∫"):
-	return libint.Model(_model % (color,)).argformat(text)
+	return text
+	#return libint.Model(_model % (color,)).argformat(text)
 
 def color_identity(identity):
 	parts = identity.split('.')
@@ -110,7 +111,7 @@ class Proceeding(object):
 	@staticmethod
 	def _report_core(test):
 		sys.stderr.write('\r{start} {fate!s} {stop} {tid}                \n'.format(
-			fate = color(test.fate.color, faten.ljust(8)), tid = color_identity(test.identity),
+			fate = color(test.fate.color, 'core'.ljust(8)), tid = color_identity(test.identity),
 			start = open_fate_message,
 			stop = close_fate_message
 		))
@@ -187,6 +188,7 @@ class Proceeding(object):
 		return report
 
 	def _dispatch(self, test):
+		faten = None
 		self._status_test_sealing(test)
 
 		# seal fate in a child process
@@ -203,8 +205,9 @@ class Proceeding(object):
 		if os.WCOREDUMP(status):
 			faten = 'core'
 			report['fate'] = 'core'
+			test.fate = libtest.Core(None)
 			self._report_core(test)
-			self._handle_core(libcore.corelocation(rpid))
+			self._handle_core(libcore.corelocation(pid))
 		elif not os.WIFEXITED(status):
 			# redrum
 			import signal
@@ -217,7 +220,7 @@ class Proceeding(object):
 
 		# C library coverage code
 
-		if report['impact'] < 0:
+		if report['impact'] < 0 and faten != 'core':
 			sys.exit(report['exitstatus'])
 
 		return report
