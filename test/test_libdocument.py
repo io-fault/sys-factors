@@ -1,5 +1,5 @@
 import sys
-from .. import libdocument as lib
+from .. import libdocument as library
 
 class Sample(object):
 	def meth(self):
@@ -56,26 +56,28 @@ def Keywords(*args, first = 'first', second = 'second'):
 def test_type_checks(test, test_module = sys.modules[__name__]):
 	# check that is_module_function sees that is_module_function is a
 	# function in the module libdocument
-	test/lib.is_module_function(ModuleFunction, test_module) == True
-	test/lib.is_module_function(module_data, test_module) == False
-	test/lib.is_module_function(dir, lib) == False
+	test/library.is_module_function(ModuleFunction, test_module) == True
+	test/library.is_module_function(module_data, test_module) == False
+	test/library.is_module_function(dir, library) == False
 
-	test/lib.is_module_class(Sample, sys.modules[__name__]) == True
+	test/library.is_module_class(Sample, sys.modules[__name__]) == True
 
-	test/lib.is_class_method(Sample.meth) == True
-	test/lib.is_class_property(Sample.prop) == True
-	test/lib.is_class_property(Sample.__dict__['prop']) == True
-	test/lib.is_class_property(Sample.data) == False
+	test/library.is_class_method(Sample.meth) == True
+	test/library.is_class_property(Sample.prop) == True
+	test/library.is_class_property(Sample.__dict__['prop']) == True
+	test/library.is_class_property(Sample.data) == False
 
 def test_project(test):
-	project = lib.project(lib)
-	test/project['name'] == 'dev'
+	project = library.project(library)
+	test/project['name'] == 'development'
 
 def test_hierarchy(test):
-	hier = lib.hierarchy('fault.dev')
+	#hier = library.hierarchy('fault.development')
+	pass
 
 def test_xml(test):
-	r = lib.routes.Import.from_fullname('fault.dev.libdocument')
+	#r = library.routes.Import.from_fullname('fault.dev.libdocument')
+	pass
 
 def test_classes(test):
 	pass
