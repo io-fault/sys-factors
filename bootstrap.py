@@ -595,7 +595,8 @@ def config(role, module_dict, source_directory):
 		'package': pkg,
 		'name': name,
 		'subject': srcobj,
-		'target': os.path.join(objdir, 'module.pyd')
+		'target': os.path.join(objdir, 'module.pyd'),
+		'role': role,
 	}
 
 def select_role():
