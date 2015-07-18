@@ -3,6 +3,15 @@ Module for working with Tracebacks and stacks of Frames.
 
 Useful for Python crash reporting and debuggers.
 """
+import inspect
+
+def traceback_frames(tb, getinnerframes=inspect.getinnerframes):
+	return getinnerframes(tb)
+
+def stack_frames(level=2, stack=inspect.stack):
+	s = stack()
+	del s[:-level]
+	return s
 
 class Filter(object):
 	__slots__ = ()
