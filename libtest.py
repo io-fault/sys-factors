@@ -1,8 +1,8 @@
 """
-A testing library that minimizes the distance between the test runner, and
+A testing library that minimizes the distance between the test harness, and
 the actual tests for the purpose of keeping the execution machinary as simple as possible.
 
-libtest provides the very basics for testing in Python. Test runners are implemented else-
+libtest provides the very basics for testing in Python. Test harnesses are implemented else-
 where as they tend to be significant pieces of code. However, a trivial @execute
 function is provided that, when given a module, will execute the tests therein. Exceptions
 are allowed to raise normally in order to report failures of any kind.
@@ -12,9 +12,8 @@ import operator
 import functools
 
 def get_test_index(tester):
-	"""
-	Returns the first line number of the underlying code object.
-	"""
+	"Returns the first line number of the underlying code object."
+
 	try:
 		return int(tester.__test_order__)
 	except AttributeError:
@@ -39,28 +38,55 @@ def get_test_index(tester):
 
 def test_order(kv):
 	"""
-	Key function used by @gather that uses @get_test_index in
+	Key function used by &gather that uses @get_test_index in
 	order to elevate a test's position given that it was explicitly listed.
 	"""
 	return get_test_index(kv[1])
 
-def gather(container, prefix = 'test_'):
+def gather(container, prefix = 'test_', key=test_order, getattr=getattr):
 	"""
-	:returns: Ordered dictionary of attribute names associated with a `Test` instance.
-	:rtype: {k : Test(v, k) for k, v in container.items()}
+	Returns an ordered dictionary of attribute names associated with a &Test instance:
+
+		{k : Test(v, k) for k, v in container.items()}
 
 	Collect the objects in the container whose name starts with "test_".
-	The ordered is defined by the @get_test_index function.
+	The ordering is defined by the &test_order function.
 	"""
-	tests = [('.'.join((container.__name__, name)), getattr(container, name)) for name in dir(container) if name.startswith(prefix)]
-	tests.sort(key = test_order)
+
+	tests = [
+		('.'.join((container.__name__, name)), getattr(container, name))
+		for name in dir(container)
+		if name.startswith(prefix)
+	]
+	tests.sort(key=key)
+
 	return tests
 
 class Absurdity(Exception):
-	"""
-	Exception raised by @Contention instances.
-	"""
-	pass
+	"Exception raised by @Contention instances."
+
+	operator_names_mapping = {
+		'__eq__': '==',
+		'__ne__': '!=',
+		'__le__': '<=',
+		'__ge__': '>=',
+		'__mod__': 'is',
+		'__truediv__': 'isinstance',
+		'__sub__': 'issubclass',
+	}
+
+	def __init__(self, operator, former, latter, inverse=None):
+		self.operator = operator
+		self.former = former
+		self.latter = latter
+		self.inverse = inverse
+
+	def __str__(self):
+		opchars = self.operator_names_mapping.get(self.operator, self.operator)
+		return ('not ' if self.inverse else '') + ' '.join((repr(self.former), opchars, repr(self.latter)))
+
+	def __repr__(self):
+		return '{0}({1!r}, {2!r}, {3!r}, inserse={4!r})'.format(self.__name__, self.operator, self.former, self.latter, self.inverse)
 
 # Exposes an assert like interface to Test objects.
 class Contention(object):
@@ -84,7 +110,7 @@ class Contention(object):
 	"""
 	__slots__ = ('test', 'object', 'storage', 'inverse')
 
-	def __init__(self, test, object, inverse = False):
+	def __init__(self, test, object, inverse=False):
 		self.test = test
 		self.object = object
 		self.inverse = inverse
@@ -107,9 +133,9 @@ class Contention(object):
 			def check(self, ob, opname = opname, operator = v):
 				test, x, y = self.test, self.object, ob
 				if self.inverse:
-					if operator(x, y): raise self.test.Absurdity(opname)
+					if operator(x, y): raise self.test.Absurdity(opname, x, y, inverse=True)
 				else:
-					if not operator(x, y): raise self.test.Absurdity(opname)
+					if not operator(x, y): raise self.test.Absurdity(opname, x, y, inverse=False)
 			locals()[k] = check
 
 	##
@@ -127,7 +153,7 @@ class Contention(object):
 			# other effect is desired.
 			return
 
-		if not isinstance(y, x): raise self.test.Absurdity("unexpected exception")
+		if not isinstance(y, x): raise self.test.Absurdity("isinstance", x, y)
 		return True # !!! Inhibiting raise.
 
 	def __xor__(self, subject):
@@ -167,40 +193,44 @@ class Fate(BaseException):
 	def __init__(self, content):
 		self.content = content
 
+	@property
+	def contention(self):
+		pass
+
 class Pass(Fate):
-	abstract = 'the test was explicitly passed'
+	abstract = "the test was explicitly passed"
 	impact = 1
-	name = 'pass'
+	name = "pass"
 	code = 0
-	color = 'green'
+	color = "green"
 
 class Return(Pass):
-	abstract = 'the test returned'
+	abstract = "the test returned; implying success"
 	impact = 1
-	name = 'return'
+	name = "return"
 	code = 1
-	color = 'green'
+	color = "green"
 
 class Explicit(Pass):
-	abstract = 'the test cannot be implicitly invoked'
+	abstract = "the test cannot be implicitly invoked"
 	impact = 0
-	name = 'explicit'
+	name = "explicit"
 	code = 2
-	color = 'magenta'
+	color = "magenta"
 
 class Skip(Pass):
-	abstract = 'the test was skipped'
+	abstract = "the test was skipped"
 	impact = 0
-	name = 'skip'
+	name = "skip"
 	code = 3
-	color = 'cyan'
+	color = "cyan"
 
 class Divide(Fate):
-	abstract = 'the test consisted of a set of tests'
+	abstract = "the test is a container of a set of tests"
 	impact = 0
-	name = 'divide'
+	name = "divide"
 	code = 4
-	color = 'blue'
+	color = "blue"
 
 	def __init__(self, container, limit = 1):
 		self.content = container
@@ -208,35 +238,35 @@ class Divide(Fate):
 		self.limit = limit
 
 class Fail(Fate):
-	abstract = 'the test raised an exception or contended an absurdity'
+	abstract = "the test raised an exception or contended an absurdity"
 	impact = -1
-	name = 'fail'
+	name = "fail"
 	code = 5
-	color = 'red'
+	color = "red"
 
 class Void(Fail):
-	abstract = 'the coverage data of the test does not meet expectations'
-	name = 'void'
+	abstract = "the coverage data of the test does not meet expectations"
+	name = "void"
 	code = 6
-	color = 'red'
+	color = "red"
 
 class Expire(Fail):
-	abstract = 'the test did not finish in the allowed time'
-	name = 'expire'
+	abstract = "the test did not finish in the allowed time"
+	name = "expire"
 	code = 8
-	color = 'yellow'
+	color = "yellow"
 
 class Interrupt(Fail):
-	abstract = 'the test was interrupted by a control exception'
-	name = 'interrupt'
+	abstract = "the test was interrupted by a control exception"
+	name = "interrupt"
 	code = 9
-	color = 'orange'
+	color = "orange"
 
 class Core(Fail):
 	"""
-	Failure cause by a process dumping a core image.
+	Failure cause by a process dumping a core image or similar uncontrollable crash.
 
-	This exception is used by advanced test runners that execute tests in subprocesses to
+	This exception is used by advanced test harnesses that execute tests in subprocesses to
 	protect subsequent tests.
 	"""
 	abstract = 'the test caused a core dump or segmentation violation'
@@ -250,19 +280,17 @@ class Test(object):
 
 	Fields:
 
-	 & identity
-	  A unique identifier for the @Test. Usually, a qualified name that can be used to
+	 /identity
+	  A unique identifier for the &Test. Usually, a qualified name that can be used to
 	  locate @focus without having the actual object.
 
-	 & focus
+	 /focus
 	  The callable that performs a series of checks--using the @Test instance--that
 	  determines the @fate.
 
-	 & fate
-	  The conclusion of the Test; pass, fail, error, skip. An instance of @BaseException
+	 /fate
+	  The conclusion of the Test; pass, fail, error, skip. An instance of &BaseException
 	  subclass.
-
-	&fields
 	"""
 	__slots__ = ('focus', 'identity', 'constraints', 'fate',)
 
@@ -306,7 +334,7 @@ class Test(object):
 	def __rfloordiv__(self, object):
 		return self.Contention(self, object, True)
 
-	def seal(self):
+	def seal(self, isinstance=isinstance, BaseException=BaseException, Exception=Exception, Fate=Fate):
 		"""
 		Seal the fate of the Test by executing the subject-callable with the Test
 		instance as the only parameter.
@@ -357,7 +385,7 @@ class Test(object):
 	def skip(self, condition):
 		"""
 		Used by test subjects to skip the test given that the provided @condition is
-		@True.
+		&True.
 		"""
 		if condition: raise self.Skip(condition)
 
@@ -396,6 +424,8 @@ class Test(object):
 
 def execute(module):
 	"""
+	A minimal test harness for Python.
+
 	Execute the tests contained in the given container. Usually given a module object.
 
 	.. warning:: No status information is printed. Raises the first negative impact Test.
