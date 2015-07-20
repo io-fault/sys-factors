@@ -98,9 +98,7 @@ def garbage(data, *sources):
 # XXX: This is waiting on libconstruct's completion.
 
 def render(route, source, proc = crossed):
-	"""
-	Create the coverage meta data for the module.
-	"""
+	"Create the coverage meta data for the module."
 	# get paths
 	ir = route
 	mod = ir.module()
@@ -119,16 +117,17 @@ def render(route, source, proc = crossed):
 		return proc((tr/filename).suffix('.gcov').fullpath)
 
 def record(cause, fullname, source, metatype = 'xlines', proc = crossed):
-	"""
-	Update the coverage meta data for the module.
-	"""
+	"Update the coverage meta data for the module."
 	mr = routeslib.Import.from_fullname(fullname)
 	mod = mr.modules()
 	dll = routelib.File.from_absolute(mod.__dll__)
 
 	coverage = render(dll, source, proc = proc)
 	if coverage:
-		settings = [tuple(map(int, x.split(b':', 1)))[2::-1] for x in coverage.split(b'\n') if x]
+		settings = [
+			tuple(map(int, x.split(b':', 1)))[2::-1]
+			for x in coverage.split(b'\n') if x
+		]
 		libmeta.append(metatype, source.fullpath, [(cause, settings)])
 
 def convert(fullname, identity, name = 'lines'):

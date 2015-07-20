@@ -1,9 +1,12 @@
 """
-Module for working with Tracebacks and stacks of Frames.
-
-Useful for Python crash reporting and debuggers.
+Extract retrace XML from a sequence of frames.
 """
+import dis
 import inspect
+import linecache
+import itertools
+
+from . import xml
 
 def traceback_frames(tb, getinnerframes=inspect.getinnerframes):
 	return getinnerframes(tb)
@@ -13,49 +16,56 @@ def stack_frames(level=2, stack=inspect.stack):
 	del s[:-level]
 	return s
 
-class Filter(object):
-	__slots__ = ()
+def frame(frame, attribute=xml.attribute):
+	lineno = frame.f_lineno
+	lasti = frame.f_lasti
+	locals = frame.f_locals
+	code = frame.f_code
 
-	def __new__(typ):
-		return typ._x
-Filter._x = object.__new__(Filter)
-assert Filter() is Filter()
+	file = code.co_filename
+	lines = ""
+	#instructions = dis.get_instructions(code, lineno)
 
-class Snapshot(object):
-	"""
-	A snapshot of a single Frame. Traceback and Frames should be converted
-	to instances of this type.
-	"""
+	yield from xml.element("frame",
+		itertools.chain.from_iterable([
+			xml.element("source", xml.escape_element_string(lines),
+				('xlink:href', ""),
+				absolute=lineno,
+				relative=-1,
+				file=file),
+			xml.element("instructions", None, type="pythong-bytecode")
+		]),
+		identifier=code.co_name
+	)
 
-	def __init__(self, name, classname, lineno, locals, globals):
-		pass
+def traceback(frames):
+	yield from xml.element("traceback",
+		itertools.chain.from_iterable((frame(x[0]) for x in frames))
+	)
 
-	def __str__(self):
-		"""
-		String Representation for printing to simple display devices. (No style support)
-		"""
-		pass
+def snapshot(stacks, filter=None):
+	"Yield out a snapshot of the current frames."
+	yield b'<snapshot>'
+	for x in stacks:
+		yield from traceback(x)
+	yield b'</snapshot>'
 
-	def __repr__(self):
-		super().__repr__()
+if __name__ == '__main__':
+	import sys
 
-class Stack(object):
-	"""
-	A stack of Snapshots.
-	"""
+	try:
+		cause_exception()
+	except:
+		exc, val, tb = sys.exc_info()
 
-class Traceback(Stack):
-	"""
-	A stack derived from a Traceback.
-	"""
+	frames = traceback_frames(tb)
 
-	def __init__(self, traceback):
-		super().__init__(frames)
+	try:
+		for x in snapshot([frames]):
+			sys.stdout.buffer.write(x)
+	except:
+		print('error')
+		raise
 
-class Frame(Stack):
-	"""
-	A stack derived from a Frame.
-	"""
-
-	def __init__(self, frame):
-		pass
+	sys.stdout.buffer.write(b'\n')
+	sys.stdout.flush()

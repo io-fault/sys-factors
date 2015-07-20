@@ -29,7 +29,7 @@ except ImportError:
 	# no namespace concept without pkg_resources
 	def is_namespace(path):
 		return False
-	
+
 	def pkg_distribution(loader):
 		return None
 
@@ -38,6 +38,7 @@ class_ignore = {
 	'__weakref__', # Runtime specific information.
 	'__dict__',    # Class content.
 	'__module__',  # Supplied by context.
+
 	# Exception subclasses will have these attributes.
 	'__cause__',
 	'__context__',
@@ -165,6 +166,9 @@ def _xml_escape_attribute_data(string):
 	string = string.replace('"', '&#34;')
 	string = string.replace('<', '&#60;')
 	return string.encode('utf-8')
+
+def _xml_attribute(identifier, value):
+	return identifier + b'="' + _xml_escape_attribute_data(value) + b'"'
 
 def _xml_object(obj, constants = {None: b'<none/>', True: b'<true/>', False: b'<false/>'}):
 	if isinstance(obj, str):
@@ -350,7 +354,7 @@ def _xml_class(route, module, obj, *path):
 			yield b'<method'
 			yield b' xml:id="'
 			yield '.'.join(path + (k,)).encode('utf-8')
-			yield b'" identifier="' 
+			yield b'" identifier="'
 			yield k.encode('utf-8')
 
 			# Identify the method type.
@@ -376,7 +380,7 @@ def _xml_class(route, module, obj, *path):
 			yield b'<property'
 			yield b' xml:id="'
 			yield '.'.join(path + (k,)).encode('utf-8')
-			yield b'" identifier="' 
+			yield b'" identifier="'
 			yield k.encode('utf-8')
 			yield b'">'
 			yield from _xml_doc(v)
@@ -495,7 +499,15 @@ if __name__ == '__main__':
 	import sys
 	r = routes.Import.from_fullname(sys.argv[1])
 	w = sys.stdout.buffer.write
-	w(b'<?xml version="1.0" encoding="utf-8"?>')
-	for x in python(r):
-		w(x)
-	sys.stdout.flush()
+	try:
+		w(b'<?xml version="1.0" encoding="utf-8"?>')
+		for x in python(r):
+			w(x)
+		sys.stdout.flush()
+	except:
+		debug = True
+		e = sys.exc_info()
+	if debug:
+		import pdb
+		pdb.post_mortem(e[2])
+

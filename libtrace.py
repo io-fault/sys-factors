@@ -1,8 +1,5 @@
 """
 Code coverage and profiling for use with libtest.
-
-For a real coverage tool, please see coverage.py. libtrace only performs naive coverage
-analysis.
 """
 import sys
 import os.path

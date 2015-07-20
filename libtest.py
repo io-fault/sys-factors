@@ -289,8 +289,7 @@ class Test(object):
 	  determines the @fate.
 
 	 /fate
-	  The conclusion of the Test; pass, fail, error, skip. An instance of &BaseException
-	  subclass.
+	  The conclusion of the Test; pass, fail, error, skip. An instance of &Fate.
 	"""
 	__slots__ = ('focus', 'identity', 'constraints', 'fate',)
 

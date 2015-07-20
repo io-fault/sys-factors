@@ -87,3 +87,7 @@ def creport(package):
 		cn = len(lines)
 		missing.sort()
 		print('%s: %f %r' %(module, ((cn / (tn or 1)) * 100), missing))
+
+if __name__ == '__main__':
+	import sys
+	creport(sys.argv[1])
