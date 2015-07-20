@@ -1,5 +1,6 @@
 "Internal module for supporting XML serialization"
 import itertools
+import inspect
 
 def escape_element_bytes(data):
 	"Escape text for storage inside an XML element."
@@ -74,12 +75,17 @@ def element(element_identifier, content, *attribute_sequence, **attributes):
 	else:
 		yield ("<%s%s/>" %(element_identifier, att)).encode('utf-8')
 
-def object(obj, constants = {None: b'<none/>', True: b'<true/>', False: b'<false/>'}):
+def object(obj,
+	constants={None: b'<none/>', True: b'<true/>', False: b'<false/>'},
+	isbuiltin=inspect.isbuiltin,
+	getmodule=inspect.getmodule,
+	isinstance=isinstance,
+):
 	"Serialize an arbitrary Python object"
 
 	if isinstance(obj, str):
 		yield b'<string xml:space="preserve">'
-		yield from _xml_escape_element_string(obj)
+		yield from escape_element_string(obj)
 		yield b'</string>'
 	elif isinstance(obj, int):
 		yield b'<integer>'
@@ -88,9 +94,9 @@ def object(obj, constants = {None: b'<none/>', True: b'<true/>', False: b'<false
 	elif obj.__hash__ is not None and obj in constants:
 		# int check needs to proceed this condition as hash(1) == hash(True)
 		yield constants[obj]
-	elif isinstance(obj, (bytes,bytearray)):
+	elif isinstance(obj, (bytes, bytearray)):
 		yield b'<bytes xml:space="preserve">'
-		yield from _xml_escape_element_bytes(obj)
+		yield from escape_element_bytes(obj)
 		yield b'</bytes>'
 	elif isinstance(obj, float):
 		yield b'<real>'
@@ -99,31 +105,32 @@ def object(obj, constants = {None: b'<none/>', True: b'<true/>', False: b'<false
 	elif isinstance(obj, tuple):
 		yield b'<tuple>'
 		for x in obj:
-			yield from _xml_object(x)
+			yield from object(x)
 		yield b'</tuple>'
 	elif isinstance(obj, list):
 		yield b'<list>'
 		for x in obj:
-			yield from _xml_object(x)
+			yield from object(x)
 		yield b'</list>'
 	elif isinstance(obj, dict):
 		yield b'<dictionary>'
 		for k, v in obj.items():
 			yield b'<item>'
-			yield from _xml_object(k)
-			yield from _xml_object(v)
+			yield from object(k)
+			yield from object(v)
 			yield b'</item>'
 		yield b'</dictionary>'
 	elif isinstance(obj, set):
 		yield b'<set>'
 		for x in obj:
-			yield from _xml_object(x)
+			yield from object(x)
 		yield b'</set>'
-	elif inspect.isbuiltin(obj):
-		om = inspect.getmodule(obj)
+	elif isbuiltin(obj) or inspect.isroutine(obj):
+		om = getmodule(obj)
 		yield b'<function name="' + (om.__name__ + '.' + obj.__name__).encode('utf-8') + b'">'
 		yield b'</function>'
 	else:
 		yield b'<object>'
-		yield from _xml_escape_element_string(repr(obj))
+		yield from escape_element_string(repr(obj))
 		yield b'</object>'
+

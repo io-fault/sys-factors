@@ -16,6 +16,7 @@ import hashlib
 import types
 
 from ..routes import library as routes
+from . import xml
 
 # If pkg_resources is available, use it to identify explicit namespace packages.
 try:
@@ -32,6 +33,62 @@ except ImportError:
 
 	def pkg_distribution(loader):
 		return None
+
+class Query(object):
+	"""
+	Documentation query object maintaining parameters and functions for extraction.
+	"""
+	class_ignore = {
+		'__doc__',     # Extracted explicitly.
+		'__weakref__', # Runtime specific information.
+		'__dict__',    # Class content.
+		'__module__',  # Supplied by context.
+
+		# Exception subclasses will have these attributes.
+		'__cause__',
+		'__context__',
+		'__suppress_context__',
+		'__traceback__',
+	}
+
+	method_order = (
+		'__init__',
+		'__new__',
+		'__call__',
+	)
+
+	def is_class_method(self, obj):
+		try:
+			inspect.getfullargspec(obj)
+		except TypeError:
+			return False
+
+		return \
+			inspect.ismethod(obj) or \
+			inspect.isbuiltin(obj) or \
+			inspect.isfunction(obj) or \
+			inspect.ismethoddescriptor(obj)
+
+	def is_class_property(self, obj):
+		return \
+			inspect.isgetsetdescriptor(obj) or \
+			inspect.isdatadescriptor(obj)
+
+	def is_module_class(self, obj, module):
+		"""
+		The given object is a plainly defined class that belongs to the module.
+		"""
+		return \
+			inspect.isclass(obj) and \
+			module.__name__ == obj.__module__
+
+	def is_module_function(self, obj, module):
+		"""
+		The given object is a plainly defined function that belongs to the module.
+		"""
+		return \
+			inspect.isroutine(obj) and \
+			module.__name__ == obj.__module__
 
 class_ignore = {
 	'__doc__',     # Extracted explicitly.
@@ -170,58 +227,6 @@ def _xml_escape_attribute_data(string):
 def _xml_attribute(identifier, value):
 	return identifier + b'="' + _xml_escape_attribute_data(value) + b'"'
 
-def _xml_object(obj, constants = {None: b'<none/>', True: b'<true/>', False: b'<false/>'}):
-	if isinstance(obj, str):
-		yield b'<string xml:space="preserve">'
-		yield from _xml_escape_element_string(obj)
-		yield b'</string>'
-	elif isinstance(obj, int):
-		yield b'<integer>'
-		yield str(obj).encode('utf-8')
-		yield b'</integer>'
-	elif obj.__hash__ is not None and obj in constants:
-		# int check needs to proceed this condition as hash(1) == hash(True)
-		yield constants[obj]
-	elif isinstance(obj, (bytes,bytearray)):
-		yield b'<bytes xml:space="preserve">'
-		yield from _xml_escape_element_bytes(obj)
-		yield b'</bytes>'
-	elif isinstance(obj, float):
-		yield b'<real>'
-		yield str(obj).encode('utf-8')
-		yield b'</real>'
-	elif isinstance(obj, tuple):
-		yield b'<tuple>'
-		for x in obj:
-			yield from _xml_object(x)
-		yield b'</tuple>'
-	elif isinstance(obj, list):
-		yield b'<list>'
-		for x in obj:
-			yield from _xml_object(x)
-		yield b'</list>'
-	elif isinstance(obj, dict):
-		yield b'<dictionary>'
-		for k, v in obj.items():
-			yield b'<item>'
-			yield from _xml_object(k)
-			yield from _xml_object(v)
-			yield b'</item>'
-		yield b'</dictionary>'
-	elif isinstance(obj, set):
-		yield b'<set>'
-		for x in obj:
-			yield from _xml_object(x)
-		yield b'</set>'
-	elif inspect.isbuiltin(obj):
-		om = inspect.getmodule(obj)
-		yield b'<function name="' + (om.__name__ + '.' + obj.__name__).encode('utf-8') + b'">'
-		yield b'</function>'
-	else:
-		yield b'<object>'
-		yield from _xml_escape_element_string(repr(obj))
-		yield b'</object>'
-
 def _xml_call_signature(obj):
 	aspec = inspect.getfullargspec(obj)
 	nargs = len(aspec.args)
@@ -233,7 +238,7 @@ def _xml_call_signature(obj):
 
 	if aspec.annotations:
 		yield b'<annotation>'
-		yield from _xml_object(aspec.annotations['return'])
+		yield from xml.object(aspec.annotations['return'])
 		yield b'</annotation>'
 
 	yield b'<signature '
@@ -252,12 +257,12 @@ def _xml_call_signature(obj):
 			yield b'>'
 			if argname in aspec.annotations:
 				yield b'<annotation>'
-				yield from _xml_object(aspec.annotations[argname])
+				yield from xml.object(aspec.annotations[argname])
 				yield b'</annotation>'
 
 			if i >= defaults_start:
 				yield b'<default>'
-				yield from _xml_object(aspec.defaults[i - defaults_start])
+				yield from xml.object(aspec.defaults[i - defaults_start])
 				yield b'</default>'
 
 			yield b'</positional>'
@@ -270,12 +275,12 @@ def _xml_call_signature(obj):
 
 		if k in aspec.annotations:
 			yield b'<annotation>'
-			yield from _xml_object(aspec.annotations[k])
+			yield from xml.object(aspec.annotations[k])
 			yield b'</annotation>'
 
 		if aspec.kwonlydefaults:
 			yield b'<default>'
-			yield from _xml_object(aspec.kwonlydefaults[k])
+			yield from xml.object(aspec.kwonlydefaults[k])
 			yield b'</default>'
 
 	yield b'</signature>'
@@ -313,9 +318,16 @@ def _xml_import(module, *path):
 	))
 
 def _xml_source_range(obj):
-	lines, lineno = inspect.getsourcelines(obj)
-	end = lineno + len(lines)
-	return b'<source unit="line" start="' + str(lineno).encode('utf-8') + b'" end="' + str(end).encode('utf-8') + b'"/>'
+	try:
+		lines, lineno = inspect.getsourcelines(obj)
+		end = lineno + len(lines)
+		return b'<source unit="line" start="' + str(lineno).encode('utf-8') + b'" stop="' + str(end).encode('utf-8') + b'"/>'
+	except TypeError:
+		return b'<source/>'
+
+@functools.lru_cache(32)
+def _encode(s, encoding = 'utf-8'):
+	return s.encode(encoding)
 
 def _xml_class(route, module, obj, *path):
 	yield b'<class '
@@ -338,6 +350,9 @@ def _xml_class(route, module, obj, *path):
 	yield b'</order>'
 
 	aliases = []
+	class_dict = obj.__dict__
+	class_names = list(class_dict.keys())
+	class_names.sort()
 
 	for k in sorted(dir(obj)):
 		if k in class_ignore:
@@ -349,6 +364,9 @@ def _xml_class(route, module, obj, *path):
 			if v.__name__.split('.')[-1] != k:
 				# it's an alias to another method.
 				aliases.append((k, v))
+				continue
+			if k not in class_names:
+				# not in the immediate class' dictionary? ignore.
 				continue
 
 			yield b'<method'
@@ -368,7 +386,7 @@ def _xml_class(route, module, obj, *path):
 
 			if mtype is not None:
 				yield b'" type="'
-				yield mtype
+				yield _encode(mtype)
 
 			yield b'">'
 
@@ -421,6 +439,7 @@ def python(route):
 	yield b'<source path="'
 	yield module.__file__.encode('utf-8')
 	yield b'"><hash type="sha512" format="hex">'
+
 	with open(module.__file__, mode='rb') as src:
 		h = hashlib.sha512()
 
@@ -475,7 +494,7 @@ def python(route):
 				b'" xml:id="', ident,
 				b'">'
 			))
-			yield from _xml_object(v)
+			yield from xml.object(v)
 			yield b'</data>'
 
 	yield b'</module></factor>'
@@ -501,13 +520,12 @@ if __name__ == '__main__':
 	w = sys.stdout.buffer.write
 	try:
 		w(b'<?xml version="1.0" encoding="utf-8"?>')
-		for x in python(r):
+		i = python(r)
+		for x in i:
 			w(x)
 		sys.stdout.flush()
 	except:
-		debug = True
 		e = sys.exc_info()
-	if debug:
 		import pdb
 		pdb.post_mortem(e[2])
 
