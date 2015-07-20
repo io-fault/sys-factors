@@ -3,7 +3,7 @@ A testing library that minimizes the distance between the test harness, and
 the actual tests for the purpose of keeping the execution machinary as simple as possible.
 
 libtest provides the very basics for testing in Python. Test harnesses are implemented else-
-where as they tend to be significant pieces of code. However, a trivial @execute
+where as they tend to be significant pieces of code. However, a trivial &execute
 function is provided that, when given a module, will execute the tests therein. Exceptions
 are allowed to raise normally in order to report failures of any kind.
 """
@@ -38,7 +38,7 @@ def get_test_index(tester, int=int, set=set, AttributeError=AttributeError):
 
 def test_order(kv):
 	"""
-	Key function used by &gather that uses @get_test_index in
+	Key function used by &gather that uses &get_test_index in
 	order to elevate a test's position given that it was explicitly listed.
 	"""
 	return get_test_index(kv[1])
@@ -63,7 +63,7 @@ def gather(container, prefix = 'test_', key=test_order, getattr=getattr):
 	return tests
 
 class Absurdity(Exception):
-	"Exception raised by @Contention instances."
+	"Exception raised by &Contention instances."
 
 	operator_names_mapping = {
 		'__eq__': '==',
@@ -91,9 +91,9 @@ class Absurdity(Exception):
 # Exposes an assert like interface to Test objects.
 class Contention(object):
 	"""
-	Contentions are objects used by @Test objects to provide assertions.
+	Contentions are objects used by &Test objects to provide assertions.
 	Usually, contention instances are made by the true division operator of
-	@Test instances passed into unit test subjects.
+	&Test instances passed into unit test subjects.
 
 		import featurelib
 
@@ -158,7 +158,7 @@ class Contention(object):
 
 	def __xor__(self, subject):
 		"""
-		Contend that the @subject raises the given exception when it is called::
+		Contend that the &subject raises the given exception when it is called::
 
 			test/Exception ^ subject
 
@@ -171,7 +171,7 @@ class Contention(object):
 
 	def __lshift__(self, subject):
 		"""
-		Contend that the parameter is contained by the object, @Container::
+		Contend that the parameter is contained by the object, &Container::
 
 			test/Container << subject
 
@@ -182,7 +182,7 @@ class Contention(object):
 
 class Fate(BaseException):
 	"""
-	The Fate of a test. @Test.seal uses @Fate exception to describe the result of a unit test.
+	The Fate of a test. &Test.seal uses &Fate exception to describe the result of a unit test.
 	"""
 	name = 'fate'
 	content = None
@@ -282,11 +282,11 @@ class Test(object):
 
 	 /identity
 	  A unique identifier for the &Test. Usually, a qualified name that can be used to
-	  locate @focus without having the actual object.
+	  locate &focus without having the actual object.
 
 	 /focus
-	  The callable that performs a series of checks--using the @Test instance--that
-	  determines the @fate.
+	  The callable that performs a series of checks--using the &Test instance--that
+	  determines the &fate.
 
 	 /fate
 	  The conclusion of the Test; pass, fail, error, skip. An instance of &Fate.
@@ -338,8 +338,8 @@ class Test(object):
 		Seal the fate of the Test by executing the subject-callable with the Test
 		instance as the only parameter.
 
-		Any exception that occurs is trapped and assigned to the @fate attribute
-		on the Test instance. @None is always returned by @seal.
+		Any exception that occurs is trapped and assigned to the &fate attribute
+		on the Test instance. &None is always returned by &seal.
 		"""
 		tb = None
 
@@ -383,7 +383,7 @@ class Test(object):
 
 	def skip(self, condition):
 		"""
-		Used by test subjects to skip the test given that the provided @condition is
+		Used by test subjects to skip the test given that the provided &condition is
 		&True.
 		"""
 		if condition: raise self.Skip(condition)
@@ -393,15 +393,15 @@ class Test(object):
 
 	def trap(self):
 		"""
-		Set a trap for exceptions converting an would-be @Error fate on exit to a @Failure.
+		Set a trap for exceptions converting an would-be &Error fate on exit to a &Failure.
 
 			with test.trap():
 				...
 
-		This allows @fail implementations set a trace prior to exiting
-		the test's @focus.
+		This allows &fail implementations set a trace prior to exiting
+		the test's &focus.
 
-		@Fate exceptions are not trapped.
+		&Fate exceptions are not trapped.
 		"""
 		return (self / None.__class__)
 
