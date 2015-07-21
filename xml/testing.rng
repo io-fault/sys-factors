@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML description of a language agnostic Traceback; a stack of frames !-->
+<grammar
+ xmlns="http://relaxng.org/ns/structure/1.0"
+ ns="https://fault.io/xml/retest"
+ datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes"
+ xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0">
+
+ <a:documentation>
+  Grammar for representing test reports. (retest: TEST REports)
+ </a:documentation>
+
+ <include href="traceback.rng"/>
+
+ <define name="na">
+  <a:documentation>Name attribute used on most elements.</a:documentation>
+  <optional>
+   <attribute name="xml:id">
+    <a:documentation>
+     Fully qualified unique identifier relative to the test context
+    </a:documentation>
+    <data type="ID"/>
+   </attribute>
+  </optional>
+  <attribute name="identifier">
+   <data type="normalizedString"/>
+  </attribute>
+ </define>
+
+ <define name="xml.space">
+  <attribute name="xml:space">
+   <choice>
+    <value>default</value>
+    <value>preserve</value>
+   </choice>
+  </attribute>
+ </define>
+
+ <define name="report">
+  <a:documentation>A hierarchy of test results.</a:documentation>
+  <element name="report">
+   <zeroOrMore>
+    <ref name="test"/>
+   </zeroOrMore>
+  </element>
+ </define>
+
+ <define name="timing">
+  <attribute name="start"><data type="timestamp"/></attribute>
+  <attribute name="stop"><data type="timestamp"/></attribute>
+  <attribute name="duration"><data type="integer"/></attribute>
+ </define>
+
+ <define name="test">
+  <element name="test">
+   <ref name="na"/>
+   <ref name="timing"/>
+
+   <choice>
+    <zeroOrMore>
+     <ref name="test"/>
+    </zeroOrMore>
+    <empty/>
+    <ref name="snapshot"/> <!-- traceback -->
+   </choice>
+  </element>
+ </define>
+</grammar>
+
+<report xmlns="https://fault.io/xml/retest">
+ <test fate="division" xml:id="pkg.test" identifier="test">
+  <test fate="division" identifier="test_library">
+   <test fate="return" identifier="test_feature" start="" stop="" duration=""/>
+   <test fate="fail" identifier="test_another_feature">
+    <snapshot xmlns="https://fault.io/xml/retrace">
+     <traceback>...</traceback>
+     <interrupt>...</interrupt>
+    </snapshot>
+   </test>
+  </test>
+ </test>
+</report>
+<!--
+ ! vim: et:ts=1:sw=1:
+ !-->
