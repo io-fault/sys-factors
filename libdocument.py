@@ -16,7 +16,7 @@ import hashlib
 import types
 
 from ..routes import library as routes
-from . import xml
+from .xml import library as xml
 
 # If pkg_resources is available, use it to identify explicit namespace packages.
 try:

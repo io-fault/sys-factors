@@ -182,7 +182,7 @@ class Contention(object):
 
 class Fate(BaseException):
 	"""
-	The Fate of a test. &Test.seal uses &Fate exception to describe the result of a unit test.
+	The Fate of a test. &Test.seal uses &Fate exceptions to describe the result of a unit test.
 	"""
 	name = 'fate'
 	content = None

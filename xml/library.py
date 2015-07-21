@@ -134,3 +134,65 @@ def object(obj,
 		yield from escape_element_string(repr(obj))
 		yield b'</object>'
 
+def frame(frame, attribute=attribute, chain=itertools.chain.from_iterable):
+	lineno = frame.f_lineno
+	lasti = frame.f_lasti
+	locals = frame.f_locals
+	code = frame.f_code
+
+	file = code.co_filename
+	lines = ""
+	#instructions = dis.get_instructions(code, lineno)
+
+	yield from element("frame",
+		chain([
+			element("source", escape_element_string(lines),
+				('xlink:href', ""),
+				absolute=lineno,
+				relative=-1,
+				file=file),
+			xml.element("instructions", None, type="pythong-bytecode")
+		]),
+		identifier=code.co_name
+	)
+
+def traceback(frames):
+	yield from xml.element("traceback",
+		itertools.chain.from_iterable((frame(x[0]) for x in frames))
+	)
+
+def snapshot(stacks, filter=None):
+	"Yield out a snapshot of the current frames."
+	yield b'<snapshot>'
+	for x in stacks:
+		yield from traceback(x)
+	yield b'</snapshot>'
+
+def test(fate):
+	"Yield out a fate description."
+	t = fate.test
+	f = fate.name
+	i = fate.impact
+	c = fate.code
+	color = fate.color
+	pass
+
+if __name__ == '__main__':
+	import sys
+
+	try:
+		cause_exception()
+	except:
+		exc, val, tb = sys.exc_info()
+
+	frames = traceback_frames(tb)
+
+	try:
+		for x in snapshot([frames]):
+			sys.stdout.buffer.write(x)
+	except:
+		print('error')
+		raise
+
+	sys.stdout.buffer.write(b'\n')
+	sys.stdout.flush()
