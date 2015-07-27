@@ -57,38 +57,57 @@ class Query(object):
 		'__call__',
 	)
 
-	def is_class_method(self, obj):
+	def is_class_method(self, obj,
+		getfullargspec = inspect.getfullargspec,
+		checks = (
+			inspect.ismethod,
+			inspect.isbuiltin,
+			inspect.isfunction,
+			inspect.ismethoddescriptor,
+		)
+	):
 		try:
-			inspect.getfullargspec(obj)
+			getfullargspec(obj)
 		except TypeError:
 			return False
 
-		return \
-			inspect.ismethod(obj) or \
-			inspect.isbuiltin(obj) or \
-			inspect.isfunction(obj) or \
-			inspect.ismethoddescriptor(obj)
+		return any(x(obj) for x in checks)
 
-	def is_class_property(self, obj):
-		return \
-			inspect.isgetsetdescriptor(obj) or \
-			inspect.isdatadescriptor(obj)
+	def is_class_property(self, obj,
+		checks = (
+			inspect.isgetsetdescriptor,
+			inspect.isdatadescriptor,
+		)
+	):
+		return any(x(obj) for x in checks)
 
-	def is_module_class(self, obj, module):
+	def is_module_class(self, obj, module, isclass=inspect.isclass):
 		"""
 		The given object is a plainly defined class that belongs to the module.
 		"""
-		return \
-			inspect.isclass(obj) and \
-			module.__name__ == obj.__module__
+		return isclass(obj) and module.__name__ == obj.__module__
 
-	def is_module_function(self, obj, module):
+	def is_module_function(self, obj, module, isroutine=inspect.isroutine):
 		"""
 		The given object is a plainly defined function that belongs to the module.
 		"""
-		return \
-			inspect.isroutine(obj) and \
-			module.__name__ == obj.__module__
+		return isroutine(obj) and module.__name__ == obj.__module__
+
+	def addressable(obj,
+		ismodule=inspect.ismodule,
+		getmodule=inspect.getmodule,
+	):
+		"""
+		Whether the object is independently addressable.
+		Specifically, it is a module or inspect.getmodule() not return None
+		*and* can `obj` be found within the module's objects.
+
+		The last condition is used to prevent broken links.
+		"""
+		return ismodule(obj) or (
+			getmodule(obj) is not None and \
+			id(obj) in [id(v) for v in getmodule(obj).__dict__.itervalues()]
+		)
 
 class_ignore = {
 	'__doc__',     # Extracted explicitly.
@@ -161,6 +180,7 @@ def project(module, _get_route = routes.Import.from_fullname):
 		try:
 			d = pkg_distribution(module.__loader__)
 		except (AttributeError, ImportError):
+			# try Route.project() as there is no pkg_distribution
 			pass
 		finally:
 			if d is not None:
