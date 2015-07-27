@@ -65,11 +65,13 @@ def gather(container, prefix = 'test_', key=test_order, getattr=getattr):
 class Absurdity(Exception):
 	"Exception raised by &Contention instances."
 
+	# for re-constituting the expression
 	operator_names_mapping = {
 		'__eq__': '==',
 		'__ne__': '!=',
 		'__le__': '<=',
 		'__ge__': '>=',
+
 		'__mod__': 'is',
 		'__truediv__': 'isinstance',
 		'__sub__': 'issubclass',
@@ -86,7 +88,7 @@ class Absurdity(Exception):
 		return ('not ' if self.inverse else '') + ' '.join((repr(self.former), opchars, repr(self.latter)))
 
 	def __repr__(self):
-		return '{0}({1!r}, {2!r}, {3!r}, inserse={4!r})'.format(self.__name__, self.operator, self.former, self.latter, self.inverse)
+		return '{0}({1!r}, {2!r}, {3!r}, inverse={4!r})'.format(self.__name__, self.operator, self.former, self.latter, self.inverse)
 
 # Exposes an assert like interface to Test objects.
 class Contention(object):
@@ -274,6 +276,23 @@ class Core(Fail):
 	code = 90
 	color = 'orange'
 
+fate_exceptions = {
+	x.name: x
+	for x in [
+		Fate,
+		Pass,
+		Return,
+		Explicit,
+		Skip,
+		Divide,
+		Fail,
+		Void,
+		Expire,
+		Interrupt,
+		Core,
+	]
+}
+
 class Test(object):
 	"""
 	An object that manages an individual test unit and it's execution.
@@ -434,3 +453,4 @@ def execute(module):
 		test.seal()
 		if test.fate.impact < 0:
 			raise test.fate
+
