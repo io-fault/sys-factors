@@ -11,12 +11,8 @@ import functools
 import types
 import importlib
 
-from .. import bootstrap
-from .. import slot
-
 from ...routes import library as routeslib
 from ...fork import library as forklib
-from ...txt import libint
 
 from .. import libtest
 from .. import libcore
@@ -26,7 +22,6 @@ from .. import coverage
 
 def color(color, text, _model = "∫text xterm.fg.%s∫"):
 	return text
-	#return libint.Model(_model % (color,)).argformat(text)
 
 def color_identity(identity):
 	parts = identity.split('.')
@@ -41,6 +36,8 @@ working_fate_messages = color('0x1c1c1c', '+' + ('/\\' * 5) + '+')
 bottom_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+')
 
 class Test(libtest.Test):
+	__slots__ = libtest.Test.__slots__ + ('proceeding',)
+
 	def seal(self):
 		with self.proceeding.tracing(self.proceeding.package, self.identity):
 			return super().seal()
@@ -225,8 +222,8 @@ class Proceeding(object):
 
 		return report
 
-	def execute(self, container, modules, division = False):
-		if division:
+	def execute(self, container, modules, division = None):
+		if division is None:
 			sys.stderr.write(top_fate_messages + '\n')
 
 		for tid, tcall in getattr(container, '__tests__', ()):
@@ -234,7 +231,7 @@ class Proceeding(object):
 			test.proceeding = self
 			self._dispatch(test)
 
-		if division:
+		if division is None:
 			sys.stderr.write(bottom_fate_messages + '\n')
 
 def main(package, modules):
@@ -247,7 +244,6 @@ def main(package, modules):
 	m = types.ModuleType("testing")
 	m.__tests__ = [(package + '.test', p.package_test)]
 
-	sys.stderr.write(top_fate_messages + '\n')
 	p.execute(m, modules)
 
 	raise SystemExit(0)
