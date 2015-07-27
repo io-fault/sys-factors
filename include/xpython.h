@@ -1,46 +1,55 @@
-/*
- * Extended Python C-APIs
- */
+/* Extended Python C-APIs */
 #define _PyLoop_Error(ITER) goto _PYERR_LABEL_##ITER
+#define _PyLoop_PassThrough(ITEM, OUTPUT, ...) ((*(OUTPUT) = ITEM) ? NULL : NULL)
 #define _PyLoop_NULL_INJECTION() ;
 #define PyLoop_ITEM _ITEM
 
-#define _PyLoop_Iterator(INJECTION, CONVERT_SUCCESS, CONVERT, ITER, GETITER, ...) \
+#define _PyLoop_Iterator(INJECTION, CONVERT_SUCCESS, CONVERT, GETITER, ITER, ...) \
 { \
 	PyObj _ITER = NULL; \
-	PyObj PyLoop_ITEM; \
-\
+	PyObj _PyLoop_ITEM = NULL; \
+	\
 	INJECTION() \
-\
+	\
 	_ITER = GETITER(ITER); \
 	if (_ITER == NULL) \
 		_PyLoop_Error(ITER); \
 	else \
 	{ \
-		while ((PyLoop_ITEM = PyIter_Next(_ITER)) != NULL) \
+		while ((_PyLoop_ITEM = PyIter_Next(_ITER)) != NULL) \
 		{ \
-			if (CONVERT(PyLoop_ITEM, __VA_ARGS__) != CONVERT_SUCCESS) \
+			if (CONVERT(_PyLoop_ITEM, __VA_ARGS__) != CONVERT_SUCCESS) \
 			{ \
-				Py_XDECREF(PyLoop_ITEM); \
+				Py_XDECREF(_PyLoop_ITEM); \
+				_PyLoop_ITEM = NULL; \
+				Py_XDECREF(_ITER); \
+				_ITER = NULL; \
 				_PyLoop_Error(ITER); \
 			} \
 
-#define PyLoop_CatchError(ITER) \
-			Py_DECREF(PyLoop_ITEM); \
+			#define PyLoop_CatchError(ITER) \
+			Py_DECREF(_PyLoop_ITEM); \
 		} \
-		Py_XDECREF(PyLoop_ITEM); \
-		PyLoop_ITEM = NULL; \
+		\
+		Py_XDECREF(_PyLoop_ITEM); \
+		_PyLoop_ITEM = NULL; \
+		Py_XDECREF(_ITER); \
+		_ITER = NULL; \
 	} \
-\
-	_PYERR_LABEL_##ITER: \
+	\
 	if (PyErr_Occurred()) \
 	{ \
+		_PYERR_LABEL_##ITER: \
 
-#define PyLoop_End(ITER) \
+		#define PyLoop_End(ITER) \
 	} \
 }
 
 #define PyLoop_ForEachTuple(ITER, ...) \
-	_PyLoop_Iterator(_PyLoop_NULL_INJECTION, 0, PyArg_ParseTuple, ITER, PyObject_GetIter, __VA_ARGS__)
+	_PyLoop_Iterator(_PyLoop_NULL_INJECTION, 1, PyArg_ParseTuple, PyObject_GetIter, ITER, __VA_ARGS__)
 #define PyLoop_ForEachDictItem(DICT, ...) \
-	_PyLoop_Iterator(_PyLoop_NULL_INJECTION, 0, PyArg_ParseTuple, DICT, PyDict_Items, __VA_ARGS__)
+	_PyLoop_Iterator(_PyLoop_NULL_INJECTION, 1, PyArg_ParseTuple, _PyLoop_DictionaryItems, DICT, __VA_ARGS__)
+
+/* For Each item in iterator loop with no conversion. */
+#define PyLoop_ForEach(ITER, ...) \
+	_PyLoop_Iterator(_PyLoop_NULL_INJECTION, NULL, _PyLoop_PassThrough, PyObject_GetIter, ITER, __VA_ARGS__)
