@@ -93,7 +93,7 @@ class Toolset(object):
 		:param directories: A sequence of include directories. (-I)
 		:type directories: :py:class:`str`
 		"""
-		flags = ('-v', '-fPIC',)
+		flags = ('-g', '-v', '-fPIC',)
 		if sys.platform == 'darwin' and type == 'objc':
 			# assume macosx
 			plat = ('-framework', 'Foundation')
