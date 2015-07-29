@@ -23,6 +23,7 @@ from ..fork import library as forklib
 from . import libmeta
 from . import trace
 
+# Location used to place traces of modules that are outside the package of interest.
 def exopath(route):
 	return (route / '__pycache__' / '__exosource__')
 
@@ -117,7 +118,7 @@ class Tracing(object):
 		"""
 		Destroy all collected data.
 
-		Usually this should be called after :manpage:`fork(2)` when tracing.
+		Usually this should be called after &fork(2) when tracing.
 		"""
 		if self.collections is not None:
 			for x in self.collections:
@@ -202,14 +203,65 @@ class Tracing(object):
 				timing = call_times[(modname, filename, func_lineno, func_name)]
 				timing['cumulative'] += sum
 				timing['resident'] += inner
+
+				# Counter() defaults to zero, so explicitly check for existence.
+				if 'rmin' not in timing or timing['rmin'] > inner:
+					timing['rmin'] = inner
+				if 'cmin' not in timing or timing['cmin'] > inner:
+					timing['cmin'] = sum
+
+				timing['rmax'] = max(inner, timing['rmax'])
+				timing['cmax'] = max(sum, timing['cmax'])
+
 				exact_call_times[(modname, filename, func_lineno, func_name)].append((sum, inner))
 
+		# calc stddev; the exact times were tracked in exact_call_times,
+		# and the initial aggregates in call_times
+		for key, agg in call_times.items():
+			xct = exact_call_times[key]
+			n = len(xct)
+			if not n:
+				continue
+
+			cfreq = collections.Counter()
+			rfreq = collections.Counter()
+
+			caverage = agg['cumulative'] / n
+			raverage = agg['resident'] / n
+			for cumulative, resident in xct:
+				agg['cdst'] += abs(cumulative - caverage)
+				agg['rdst'] += abs(resident - raverage)
+				agg['cvar'] += (cumulative - caverage) ** 2
+				agg['rvar'] += (resident - raverage) ** 2
+				cfreq[cumulative] += 1
+				rfreq[resident] += 1
+
+			# mode and median does't seem to be particularly useful,
+			# so don't bother calculating them for the report.
+			if False:
+				# modes
+				cfreq = list(cfreq.items())
+				rfreq = list(rfreq.items())
+				cfreq.sort(key=operator.itemgetter(1))
+				rfreq.sort(key=operator.itemgetter(1))
+				agg['cmode'] = cfreq[0]
+				agg['rmode'] = rfreq[0]
+
+			# medians
+			if False:
+				cfreq.sort(key=operator.itemgetter(0))
+				rfreq.sort(key=operator.itemgetter(0))
+				index, remainder = n % 2
+				agg['cmedian'] = cfreq[n//2]
+				agg['rmedian'] = rfreq[n//2]
+
+		append = libmeta.append
 		for filename, lines in line_counts.items():
 			evpath = self.cached_realpath(filename)
 			if evpath.startswith(pkgdir):
 				counts = list(lines.items())
 				counts.sort()
-				libmeta.append(libmeta.crossed_name, evpath, [(self.cause, counts)])
+				append(libmeta.crossed_name, evpath, [(self.cause, counts)])
 			# ignore lines outside of our package
 
 		# group by file
@@ -220,6 +272,15 @@ class Tracing(object):
 			r = quantities['resident']
 			n = quantities['count']
 
+			cmin = quantities['cmin']
+			cmax = quantities['cmax']
+			rmin = quantities['rmin']
+			rmax = quantities['rmax']
+			rdst = quantities['rdst']
+			cdst = quantities['cdst']
+			rvar = quantities['rvar']
+			cvar = quantities['cvar']
+
 			# applies to package?
 			evpath = self.cached_realpath(filename)
 			if not evpath.startswith(pkgdir):
@@ -228,7 +289,14 @@ class Tracing(object):
 
 			# {module}.{function}.L{line_number}
 			key = modname + '.' + func_name + '.L' + str(func_lineno)
-			d[evpath].append((key, ','.join(map(str, (n, r, c)))))
+			d[evpath].append((key, str(n),
+				','.join(map(str, (
+					r, rmin, rdst, rvar, rmax,
+				))),
+				','.join(map(str, (
+					c, cmin, cdst, cvar, cmax,
+				))),
+			))
 
 		# write
 		for path, seq in d.items():
