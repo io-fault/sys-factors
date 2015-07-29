@@ -116,7 +116,7 @@ def render(route, source, proc = crossed):
 		# extract and write coverage
 		return proc((tr/filename).suffix('.gcov').fullpath)
 
-def record(cause, fullname, source, metatype = 'xlines', proc = crossed):
+def record(cause, fullname, source, metatype = 'xlines', proc=crossed, append=libmeta.append):
 	"Update the coverage meta data for the module."
 	mr = routeslib.Import.from_fullname(fullname)
 	mod = mr.modules()
@@ -128,7 +128,7 @@ def record(cause, fullname, source, metatype = 'xlines', proc = crossed):
 			tuple(map(int, x.split(b':', 1)))[2::-1]
 			for x in coverage.split(b'\n') if x
 		]
-		libmeta.append(metatype, source.fullpath, [(cause, settings)])
+		append(metatype, source.fullpath, [(cause, settings)])
 
 def convert(fullname, identity, name = 'lines'):
 	"""

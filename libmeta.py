@@ -9,7 +9,6 @@ from . import slot
 
 from ..routes import library as routeslib
 
-meta_type = 'fault-dev-coverage'
 crossed_name = 'crossed-lines'
 crossable_name = 'possible-lines'
 
@@ -59,15 +58,27 @@ def coverage(package):
 				])
 				yield x.fullname, crossed, lines, ignored
 
-def append(type, filepath, settings, from_abs = routeslib.File.from_absolute):
+def append(type, filepath, records,
+	from_abs=routeslib.File.from_absolute,
+	channel=':1', str=str, map=map):
 	"""
-	append(type, filepath, settings)
+	/type
+		String describing the records that will be written.
+
+	/filepath
+		The absolute path of the file that the data is regarding.
+
+	/records
+		A sequence of field sequences to write to the file.
+		The fields will be stored in a tab separated form and should not contain tabs.
+
+	Append the given records to the meta data file identified by the &type and &filepath.
 	"""
 	metadir = slot.route(filepath)
 	meta = metadir/type
 
 	with meta.open(mode='a') as f:
-		for k, v in settings:
+		for k, v in records:
 			f.write(':1 %s\n' % (k,))
 			for s in v:
 				f.write('++ ' + '\t'.join(map(str, s)) + '\n')
