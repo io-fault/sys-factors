@@ -8,7 +8,6 @@ overwriting old data, a new slot identifier can be rendered for every run.
 import os
 import functools
 
-from ..chronometry import library as timelib
 from ..routes import library as routeslib
 
 slot_environment = 'FAULT_DEV_SLOT'
@@ -20,17 +19,31 @@ developer_cache = '__dev__'
 timestamp = None
 identifier = 'uninitialized'
 
-def initialize():
+def initialize(slot_environment = slot_environment):
 	"""
 	Initialize the module's timestamp and identifier globals for developer cache.
+
+	If the slot environment variable, FAULT_DEV_SLOT, is not set, an identifier
+	will generated based on the current demotic time identified by chronometry.
+	When an identifier is generated, it is set to the environment so that child
+	processes automatically use it regardless of how they're executed.
+
+	If a new slot should be used by a child, the environment variable should be unset
+	or set to an empty string. Using fork's Invocation interface, the environment should
+	be altered using its environment variable parameters.
+
+	This function is automatically called when the module is imported.
 	"""
 	global timestamp, identifier
+	from ..chronometry import library as timelib
 
 	timestamp = timelib.now().truncate('second')
-	if 'FAULT_DEV_SLOT' in os.environ:
+	if os.environ.get(slot_environment, None):
+		# Only use the identifier if its not an empty string.
 		identifier = os.environ[slot_environment]
 	else:
 		identifier = timestamp.select("iso")
+		os.environ[slot_environment] = identifier
 
 initialize()
 
@@ -40,7 +53,7 @@ def prefix(route):
 
 def resolve(route, slot_id = None):
 	"""
-	Resolve the developer cache directory. If not @slot_id is provided,
+	Resolve the developer cache directory. If no &slot_id is provided,
 	the `slot_id` in the module's globals is used to allow for modifying the current
 	working slot.
 	"""
