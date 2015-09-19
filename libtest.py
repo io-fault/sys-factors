@@ -85,10 +85,13 @@ class Absurdity(Exception):
 
 	def __str__(self):
 		opchars = self.operator_names_mapping.get(self.operator, self.operator)
-		return ('not ' if self.inverse else '') + ' '.join((repr(self.former), opchars, repr(self.latter)))
+		prefix = ('not ' if self.inverse else '')
+		return prefix + ' '.join((repr(self.former), opchars, repr(self.latter)))
 
 	def __repr__(self):
-		return '{0}({1!r}, {2!r}, {3!r}, inverse={4!r})'.format(self.__name__, self.operator, self.former, self.latter, self.inverse)
+		return '{0}({1!r}, {2!r}, {3!r}, inverse={4!r})'.format(
+			self.__name__, self.operator, self.former, self.latter, self.inverse
+		)
 
 # Exposes an assert like interface to Test objects.
 class Contention(object):
@@ -123,6 +126,7 @@ class Contention(object):
 		'__sub__' : ('issubclass', issubclass),
 		'__mod__' : ('is', lambda x,y: x is y)
 	}
+
 	for k, v in operator.__dict__.items():
 		if k.startswith('__get') or k.startswith('__set'):
 			continue
