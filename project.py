@@ -4,14 +4,10 @@ abstract = 'tools and libraries for supporting a development environment'
 
 identity = 'https://fault.io/project/python/development'
 
-#: Project name.
-name = 'development'
-fork = 'industry'
+name = 'development' # Project name.
+fork = 'bootstraps'
 
 icon = '🐜'
 
-#: Responsible Party
-controller = 'fault.io'
-
-#: Contact point for the Responsible Party
-contact = 'mailto:critical@fault.io'
+controller = 'fault.io' # Responsible Party
+contact = 'mailto:critical@fault.io' # Contact point for the Responsible Party
