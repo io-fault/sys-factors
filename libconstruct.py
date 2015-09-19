@@ -1,45 +1,31 @@
 """
+Manage the process of constructing operating system executables and libraries.
+Bootstrap is used to create the necessary dependencies for &.libconstruct.
 """
-from . import abstract
-from ..routes import library as routeslib
+import sys
+import os.path
+import subprocess
 
-# New Solution WIP
-roles = set([
-	'bootstrap',
-	'debug',
-	'profile',
-	'coverage',
-	'factor',
-	'test',
-	'documentation',
-])
+# The default build role.
+role = 'debug' # default build role; can be updated.
 
-def outerlocals(depth = 0):
-	"""
-	Get the locals dictionary of the calling context.
-
-	If the depth isn't specified, the locals of the caller's caller.
-	"""
-	if depth < 0:
-		raise TypeError("depth must be greater than or equal to zero")
-
-	f = sys._getframe().f_back.f_back
-	while depth:
-		depth -= 1
-		f = f.f_back
-	return f.f_locals
-
+# Specifically for identifying files to be compiled.
 extensions = {
 	'c': ('c',),
 	'c++': ('c++', 'cxx', 'cpp'),
 	'objective-c': ('m',),
 	'ada': ('ads', 'ada'),
-	'assembly': ('asm', 'a'),
-	'bc': ('bc',),
+	'assembly': ('asm',),
+	'bitcode': ('bc',),
 }
 
+languages = {}
+for k, v in extensions.items():
+	for y in v:
+		languages[y] = k
+
 collection = (
-	'cc', 'gcc',
+	'cc', 'gcc', 'msvs', 'llvm'
 )
 
 commands = {
@@ -51,7 +37,7 @@ commands = {
 		'c': (
 			{'cc', 'gcc', 'clang', 'egcs'},
 			('clang', 'cc',)
-		)
+		),
 		'c++': (
 			{'c++', 'gc++', 'clang++',},
 			('clang++',)
@@ -69,28 +55,77 @@ environment = {
 	'objcopy': 'OBJCOPY',
 }
 
-cwindows = 'cl.exe'
+x = dict(
+	cwindows = 'cl.exe',
+	compile = ('cl.exe', '/c'),
+	link = ('cl.exe',),
+	debug_compile = '/Yd',
+	csource = '/Tc',
+	cxxsource = '/Tp',
+)
 
-compile = ('cl.exe', '/c')
-link = ('cl.exe',)
-debug_compile = '/Yd'
-csource = '/Tc'
-cxxsource = '/Tp'
+systems = {
 
-class Toolchain(abstract.Linked):
+}
+
+def select_role():
+	# use override if available; otherwise, use global role in this module
+	if role is None:
+		default_role = sys.modules[__name__].role
+		if default_role is None:
+			role = ('debug' if __debug__ else 'factor')
+		else:
+			role = default_role
+
+def gather(objdir, srcdir, suffixes, suffix_delimiter='.', join=os.path.join):
+	"Recursive acquire sources for compilation and build out objects."
+	os.makedirs(objdir, exist_ok = True)
+	prefix = len(srcdir)
+
+	for path, dirs, files in os.walk(srcdir):
+		# build out sub-directories for object cache
+		for x in dirs:
+			if x == '__pycache__':
+				# there shouldn't be __pycache__ directories here, but ignore anyways
+				continue
+
+		for x in files:
+			suffix = None
+
+			suffix_position = x.rfind(suffix_delimiter)
+			if suffix_position == -1:
+				# no suffix delimiter
+				continue
+			else:
+				# extract suffix; continue if it's not a recognized language
+				suffix = x[suffix_position+1:]
+				if suffix not in languages:
+					continue
+
+			srcpath = join(srcdir, path, x)
+			src_suffix = srcpath[prefix+1:][:-(len(suffix)+len(suffix_delimiter))]
+			objpath = join(objdir, src_suffix) + '.o'
+			objpathdir = os.path.dirname(objpath)
+			if not os.path.exists(objpathdir):
+				os.makedirs(objpathdir, exist_ok = True)
+			yield languages[suffix], srcpath, objpath
+
+class Toolchain(object):
 	"""
 	Toolchain for compiling and linking executables, shared libraries, and dynamically
 	loaded libraries.
 	"""
 
+	# -fPIC is always used for bootstrapped python extensions
 	role_compile_flags = {
 		'factor': ('-O3', '-g'),
 		'debug': ('-O0', '-g'),
-		'test': ('--coverage', '-O0', '-g'),
+		'test': ('-O0', '-g'),
+		'analysis': ('--coverage', '-O0', '-g'),
 	}
 
 	role_link_flags = {
-		'test': ('--coverage', '-ftest-coverage', '-fprofile-arcs'),
+		'analysis': ('--coverage', '-ftest-coverage', '-fprofile-arcs'),
 		'factor': (),
 	}
 
@@ -104,6 +139,7 @@ class Toolchain(abstract.Linked):
 
 	@classmethod
 	def ldll(typ, t, name, version = None, loader = None):
+		"Link DLL libraries on Microsoft systems."
 		if t == 'bin':
 			tfalgs = ()
 			suffix = 'exe'
@@ -121,9 +157,7 @@ class Toolchain(abstract.Linked):
 
 	@classmethod
 	def ldylib(typ, t, name, version = None, loader = None):
-		"""
-		Link .dylib libraries. (macosx/darwin)
-		"""
+		"Link .dylib libraries. (macosx/darwin)"
 		if t == 'bin':
 			tflags = ('-execute', '-lcrt1.o')
 			suffix = 'exe'
@@ -147,9 +181,7 @@ class Toolchain(abstract.Linked):
 
 	@classmethod
 	def lelf(typ, t, name, version = None, loader = None):
-		"""
-		Link ELF libraries. (shared objects on most unix systems)
-		"""
+		"Link ELF libraries. (shared objects on most unix systems)"
 		if t == 'bin':
 			# default is executable
 			tflags = ()
@@ -201,12 +233,15 @@ class Toolchain(abstract.Linked):
 		dependency = None,
 	):
 		"""
-		:param defines: A sequence of key-value pairs that make up parameter defines.
-		:type defines: (:py:class:`str`, :py:class:`str`)
-		:param includes: A sequence of files that will be directly included in the source.  (-include)
-		:type includes: :py:class:`str`
-		:param directories: A sequence of include and framework directories. (-I and -F on applicable platforms)
-		:type directories: :py:class:`str`
+		/defines
+			A sequence of key-value pairs that make up parameter defines.
+			:type defines: (:py:class:`str`, :py:class:`str`)
+		/includes
+			A sequence of files that will be directly included in the source.
+			:type includes: :py:class:`str`
+		/directories
+			A sequence of include and framework directories. (-I and -F on applicable platforms)
+			:type directories: :py:class:`str`
 		"""
 		flags = ('-v', '-fPIC',)
 
@@ -243,12 +278,15 @@ class Toolchain(abstract.Linked):
 		linker = None
 	):
 		"""
-		:param directories: A sequence of library and framework directories. (-L, -F on some systems)
-		:type directories: (:py:class:`str`)
-		:param libraries: A sequence of libraries to dynamically link against the target. (-l)
-		:type libraries: :py:class:`str`
-		:param frameworks: A sequence of frameworks to use for linkage; library sets (-framework)
-		:type frameworks: (:py:class:`str`)
+		/directories
+			A sequence of library and framework directories. (-L, -F on some systems)
+			:type directories: (:py:class:`str`)
+		/libraries
+			A sequence of libraries to dynamically link against the target. (-l)
+			:type libraries: :py:class:`str`
+		/frameworks
+			A sequence of frameworks to use for linkage; library sets (-framework)
+			:type frameworks: (:py:class:`str`)
 		"""
 		basename, canons, link = self.linker(self.type, name, version = version)
 		target = os.path.join(targetdir, basename)

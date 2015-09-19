@@ -1,8 +1,8 @@
 """
 Compilation bootstrapping.
 
-In cases where libconstruct needs to perform compilation, this module can be used
-independently.
+Compilation support based on built-in Python modules designed to allow libconstruct
+to build libraries with (fault) native system interfaces.
 """
 import sys
 import os.path
@@ -16,20 +16,10 @@ import collections
 from . import include # foundation includes
 from . import sysconfig
 from . import libcore # disabling core dumps when in Frame code
+from .core import cache_path
 
-extensions = {
-	'c': ('c',),
-	'c++': ('c++', 'cxx', 'cpp'),
-	'objective-c': ('m',),
-	'ada': ('ads', 'ada'),
-	'assembly': ('asm', 'a'),
-	'bc': ('bc',),
-}
-
-languages = {}
-for k, v in extensions.items():
-	for y in v:
-		languages[y] = k
+from . import extension
+from . import libconstruct
 
 class OrderedSet(object):
 	"""
@@ -54,67 +44,6 @@ class OrderedSet(object):
 
 	def __iter__(self):
 		return iter(self.sequence)
-
-def outerlocals(depth = 0):
-	"""
-	Get the locals dictionary of the calling context.
-
-	If the depth isn't specified, the locals of the caller's caller.
-	"""
-	if depth < 0:
-		raise TypeError("depth must be greater than or equal to zero")
-
-	f = sys._getframe().f_back.f_back
-	while depth:
-		depth -= 1
-		f = f.f_back
-
-	return f.f_locals
-
-if hasattr(imp, 'cache_from_source'):
-	def cache_path(path):
-		"""
-		Given a module path, retrieve the basename of the bytecode file.
-		"""
-		return imp.cache_from_source(path)[:-len('.pyc')]
-else:
-	def cache_path(path):
-		return path[:path.rfind('.py')]
-
-def collect(objdir, srcdir, suffixes, suffix_delimiter = '.', join = os.path.join):
-	"""
-	Recursive acquire sources for compilation and build out objects.
-	"""
-	os.makedirs(objdir, exist_ok = True)
-	prefix = len(srcdir)
-
-	for path, dirs, files in os.walk(srcdir):
-		# build out sub-directories for object cache
-		for x in dirs:
-			if x == '__pycache__':
-				# there shouldn't be __pycache__ directories here, but ignore anyways
-				continue
-
-		for x in files:
-			suffix = None
-
-			suffix_position = x.rfind(suffix_delimiter)
-			if suffix_position == -1:
-				# no suffix delimiter
-				continue
-			else:
-				# extract suffix; continue if it's not a recognized language
-				suffix = x[suffix_position+1:]
-				if suffix not in languages:
-					continue
-
-			srcpath = join(srcdir, path, x)
-			src_suffix = srcpath[prefix+1:][:-(len(suffix)+len(suffix_delimiter))]
-			objpath = join(objdir, src_suffix) + '.o'
-			objpathdir = os.path.dirname(objpath)
-			if not os.path.exists(objpathdir):
-				os.makedirs(objpathdir, exist_ok = True)
-			yield languages[suffix], srcpath, objpath
 
 class Frame(tuple):
 	"""
@@ -395,8 +324,6 @@ class Context(object):
 		self._queue.append(('_dynamic_link', libs))
 
 	def define(self, **defines):
-		"""
-		"""
 		l = list(defines.items())
 		l.sort() # consistent serialization
 		self._queue.append(('_define', l))
@@ -435,7 +362,7 @@ class Context(object):
 
 class Compilation(object):
 	"""
-	Compile and Link C-API modules from C, C++, Objective-C, and Haskell.
+	Compile and Link C-API modules from C, C++, and Objective-C.
 	"""
 
 	#: Call each object in this set upon a successful load of a C-API module.
@@ -551,79 +478,12 @@ class Compilation(object):
 		)
 		self.tools.stage('link', self.target, self.target + '.log', link)
 
-	def load(self, load_dynamic = imp.load_dynamic, exists = os.path.exists, getmtime = os.path.getmtime):
-		fsconditions = (not exists(self.target) or getmtime(self.target) < getmtime(self.sources))
-		if fsconditions:
-			exc = self.build()
-			if exc is not None:
-				raise ImportError(self.fullname) from exc
-
-		try:
-			mod = load_dynamic(self.name, self.target)
-		except Exception:
-			raise ImportError(self.name)
-
-		for x in self.traceset:
-			x(self)
-		return mod
-
-def config(role, module_dict, source_directory):
-	"""
-	Given a package module's dictionary, build the necessary details for locating
-	source files and storing object files.
-	"""
-	parent = module_dict['__package__']
-	dir = os.path.dirname(os.path.abspath(module_dict['__file__']))
-	srcdir = os.path.join(dir, source_directory)
-	pkg, name = module_dict['__name__'].rsplit('.', 1)
-
-	cache_name = '{role}:python-{version}{abiflags}.{platform}'.format(
-		role = role,
-		abiflags = sys.__dict__.get('abiflags', ''),
-		version = ''.join(map(str, sys.version_info[:2])),
-		platform = Compilation.platform,
-	)
-	# For instance, project/pkg/__pycache__/debug:abi.linux/subdir/foo.c
-	objdir = os.path.join(dir, '__pycache__', cache_name)
-
-	# list of (language, source_filepath, object_filepath) tuples.
-	srcobj = list(collect(objdir, srcdir, languages))
-
-	return {
-		'src': srcdir,
-		'obj': objdir,
-		'package': pkg,
-		'name': name,
-		'subject': srcobj,
-		'target': os.path.join(objdir, 'module.pyd'),
-		'role': role,
-	}
-
-def select_role():
-	# use override if available; otherwise, use global role in this module
-	if role is None:
-		default_role = sys.modules[__name__].role
-		if default_role is None:
-			role = ('debug' if __debug__ else 'factor')
-		else:
-			role = default_role
-	ctx['__role__'] = role
-
-def construct(foundation = None, source_directory = 'src'):
+def construct(target, sources, module, role = 'bootstrap', source_directory = 'src'):
 	"""
 	Execute within a package module containing a 'src' directory to build the C-API
 	module using bootstrap's @Compilation.
 	"""
-	ctx = outerlocals()
-
-	cfg = config('bootstrap', ctx, source_directory = source_directory)
-	cl = Compilation(cfg['package'], cfg['name'], cfg['target'], cfg['subject'], cfg['src'], role = 'bootstrap')
-
-	# rewrite the package module contents with that of the extension module
-	m = cl.load()
-	for k, v in m.__dict__.items():
-		if k.startswith('__'):
-			continue
-		ctx[k] = v
-	ctx['__shared_object__'] = m
-	ctx['__bootstrap__'] = cl
+	pkg, name = module.__name__.rsplit('.', 1)
+	subject = list(libconstruct.gather(os.path.dirname(target), sources, libconstruct.languages))
+	cl = Compilation(pkg, name, target, subject, sources, role = role)
+	return cl.build()
