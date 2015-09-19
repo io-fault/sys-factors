@@ -18,12 +18,12 @@ main(int argc, char *argv[])
 	wchar_t **wargv;
 	PyObject *ob, *mod;
 
-#if __FreeBSD__
-	/* from python.c */
-	fp_except_t m;
-	m = fpgetmask();
-	fpsetmask(m & ~FP_X_OFL);
-#endif
+	#if __FreeBSD__
+		/* from python.c */
+		fp_except_t m;
+		m = fpgetmask();
+		fpsetmask(m & ~FP_X_OFL);
+	#endif
 
 	Py_SetProgramName(xname);
 	Py_Initialize();
