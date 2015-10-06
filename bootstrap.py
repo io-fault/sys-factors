@@ -263,6 +263,7 @@ class Context(object):
 	Context objects are given to the C-API's probe module for building out the environment
 	used to compile and link the extension module.
 	"""
+
 	def __init__(self, filepath = None):
 		self._state = None
 		self._queue = None
@@ -447,8 +448,7 @@ class Compilation(object):
 		else:
 			self.fullname = '.'.join((pkg,name))
 
-	def build(self, context = None):
-		context = Context()
+	def build(self, context):
 		copts = context.stack.compile
 
 		defines = self.defines
@@ -484,6 +484,13 @@ def construct(target, sources, module, role = 'bootstrap', source_directory = 's
 	module using bootstrap's @Compilation.
 	"""
 	pkg, name = module.__name__.rsplit('.', 1)
-	subject = list(libconstruct.gather(os.path.dirname(target), sources, libconstruct.languages))
+	tdir = os.path.dirname(target)
+	subject = list(libconstruct.gather(tdir, sources, libconstruct.languages))
 	cl = Compilation(pkg, name, target, subject, sources, role = role)
-	return cl.build()
+
+	# Not the original design...
+	context = Context(os.path.join(tdir, "libconstruct.h"))
+	with context:
+		context.dynamic_link(*getattr(module, 'libraries', ()))
+
+	return cl.build(context)
