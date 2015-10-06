@@ -27,6 +27,7 @@
 				_PyLoop_Error(ITER); \
 			} \
 
+
 			#define PyLoop_CatchError(ITER) \
 			Py_DECREF(_PyLoop_ITEM); \
 		} \
@@ -41,9 +42,22 @@
 	{ \
 		_PYERR_LABEL_##ITER: \
 
+
 		#define PyLoop_End(ITER) \
 	} \
 }
+
+/*
+ * PyLoop_ForEach(iter, &obj)
+ * {
+ *     ...
+ * }
+ * PyLoop_CatchError(iter)
+ * {
+ *     ...
+ * }
+ * PyLoop_End(iter)
+ */
 
 #define PyLoop_ForEachTuple(ITER, ...) \
 	_PyLoop_Iterator(_PyLoop_NULL_INJECTION, 1, PyArg_ParseTuple, PyObject_GetIter, ITER, __VA_ARGS__)
