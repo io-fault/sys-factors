@@ -9,6 +9,8 @@ import os.path
 import sys
 
 platform = platform.system().lower() + '.' + platform.machine().lower()
+del sys.modules['platform']
+
 role = 'debug'
 extension = '.pyd'
 file = 'module'
