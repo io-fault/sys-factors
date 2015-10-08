@@ -53,6 +53,10 @@ def attribute(identifier, value, quote='"', str=str):
 	att += escape_attribute_string(str(value)) + quote
 	return att
 
+def empty(element_identifier):
+	"Return an iterable to an empty element."
+	return ('<' + element_identifier + '/>',)
+
 def element(element_identifier, content, *attribute_sequence, **attributes):
 	"Generate an entire element populating the body by yielding from the given content."
 

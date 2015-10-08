@@ -1,11 +1,5 @@
 """
-Extract the documentation and index of a given Python object.
-
-doc-strings
-argument spec - callables
-type (with references)
-imports
-base classes and mro - classes
+Extract the documentation and index of Python objects.
 """
 import sys
 import os
@@ -38,6 +32,7 @@ class Query(object):
 	"""
 	Documentation query object maintaining parameters and functions for extraction.
 	"""
+
 	class_ignore = {
 		'__doc__',     # Extracted explicitly.
 		'__weakref__', # Runtime specific information.
@@ -199,6 +194,7 @@ def addressable(obj):
 
 	The last condition is used to prevent broken links.
 	"""
+
 	return inspect.ismodule(obj) or (
 		inspect.getmodule(obj) is not None and \
 		id(obj) in [id(v) for v in inspect.getmodule(obj).__dict__.itervalues()]
@@ -208,44 +204,43 @@ def hierarchy(package, _get_route = routes.Import.from_fullname):
 	"""
 	Return a (root, (packages_list, modules_list)) tuple of the contents of the given package.
 	"""
+
 	root = _get_route(package)
 	return (root, root.tree())
 
-def _xml_escape_element_bytes(data):
-	if len(data) < 256:
-		data = data.replace(b'&', b'&#38;')
-		data = data.replace(b'<', b'&#60;')
-		yield data
-	else:
-		c = 0
-		i = data.find(b']]>')
-		while i != -1:
-			yield b'<![CDATA['
-			yield data[c:i]
-			# once for CDATA end and another for the literal
-			yield b']]>]]>'
-			c = i
-			i = data.find(b']]>', c)
+def _xml_object(name, obj):
+	yield from xml.element(name, xml.object(obj))
 
-		if c == 0 and i == -1:
-			# there were not CDATA end sequences in the data.
-			yield b'<![CDATA['
-			yield data
-			yield b']]>'
+def _xml_argument(aspec, index, argname):
+	if argname in aspec.annotations:
+		yield from _xml_object('annotation', aspec.annotations[argname])
 
-def _xml_escape_element_string(string):
-	yield from _xml_escape_element_bytes(string.encode('utf-8'))
+	if i >= defaults_start:
+		yield from _xml_object('default', aspec.defaults[i - defaults_start])
 
-def _xml_escape_attribute_data(string):
-	string = string.replace('&', '&#38;')
-	# unconditionally escape both quotations
-	string = string.replace("'", '&#39;')
-	string = string.replace('"', '&#34;')
-	string = string.replace('<', '&#60;')
-	return string.encode('utf-8')
+def _xml_keywords(aspec):
+	for k in aspec.kwonlyargs:
+		yield from xml.element('keyword',
+			itertools.chain(
+				_xml_object('annotation', aspec.annotations[k]),
+				_xml_object('default', aspec.kwonlydefaults[k]),
+			),
+			('name', k),
+		)
 
-def _xml_attribute(identifier, value):
-	return identifier + b'="' + _xml_escape_attribute_data(value) + b'"'
+def _xml_signature_arguments(aspec, nargs, default_start):
+	for i in range(nargs):
+		argname = aspec.args[i]
+		if argname in aspec.annotations or i >= defaults_start:
+			has_content = True
+		else:
+			has_content = False
+
+		yield from xml.element('positional',
+			_xml_argument(aspec, i, argname) if has_content else None,
+			('name', argname),
+			('index', str(i)),
+		)
 
 def _xml_call_signature(obj):
 	aspec = inspect.getfullargspec(obj)
@@ -257,124 +252,83 @@ def _xml_call_signature(obj):
 		defaults_start = nargs
 
 	if aspec.annotations:
-		yield b'<annotation>'
-		yield from xml.object(aspec.annotations['return'])
-		yield b'</annotation>'
+		yield from _xml_object('annotation', aspec.annotations['return'])
 
-	yield b'<signature '
-	if aspec.varargs is not None:
-		yield b' varargs="' + aspec.varargs.encode('utf-8') + b'"'
-	if aspec.varkw is not None:
-		yield b' varkw="' + aspec.varkw.encode('utf-8') + b'"'
-	yield b'>'
-
-	for i in range(nargs):
-		argname = aspec.args[i]
-		yield b'<positional name="' + argname.encode('utf-8')
-		yield b'" index="' + str(i).encode('utf-8') + b'"'
-
-		if argname in aspec.annotations or i >= defaults_start:
-			yield b'>'
-			if argname in aspec.annotations:
-				yield b'<annotation>'
-				yield from xml.object(aspec.annotations[argname])
-				yield b'</annotation>'
-
-			if i >= defaults_start:
-				yield b'<default>'
-				yield from xml.object(aspec.defaults[i - defaults_start])
-				yield b'</default>'
-
-			yield b'</positional>'
-		else:
-			# be tidy about it being an empty element
-			yield b'/>'
-
-	for k in aspec.kwonlyargs:
-		yield b'<keyword name="' + k.encode('utf-8') + b'">'
-
-		if k in aspec.annotations:
-			yield b'<annotation>'
-			yield from xml.object(aspec.annotations[k])
-			yield b'</annotation>'
-
-		if aspec.kwonlydefaults:
-			yield b'<default>'
-			yield from xml.object(aspec.kwonlydefaults[k])
-			yield b'</default>'
-
-	yield b'</signature>'
+	yield from xml.element('signature',
+		itertools.chain(
+			_xml_signature_arguments(aspec, nargs, default_start),
+		)
+		('varargs', aspec.varargs),
+		('varkw', aspec.varkw),
+	)
 
 def _xml_type(obj):
-	yield b'<type name="' + obj.__name__.encode('utf-8') + b'"'
-	yield b' module="' + obj.__module__.encode('utf-8') + b'"'
-	yield b' path="' + obj.__qualname__.encode('utf-8') + b'"'
-	yield b'/>'
+	yield from xml.element('type', None,
+		('name', obj.__name__),
+		('module', obj.__module__),
+		('path', obj.__qualname__),
+	)
 
 def _xml_doc(obj):
 	doc = inspect.getdoc(obj)
-	if doc is None:
-		yield b''
-	else:
-		yield b'<doc xml:space="preserve">'
-		yield from _xml_escape_element_string(doc)
-		yield b'</doc>'
+	if doc is not None:
+		yield from xml.element('doc', xml.escape_element_string(doc),
+			('xml:space', 'preserve')
+		)
 
 def _xml_import(module, *path):
 	if False:
-		pkgtype = b'project-local'
+		pkgtype = 'project-local'
 	elif 'site-packages' in module.__name__:
 		# *normally* distutils or distutils compliant package.
-		pkgtype = b'distutils'
+		pkgtype = 'distutils'
 	else:
-		pkgtype = b'builtin'
+		pkgtype = 'builtin'
 
-	return b''.join((
-		b'<import identifier="', path[-1].encode('utf-8'), b'"',
-		b' name="', _xml_escape_attribute_data(module.__name__), b'"',
-		b' xml:id="', '.'.join(path).encode('utf-8'), b'"',
-		b' source="', pkgtype, b'"',
-		b'/>',
-	))
+	return element("import", None,
+		('identifier', path[-1]),
+		('name', module.__name__),
+		('xml:id', '.'.join(path)),
+		('source', pkgtype),
+	)
 
 def _xml_source_range(obj):
 	try:
 		lines, lineno = inspect.getsourcelines(obj)
 		end = lineno + len(lines)
-		return b'<source unit="line" start="' + str(lineno).encode('utf-8') + b'" stop="' + str(end).encode('utf-8') + b'"/>'
+
+		return xml.element('source', None,
+			('unit', 'line'),
+			('start', str(lineno)),
+			('stop', str(end)),
+		)
 	except TypeError:
-		return b'<source/>'
+		return xml.empty('source')
 
-@functools.lru_cache(32)
-def _encode(s, encoding = 'utf-8'):
-	return s.encode(encoding)
+def _xml_function(method):
+	yield from _xml_source_range(method)
+	yield from _xml_doc(method)
+	yield from _xml_call_signature(method)
 
-def _xml_class(route, module, obj, *path):
-	yield b'<class '
-	yield b' xml:id="' + '.'.join(path).encode('utf-8') + b'"'
-	yield b' identifier="' + path[-1].encode('utf-8') + b'"'
-
-	yield b'>'
-	yield _xml_source_range(obj)
-
+def _xml_class_content(route, module, obj, *path):
+	yield from _xml_source_range(obj)
 	yield from _xml_doc(obj)
 
-	yield b'<bases>'
 	for x in obj.__bases__:
-		yield from _xml_type(x)
-	yield b'</bases>'
+		yield from xml.element('bases', _xml_type(x))
 
-	yield b'<order>'
 	for x in inspect.getmro(obj):
-		yield from _xml_type(x)
-	yield b'</order>'
+		yield from xml.element('order', _xml_type(x))
 
 	aliases = []
 	class_dict = obj.__dict__
 	class_names = list(class_dict.keys())
 	class_names.sort()
+	nested_classes = []
 
 	for k in sorted(dir(obj)):
+		qn = '.'.join(path + (k,))
+
 		if k in class_ignore:
 			continue
 
@@ -383,83 +337,59 @@ def _xml_class(route, module, obj, *path):
 		if is_class_method(v):
 			if v.__name__.split('.')[-1] != k:
 				# it's an alias to another method.
-				aliases.append((k, v))
+				aliases.append((qn, k, v))
 				continue
 			if k not in class_names:
 				# not in the immediate class' dictionary? ignore.
 				continue
 
-			yield b'<method'
-			yield b' xml:id="'
-			yield '.'.join(path + (k,)).encode('utf-8')
-			yield b'" identifier="'
-			yield k.encode('utf-8')
-
 			# Identify the method type.
-			if isinstance(v, classmethod) or k == '__new__':
+			if isinstance(method, classmethod) or k == '__new__':
 				mtype = 'class'
-			elif isinstance(obj, staticmethod):
+			elif isinstance(method, staticmethod):
 				mtype = 'static'
 			else:
 				# regular method
 				mtype = None
 
-			if mtype is not None:
-				yield b'" type="'
-				yield _encode(mtype)
-
-			yield b'">'
-
-			yield _xml_source_range(v)
-			yield from _xml_doc(v)
-			yield from _xml_call_signature(v)
-			yield b'</method>'
+			yield from xml.element('method', _xml_function(v),
+				('xml:id', qn),
+				('identifier', k),
+				('type', mtype),
+			)
 		elif is_class_property(v):
-			yield b'<property'
-			yield b' xml:id="'
-			yield '.'.join(path + (k,)).encode('utf-8')
-			yield b'" identifier="'
-			yield k.encode('utf-8')
-			yield b'">'
-			yield from _xml_doc(v)
-			yield b'</property>'
+			yield from xml.element(
+				'property', _xml_doc(v),
+				('xml:id', qn),
+				('identifier', k),
+			)
 		elif inspect.ismodule(v):
 			# handled the same way as module imports
-			yield _xml_import(v, k)
+			yield from _xml_import(v, k)
 		else:
 			pass
 
-	for k, v in aliases:
-		yield b'<alias xml:id="' + '.'.join(path + (k,)).encode('utf-8')
-		yield b'" identifier="' + k.encode('utf-8')
-		yield b'" address="' + v.__name__.encode('utf-8') + b'"/>'
+	for qn, k, v in aliases:
+		yield from xml.element('alias', None,
+			('xml:id', qn),
+			('identifier', k),
+			('address', v.__name__),
+		)
 
-	yield b'</class>'
+	# _xml_class will populated nested_classes for processing
+	while nested_classes:
+		c = nested_classes[-1]
+		del nested_classes[-1]
+		yield from _xml_class(route, module, c, c.__qualname__)
 
-def python(route):
-	"""
-	Yield out a module element for writing to an XML file exporting the documentation,
-	data, and signatures of the module's content.
-	"""
-	module = route.module()
-	modtype = b'package' if module.__file__.endswith('__init__.py') else b'module'
+def _xml_class(route, module, obj, *path):
+	yield from xml.element('class',
+		_xml_class_content(route, module, obj, *path),
+		('xml:id', '.'.join(path)),
+		('identifier', path[-1]),
+	)
 
-	bottom = route.bottom()
-	prefix = bottom.container.fullname
-	project_package = bottom.basename
-
-	yield b''.join((
-		b'<factor domain="python" xmlns="https://fault.io/xml/documentation">',
-		b'<module',
-		b' identifier="', route.basename.encode('utf-8'), b'"',
-		b' xml:id="', module.__name__.encode('utf-8'), b'"',
-		b'>'
-	))
-
-	yield b'<source path="'
-	yield module.__file__.encode('utf-8')
-	yield b'"><hash type="sha512" format="hex">'
-
+def _xml_module(mod):
 	with open(module.__file__, mode='rb') as src:
 		h = hashlib.sha512()
 
@@ -469,19 +399,28 @@ def python(route):
 			data = src.read(512)
 			h.update(data)
 
-		yield h.hexdigest().encode('utf-8')
-	yield b'</hash></source>'
+		hash = h.hexdigest()
+
+	yield from xml.element('source',
+		xml.element('hash',
+			xml.escape_element_bytes(hash),
+			('type', 'sha512'),
+			('format', 'hex'),
+		)
+		('path', module.__file__),
+	)
 
 	yield from _xml_doc(module)
 
 	for typ, l in zip((b'package"', b'module"'), route.subnodes()):
 		for x in l:
-			yield b'<submodule type="' + typ + b' identifier="' + x.basename.encode('utf-8')
-			yield b'"/>'
+			yield from xml.element('submodule', None,
+				('type', typ),
+				('identifier', x.basename),
+			)
 
 	# accumulate nested classes for subsequent processing
 	documented_classes = set()
-	nested_classes = []
 
 	for k in sorted(dir(module)):
 		if k.startswith('__'):
@@ -489,41 +428,53 @@ def python(route):
 		v = getattr(module, k)
 
 		if is_module_function(v, module):
-			yield b''.join((
-				b'<function identifier="', k.encode('utf-8'),
-				b'" xml:id="', k.encode('utf-8'),
-				b'">',
-			))
-			yield _xml_source_range(v)
-			yield from _xml_doc(v)
-			yield from _xml_call_signature(v)
-			yield b'</function>'
+			yield from xml.element('function',
+				_xml_function(v),
+				('xml:id', k),
+				('identifier', k),
+			)
 		elif inspect.ismodule(v):
-			yield _xml_import(module, k)
+			yield from _xml_import(module, k)
 		elif is_module_class(v, module):
 			yield from _xml_class(route, module, v, k)
-			# _xml_class will populated nested_classes for processing
-			while nested_classes:
-				c = nested_classes[-1]
-				del nested_classes[-1]
-				yield from _xml_class(route, module, c, c.__qualname__)
 		else:
-			ident = k.encode('utf-8')
-			yield b''.join((
-				b'<data identifier="', ident,
-				b'" xml:id="', ident,
-				b'">'
-			))
-			yield from xml.object(v)
-			yield b'</data>'
+			yield from xml.element('data',
+				xml.object(v)
+				('xml:id', ident),
+				('identifier', ident),
+			)
 
-	yield b'</module></factor>'
+def python(route):
+	"""
+	Yield out a module element for writing to an XML file exporting the documentation,
+	data, and signatures of the module's content.
+	"""
+
+	module = route.module()
+	modtype = b'package' if module.__file__.endswith('__init__.py') else b'module'
+
+	bottom = route.bottom()
+	prefix = bottom.container.fullname
+	project_package = bottom.basename
+
+	yield from xml.element('factor',
+		itertools.chain(
+			xml.element('module',
+				_xml_module(route),
+				('xml:id', module.__name__.encode('utf-8')),
+				('identifier', route.basename.encode('utf-8')),
+			),
+		),
+		('domain', 'python'),
+		('xmlns', 'https://fault.io/xml/documentation'),
+	)
 
 def document(path):
 	"""
 	Document an entire project package placing the XML files in the project's
-	:file:`documentation/xml` directory.
+	project:[documentation/xml] directory.
 	"""
+
 	r = routes.Import.from_fullname(path)
 	project = r.bottom()
 
