@@ -6,6 +6,7 @@ import os
 import os.path
 import inspect
 import functools
+import itertools
 import hashlib
 import types
 
@@ -211,12 +212,12 @@ def hierarchy(package, _get_route = routes.Import.from_fullname):
 def _xml_object(name, obj):
 	yield from xml.element(name, xml.object(obj))
 
-def _xml_argument(aspec, index, argname):
+def _xml_argument(aspec, index, argname, defaults_start):
 	if argname in aspec.annotations:
 		yield from _xml_object('annotation', aspec.annotations[argname])
 
-	if i >= defaults_start:
-		yield from _xml_object('default', aspec.defaults[i - defaults_start])
+	if index >= defaults_start:
+		yield from _xml_object('default', aspec.defaults[index - defaults_start])
 
 def _xml_keywords(aspec):
 	for k in aspec.kwonlyargs:
@@ -228,7 +229,7 @@ def _xml_keywords(aspec):
 			('name', k),
 		)
 
-def _xml_signature_arguments(aspec, nargs, default_start):
+def _xml_signature_arguments(aspec, nargs, defaults_start):
 	for i in range(nargs):
 		argname = aspec.args[i]
 		if argname in aspec.annotations or i >= defaults_start:
@@ -237,30 +238,34 @@ def _xml_signature_arguments(aspec, nargs, default_start):
 			has_content = False
 
 		yield from xml.element('positional',
-			_xml_argument(aspec, i, argname) if has_content else None,
+			_xml_argument(aspec, i, argname, defaults_start) if has_content else None,
 			('name', argname),
 			('index', str(i)),
 		)
 
 def _xml_call_signature(obj):
-	aspec = inspect.getfullargspec(obj)
-	nargs = len(aspec.args)
+	try:
+		aspec = inspect.getfullargspec(obj)
+		nargs = len(aspec.args)
 
-	if aspec.defaults is not None:
-		defaults_start = nargs - len(aspec.defaults)
-	else:
-		defaults_start = nargs
+		if aspec.defaults is not None:
+			defaults_start = nargs - len(aspec.defaults)
+		else:
+			defaults_start = nargs
 
-	if aspec.annotations:
-		yield from _xml_object('annotation', aspec.annotations['return'])
+		if aspec.annotations:
+			yield from _xml_object('annotation', aspec.annotations['return'])
 
-	yield from xml.element('signature',
-		itertools.chain(
-			_xml_signature_arguments(aspec, nargs, default_start),
+		yield from xml.element('signature',
+			itertools.chain(
+				_xml_signature_arguments(aspec, nargs, defaults_start),
+			),
+			('varargs', aspec.varargs),
+			('varkw', aspec.varkw),
 		)
-		('varargs', aspec.varargs),
-		('varkw', aspec.varkw),
-	)
+	except TypeError:
+		# unsupported callable
+		pass
 
 def _xml_type(obj):
 	yield from xml.element('type', None,
@@ -285,7 +290,7 @@ def _xml_import(module, *path):
 	else:
 		pkgtype = 'builtin'
 
-	return element("import", None,
+	return xml.element("import", None,
 		('identifier', path[-1]),
 		('name', module.__name__),
 		('xml:id', '.'.join(path)),
@@ -310,7 +315,7 @@ def _xml_function(method):
 	yield from _xml_doc(method)
 	yield from _xml_call_signature(method)
 
-def _xml_class_content(route, module, obj, *path):
+def _xml_class_content(module, obj, *path):
 	yield from _xml_source_range(obj)
 	yield from _xml_doc(obj)
 
@@ -344,9 +349,9 @@ def _xml_class_content(route, module, obj, *path):
 				continue
 
 			# Identify the method type.
-			if isinstance(method, classmethod) or k == '__new__':
+			if isinstance(v, classmethod) or k == '__new__':
 				mtype = 'class'
-			elif isinstance(method, staticmethod):
+			elif isinstance(v, staticmethod):
 				mtype = 'static'
 			else:
 				# regular method
@@ -380,16 +385,16 @@ def _xml_class_content(route, module, obj, *path):
 	while nested_classes:
 		c = nested_classes[-1]
 		del nested_classes[-1]
-		yield from _xml_class(route, module, c, c.__qualname__)
+		yield from _xml_class(module, c, c.__qualname__)
 
-def _xml_class(route, module, obj, *path):
+def _xml_class(module, obj, *path):
 	yield from xml.element('class',
-		_xml_class_content(route, module, obj, *path),
+		_xml_class_content(module, obj, *path),
 		('xml:id', '.'.join(path)),
 		('identifier', path[-1]),
 	)
 
-def _xml_module(mod):
+def _xml_module(module):
 	with open(module.__file__, mode='rb') as src:
 		h = hashlib.sha512()
 
@@ -403,21 +408,14 @@ def _xml_module(mod):
 
 	yield from xml.element('source',
 		xml.element('hash',
-			xml.escape_element_bytes(hash),
+			xml.escape_element_string(hash),
 			('type', 'sha512'),
 			('format', 'hex'),
-		)
+		),
 		('path', module.__file__),
 	)
 
 	yield from _xml_doc(module)
-
-	for typ, l in zip((b'package"', b'module"'), route.subnodes()):
-		for x in l:
-			yield from xml.element('submodule', None,
-				('type', typ),
-				('identifier', x.basename),
-			)
 
 	# accumulate nested classes for subsequent processing
 	documented_classes = set()
@@ -428,20 +426,18 @@ def _xml_module(mod):
 		v = getattr(module, k)
 
 		if is_module_function(v, module):
-			yield from xml.element('function',
-				_xml_function(v),
+			yield from xml.element('function', _xml_function(v),
 				('xml:id', k),
 				('identifier', k),
 			)
 		elif inspect.ismodule(v):
 			yield from _xml_import(module, k)
 		elif is_module_class(v, module):
-			yield from _xml_class(route, module, v, k)
+			yield from _xml_class(module, v, k)
 		else:
-			yield from xml.element('data',
-				xml.object(v)
-				('xml:id', ident),
-				('identifier', ident),
+			yield from xml.element('data', xml.object(v),
+				('xml:id', k),
+				('identifier', k),
 			)
 
 def python(route):
@@ -460,14 +456,21 @@ def python(route):
 	yield from xml.element('factor',
 		itertools.chain(
 			xml.element('module',
-				_xml_module(route),
-				('xml:id', module.__name__.encode('utf-8')),
-				('identifier', route.basename.encode('utf-8')),
+				_xml_module(module),
+				('xml:id', module.__name__),
+				('identifier', route.basename),
 			),
 		),
 		('domain', 'python'),
 		('xmlns', 'https://fault.io/xml/documentation'),
 	)
+
+	for typ, l in zip((b'package"', b'module"'), route.subnodes()):
+		for x in l:
+			yield from xml.element('submodule', None,
+				('type', typ),
+				('identifier', x.basename),
+			)
 
 def document(path):
 	"""
@@ -496,6 +499,7 @@ if __name__ == '__main__':
 			w(x)
 		sys.stdout.flush()
 	except:
+		raise
 		e = sys.exc_info()
 		import pdb
 		pdb.post_mortem(e[2])
