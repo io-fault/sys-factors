@@ -481,7 +481,7 @@ class Compilation(object):
 def construct(target, sources, module, role = 'bootstrap', source_directory = 'src'):
 	"""
 	Execute within a package module containing a 'src' directory to build the C-API
-	module using bootstrap's @Compilation.
+	module using bootstrap's &Compilation.
 	"""
 	pkg, name = module.__name__.rsplit('.', 1)
 	tdir = os.path.dirname(target)
@@ -492,5 +492,6 @@ def construct(target, sources, module, role = 'bootstrap', source_directory = 's
 	context = Context(os.path.join(tdir, "libconstruct.h"))
 	with context:
 		context.dynamic_link(*getattr(module, 'libraries', ()))
+		context.add_include_directory(*getattr(module, 'includes', ()))
 
 	return cl.build(context)
