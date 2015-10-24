@@ -9,9 +9,9 @@ import functools
 import types
 import importlib
 
-from ...routes import library as routeslib
-from .. import libtest
-from .. import libcore
+from ..routes import library as routeslib
+from . import libtest
+from . import libcore
 
 class Test(libtest.Test):
 	"Test subclass with Harness reference"
