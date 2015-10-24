@@ -88,6 +88,7 @@ del imp
 
 class Context(object):
 	"A toolset for constructing targets."
+
 	def __init__(self):
 		self.tools = {}
 		self.environment = {}
