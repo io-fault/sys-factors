@@ -47,7 +47,7 @@ class Collector(object):
 		s = None
 		if co.co_argcount:
 			name = co.co_varnames[0]
-			if name in {'self', 'typ', 'type', 'Class', 'this', 'wolves'}:
+			if name in {'self', 'typ', 'type', 'Class', 'this'}:
 				s = frame.f_locals[name]
 				if not isinstance(s, type):
 					s = s.__class__.__qualname__

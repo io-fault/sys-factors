@@ -2,7 +2,6 @@
 Project development interface for software engineers.
 """
 import contextlib
-from .core import ToolError
 from .core import roles
 
 class Project(object):

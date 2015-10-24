@@ -57,7 +57,7 @@ def outerlocals(depth = 0):
 
 	return f.f_locals
 
-def load_dynamic(module = None, role_override = None, internal_load_dynamic = imp.load_dynamic):
+def load_dynamic(module=None, role_override=None, internal_load_dynamic=imp.load_dynamic):
 	"Load the libconstruct or bootstrap built extension module."
 	global construction
 	global role

@@ -9,9 +9,11 @@ import functools
 import itertools
 import hashlib
 import types
+import lzma
+import codecs
 
-from ..routes import library as routes
-from .xml import library as xml
+from ..routes import library as routeslib
+from ..xml import library as xml
 
 # If pkg_resources is available, use it to identify explicit namespace packages.
 try:
@@ -161,7 +163,7 @@ def is_module_function(obj, module):
 		module.__name__ == obj.__module__
 
 @functools.lru_cache(32)
-def project(module, _get_route = routes.Import.from_fullname):
+def project(module, _get_route = routeslib.Import.from_fullname):
 	"""
 	Return the project information about a particular module.
 
@@ -201,7 +203,7 @@ def addressable(obj):
 		id(obj) in [id(v) for v in inspect.getmodule(obj).__dict__.itervalues()]
 	)
 
-def hierarchy(package, _get_route = routes.Import.from_fullname):
+def hierarchy(package, _get_route = routeslib.Import.from_fullname):
 	"""
 	Return a (root, (packages_list, modules_list)) tuple of the contents of the given package.
 	"""
@@ -254,7 +256,8 @@ def _xml_call_signature(obj):
 			defaults_start = nargs
 
 		if aspec.annotations:
-			yield from _xml_object('annotation', aspec.annotations['return'])
+			if 'return' in aspec.annotations:
+				yield from _xml_object('annotation', aspec.annotations['return'])
 
 		yield from xml.element('signature',
 			itertools.chain(
@@ -290,9 +293,17 @@ def _xml_import(module, *path):
 	else:
 		pkgtype = 'builtin'
 
+	mn = module.__name__
+	r = routeslib.Import.from_fullname(mn)
+	absolute = r.absolute
+	br = routeslib.Import.from_fullname(absolute[0])
+	if hasattr(br.module(), 'canonical'):
+		prefix = br.module().canonical
+		mn = prefix + mn[len(absolute[0]):]
+
 	return xml.element("import", None,
 		('identifier', path[-1]),
-		('name', module.__name__),
+		('name', mn),
 		('xml:id', '.'.join(path)),
 		('source', pkgtype),
 	)
@@ -307,7 +318,7 @@ def _xml_source_range(obj):
 			('start', str(lineno)),
 			('stop', str(end)),
 		)
-	except TypeError:
+	except (TypeError, SyntaxError, OSError):
 		return xml.empty('source')
 
 def _xml_function(method):
@@ -319,11 +330,13 @@ def _xml_class_content(module, obj, *path):
 	yield from _xml_source_range(obj)
 	yield from _xml_doc(obj)
 
-	for x in obj.__bases__:
-		yield from xml.element('bases', _xml_type(x))
+	yield from xml.element('bases',
+		itertools.chain.from_iterable(map(_xml_type, obj.__bases__)),
+	)
 
-	for x in inspect.getmro(obj):
-		yield from xml.element('order', _xml_type(x))
+	yield from xml.element('order',
+		itertools.chain.from_iterable(map(_xml_type, inspect.getmro(obj))),
+	)
 
 	aliases = []
 	class_dict = obj.__dict__
@@ -397,20 +410,32 @@ def _xml_class(module, obj, *path):
 def _xml_module(module):
 	with open(module.__file__, mode='rb') as src:
 		h = hashlib.sha512()
+		x = lzma.LZMACompressor()
+		cs = bytearray()
 
 		data = src.read(512)
 		h.update(data)
+		cs += x.compress(data)
 		while len(data) == 512:
 			data = src.read(512)
 			h.update(data)
+			cs += x.compress(data)
 
 		hash = h.hexdigest()
+		cs += x.flush()
 
 	yield from xml.element('source',
-		xml.element('hash',
-			xml.escape_element_string(hash),
-			('type', 'sha512'),
-			('format', 'hex'),
+		itertools.chain(
+			xml.element('hash',
+				xml.escape_element_string(hash),
+				('type', 'sha512'),
+				('format', 'hex'),
+			),
+			xml.element('data',
+				xml.escape_element_bytes(codecs.encode(cs, 'base64')),
+				('type', 'application/x-xz'),
+				('format', 'base64'),
+			),
 		),
 		('path', module.__file__),
 	)
@@ -450,14 +475,24 @@ def python(route):
 	modtype = b'package' if module.__file__.endswith('__init__.py') else b'module'
 
 	bottom = route.bottom()
+
 	prefix = bottom.container.fullname
+	if prefix:
+		# if the bottom's container has a canonical name, use it instead.
+		collection = bottom.container
+		cmod = collection.module()
+		canonical = getattr(cmod, 'canonical', prefix)
+		del collection, cmod
+	else:
+		canonical = prefix
+
 	project_package = bottom.basename
 
 	yield from xml.element('factor',
 		itertools.chain(
 			xml.element('module',
 				_xml_module(module),
-				('xml:id', module.__name__),
+				('xml:id', canonical + module.__name__[len(prefix):]),
 				('identifier', route.basename),
 			),
 		),
@@ -478,10 +513,10 @@ def document(path):
 	project:[documentation/xml] directory.
 	"""
 
-	r = routes.Import.from_fullname(path)
+	r = routeslib.Import.from_fullname(path)
 	project = r.bottom()
 
-	root = routes.File.from_path(project.module().__file__).container
+	root = routeslib.File.from_path(project.module().__file__).container
 	docs = root / 'documentation'
 	xml = docs / 'xml'
 	xml.init(type='directory')
@@ -490,7 +525,7 @@ def document(path):
 
 if __name__ == '__main__':
 	import sys
-	r = routes.Import.from_fullname(sys.argv[1])
+	r = routeslib.Import.from_fullname(sys.argv[1])
 	w = sys.stdout.buffer.write
 	try:
 		w(b'<?xml version="1.0" encoding="utf-8"?>')
@@ -499,8 +534,6 @@ if __name__ == '__main__':
 			w(x)
 		sys.stdout.flush()
 	except:
-		raise
 		e = sys.exc_info()
 		import pdb
 		pdb.post_mortem(e[2])
-
