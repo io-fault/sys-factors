@@ -1,5 +1,5 @@
 """
-Tools for generating and extracting coverage data from C coverage tools.
+Coverage generation and processing functions.
 """
 import subprocess
 from ..routes import library as routeslib
@@ -72,10 +72,14 @@ def ignored(filepath,
 
 def llvm(data, *sources):
 	"""
-	:param data: Path prefix of the '.gcno' and '.gcda' files.
-	:param sources: The list of sources.
+	Return the system command tuple for running gcov.
 
-	Return the command tuple for running gcov.
+	[ Parameters ]
+
+	/data
+		Path prefix of the '.gcno' and '.gcda' files.
+	/sources
+		The list of sources.
 	"""
 	return (
 		'llvm-cov',
@@ -84,10 +88,14 @@ def llvm(data, *sources):
 
 def garbage(data, *sources):
 	"""
-	:param data: Path prefix of the '.gcno' and '.gcda' files.
-	:param sources: The list of sources.
-
 	Return the command tuple for running gcov.
+
+	[ Parameters ]
+
+	/data
+		Path prefix of the '.gcno' and '.gcda' files.
+	/sources
+		The list of sources.
 	"""
 	return (
 		'gcov',
