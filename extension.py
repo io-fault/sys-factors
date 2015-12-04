@@ -7,15 +7,32 @@ import platform # 1MB memory on 64-bit systems.
 import imp
 import os.path
 import sys
+import contextlib
 
 platform = platform.system().lower() + '.' + platform.machine().lower()
 del sys.modules['platform']
 
-role = 'debug'
+role = 'bootstrap'
 extension = '.pyd'
 file = 'module'
 source_directory = 'src'
 construction = None
+enabled = True
+
+@contextlib.contextmanager
+def inhibit():
+	"""
+	Inhibit the automatic compilation and loading of
+	development.extension modules.
+
+	Used to allow extensions to be introspected.
+	"""
+	global enabled
+	try:
+		enabled = False
+		yield None
+	finally:
+		enabled = True
 
 def extension_sources(module):
 	return os.path.join(os.path.dirname(os.path.abspath(module.__file__)), source_directory)
@@ -37,7 +54,7 @@ def resolve_extension_path(module, role, pjoin=os.path.join):
 	"Calculate the path of the extension module using the role and module."
 	return pjoin(extension_cache(module, role), file + extension)
 
-def conditions(target, sources, exists=os.path.exists, getmtime=os.path.getmtime):
+def conditions(target, sources, exists=os.path.exists, getmtime=os.path.getmtime) -> bool:
 	"Determine whether the extension needs to be rebuilt."
 	return (not exists(target) or getmtime(target) < getmtime(sources))
 
@@ -57,10 +74,12 @@ def outerlocals(depth = 0):
 
 	return f.f_locals
 
-def load_dynamic(module=None, role_override=None, internal_load_dynamic=imp.load_dynamic):
+def load(module=None, role_override=None, internal_load_dynamic=imp.load_dynamic):
 	"Load the libconstruct or bootstrap built extension module."
+
 	global construction
 	global role
+	global enabled
 
 	if module is None:
 		# package modules defining a target don't have to define themselves.
@@ -69,6 +88,10 @@ def load_dynamic(module=None, role_override=None, internal_load_dynamic=imp.load
 
 	sources = extension_sources(module)
 	path = resolve_extension_path(module, role_override or role)
+
+	if not enabled:
+		module.sources = sources
+		return
 
 	rebuild = conditions(path, sources)
 	if rebuild:
@@ -91,6 +114,7 @@ def load_dynamic(module=None, role_override=None, internal_load_dynamic=imp.load
 				continue
 			module.__dict__[k] = v
 		module.__dict__['__shared_object__'] = mod
+		mod.__path__ = module.__path__ = None
 
 	except Exception:
 		raise ImportError(module.__name__)
