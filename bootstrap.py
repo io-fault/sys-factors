@@ -161,7 +161,7 @@ class Independent(Frame):
 
 class Stack(object):
 	"""
-	A stack of :py:class:`Compile`, :py:class:`Link`, and :py:class:`Independent`
+	A stack of &Compile, &Link, and &Independent
 	parameters to be used by a compiler and linker.
 	"""
 	__slots__ = ('_data',)
