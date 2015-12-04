@@ -3,5 +3,4 @@
 from ...chronometry import library
 from ...fork import library
 from ...io import library
-from ...io.console import library
 from .. import trace
