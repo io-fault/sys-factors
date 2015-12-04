@@ -16,9 +16,9 @@ try:
 except ImportError:
 	pass
 
-from ..routes import library as routeslib
 from ..chronometry import kernel as timekernel
-from ..fork import library as forklib
+from ..routes import library as libroutes
+from ..fork import library as libfork
 
 from . import libmeta
 from . import trace
@@ -35,7 +35,10 @@ class Collector(object):
 		# The C @trace module is used.
 		raise Exception("python collector needs an event-id mapping")
 
-	def _collect(self, append, time_delta, frame, event, arg, event_map = None):
+	def _collect(self, append, time_delta, frame, event, arg,
+			event_map=None,
+			isinstance=isinstance,
+		):
 		co = frame.f_code
 		#if event == "line" and not relevant(co.co_filename):
 			# the point of this is avoid accumulating massive of amount
@@ -79,7 +82,7 @@ class Tracing(object):
 		self.package = package
 		self.cause = cause
 		self.tracing = False
-		self.pkgroute = routeslib.Import.from_fullname(self.package).file().container
+		self.pkgroute = libroutes.Import.from_fullname(self.package).file().container
 		self.directory = self.pkgroute.fullpath
 		self.exopath = exopath(self.pkgroute).fullpath
 		self.cached_realpath = functools.lru_cache(512)(os.path.realpath)
@@ -91,13 +94,13 @@ class Tracing(object):
 		self._orig_start_new_threads = (thread.start_new_thread, threading._start_new_thread)
 		thread.start_new_thread = threading._start_new_thread = self._start_new_thread_override
 
-		forklib.fork_child_callset.add(self.truncate)
+		libfork.fork_child_callset.add(self.truncate)
 		self.trace()
 
 	def __exit__(self, typ, val, tb):
 		sys.settrace(None)
 		del __builtins__['TRACE']
-		forklib.fork_child_callset.remove(self.truncate)
+		libfork.fork_child_callset.remove(self.truncate)
 
 		thread.start_new_thread, threading._start_new_thread = self._orig_start_new_threads
 
@@ -114,7 +117,7 @@ class Tracing(object):
 		finally:
 			sys.settrace(None)
 
-	def truncate(self, _truncate = operator.methodcaller("clear")):
+	def truncate(self, _truncate=operator.methodcaller("clear")):
 		"""
 		Destroy all collected data.
 
@@ -140,17 +143,20 @@ class Tracing(object):
 		return self.cached_realpath(path).startswith(self.directory)
 
 	def aggregate(self, events,
-		TRACE_LINE = trace.TRACE_LINE,
+			TRACE_LINE = trace.TRACE_LINE,
 
-		TRACE_CALL = trace.TRACE_CALL,
-		TRACE_RETURN = trace.TRACE_RETURN,
-		TRACE_EXCEPTION = trace.TRACE_EXCEPTION,
+			TRACE_CALL = trace.TRACE_CALL,
+			TRACE_RETURN = trace.TRACE_RETURN,
+			TRACE_EXCEPTION = trace.TRACE_EXCEPTION,
 
-		TRACE_C_CALL = trace.TRACE_C_CALL,
-		TRACE_C_RETURN = trace.TRACE_C_RETURN,
-		TRACE_C_EXCEPTION = trace.TRACE_C_EXCEPTION,
-		getitem = operator.itemgetter(0)
-	):
+			TRACE_C_CALL = trace.TRACE_C_CALL,
+			TRACE_C_RETURN = trace.TRACE_C_RETURN,
+			TRACE_C_EXCEPTION = trace.TRACE_C_EXCEPTION,
+
+			getitem = operator.itemgetter(0),
+			list=list, str=str,
+			map=map, max=max, abs=abs, len=len,
+		):
 		"""
 		aggregate()
 
@@ -303,7 +309,11 @@ class Tracing(object):
 			seq.sort(key = getitem)
 			libmeta.append('functions', path, [(self.cause, seq)])
 
-	def trace(self, Queue = collections.deque, Collector = trace.Collector, Chronometer = timekernel.Chronometer):
+	def trace(self,
+			Queue=collections.deque,
+			Collector=trace.Collector,
+			Chronometer=timekernel.Chronometer,
+		):
 		"""
 		Construct event collection, add to the collections set, and set the trace.
 		"""

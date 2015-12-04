@@ -77,7 +77,11 @@ def select_role():
 		else:
 			role = default_role
 
-def gather(objdir, srcdir, suffixes, suffix_delimiter='.', join=os.path.join):
+def gather(
+		objdir, srcdir, suffixes,
+		suffix_delimiter:str='.',
+		join=os.path.join,
+	):
 	"Recursive acquire sources for compilation and build out objects."
 	os.makedirs(objdir, exist_ok = True)
 	prefix = len(srcdir)
@@ -235,13 +239,10 @@ class Toolchain(object):
 		"""
 		/defines
 			A sequence of key-value pairs that make up parameter defines.
-			:type defines: (:py:class:`str`, :py:class:`str`)
 		/includes
 			A sequence of files that will be directly included in the source.
-			:type includes: :py:class:`str`
 		/directories
 			A sequence of include and framework directories. (-I and -F on applicable platforms)
-			:type directories: :py:class:`str`
 		"""
 		flags = ('-v', '-fPIC',)
 
@@ -280,13 +281,10 @@ class Toolchain(object):
 		"""
 		/directories
 			A sequence of library and framework directories. (-L, -F on some systems)
-			:type directories: (:py:class:`str`)
 		/libraries
 			A sequence of libraries to dynamically link against the target. (-l)
-			:type libraries: :py:class:`str`
 		/frameworks
 			A sequence of frameworks to use for linkage; library sets (-framework)
-			:type frameworks: (:py:class:`str`)
 		"""
 		basename, canons, link = self.linker(self.type, name, version = version)
 		target = os.path.join(targetdir, basename)

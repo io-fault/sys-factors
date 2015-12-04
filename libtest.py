@@ -47,6 +47,7 @@ def gather(container, prefix = 'test_', key=test_order, getattr=getattr):
 	"""
 	Returns an ordered dictionary of attribute names associated with a &Test instance:
 
+	#!/pl/python
 		{k : Test(v, k) for k, v in container.items()}
 
 	Collect the objects in the container whose name starts with "test_".
@@ -100,6 +101,7 @@ class Contention(object):
 	Usually, contention instances are made by the true division operator of
 	&Test instances passed into unit test subjects.
 
+	#!/pl/python
 		import featurelib
 
 		def test_feature(test):
@@ -166,6 +168,7 @@ class Contention(object):
 		"""
 		Contend that the &subject raises the given exception when it is called::
 
+		#!/pl/python
 			test/Exception ^ subject
 
 		Reads: "Test that 'Exception' is raised by 'subject'".
@@ -179,6 +182,7 @@ class Contention(object):
 		"""
 		Contend that the parameter is contained by the object, &Container::
 
+		#!/pl/python
 			test/Container << subject
 
 		Reads: "Test that 'Container' contains 'subject'".
@@ -301,18 +305,18 @@ class Test(object):
 	"""
 	An object that manages an individual test unit and it's execution.
 
-	Fields:
+	[ Properties ]
 
-	 /identity
-	  A unique identifier for the &Test. Usually, a qualified name that can be used to
-	  locate &focus without having the actual object.
+	/identity
+		A unique identifier for the &Test. Usually, a qualified name that can be used to
+		locate &focus without having the actual object.
 
-	 /focus
-	  The callable that performs a series of checks--using the &Test instance--that
-	  determines the &fate.
+	/focus
+		The callable that performs a series of checks--using the &Test instance--that
+		determines the &fate.
 
-	 /fate
-	  The conclusion of the Test; pass, fail, error, skip. An instance of &Fate.
+	/fate
+		The conclusion of the Test; pass, fail, error, skip. An instance of &Fate.
 	"""
 	__slots__ = ('focus', 'identity', 'constraints', 'fate',)
 
@@ -418,6 +422,7 @@ class Test(object):
 		"""
 		Set a trap for exceptions converting an would-be &Error fate on exit to a &Failure.
 
+		#!/pl/python
 			with test.trap():
 				...
 
@@ -450,7 +455,8 @@ def execute(module):
 
 	Execute the tests contained in the given container. Usually given a module object.
 
-	.. warning:: No status information is printed. Raises the first negative impact Test.
+	! WARNING:
+		No status information is printed. Raises the first negative impact Test.
 	"""
 	for id, func in gather(module):
 		test = Test(id, func)
