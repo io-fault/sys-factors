@@ -2,7 +2,42 @@
 Project development interface for software engineers.
 """
 import contextlib
+
+from . import extension
 from .core import roles
+from ..routes import library as libroutes
+
+class Factor(tuple):
+	"""
+	The abstract factor that makes up part of a product.
+	Essentially, the route and factor type with respect to construction,
+	but also higher level interfaces for supporting construction.
+	"""
+	__slots__ = ()
+
+	@classmethod
+	def from_module(Class, module):
+		mt = getattr(module, '__type__', 'python-module')
+		return Class((mt, libroutes.Import.from_fullname(module.__name__)))
+
+	@property
+	def type(self):
+		"The module's `__type__` attribute."
+		return self[0]
+
+	@property
+	def route(self):
+		"The route to the module."
+		return self[1]
+
+	def sources(self):
+		"The full set of source files of the factor."
+		if self.type == 'extension':
+			srcdir = extension.extension_sources(self.route.module())
+			fr = libroutes.File.from_absolute(srcdir)
+			return fr.tree()[1]
+		else:
+			return [libroutes.File.from_absolute(self.route.module().__file__)]
 
 class Project(object):
 	"""
@@ -17,15 +52,11 @@ class Project(object):
 		self.route = route
 		self.directory = self.route.file().container
 
-	from ..routes import library as routeslib
-
 	@classmethod
-	def from_module(Class, module, Import = routeslib.Import):
+	def from_module(Class, module, Import = libroutes.Import):
 		"Return the &Project instance for the given module path."
 		r = Import.from_module(module)
 		return Class(r.bottom())
-
-	del routeslib
 
 	@property
 	def information(self):
@@ -67,35 +98,3 @@ class Project(object):
 		"""
 		Modify the package to become a release.
 		"""
-
-class Type():
-	pass
-
-class Factor(tuple):
-	"""
-	A build target of the project and the plan to prepare it.
-	"""
-	__slots__ = ()
-
-	@property
-	def type(self):
-		"The type of factor; operation system executable, library, Python module, etc."
-		return self[0]
-
-	@property
-	def path(self):
-		"The Python module path of the target."
-		return self[1]
-
-	@property
-	def plan(self):
-		"The series of operations necessary for preparing the factor."
-		return self[2]
-
-	@property
-	def files(self):
-		"The files produced that represent the prepared factor."
-		return self[3]
-
-	def __new___(Class, type, path, plan, files):
-		return super().__new__(Class, (type, path, plan, files))
