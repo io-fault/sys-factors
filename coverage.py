@@ -53,9 +53,12 @@ def crossable(filepath,
 	"""
 	lines(filepath)
 
-	:param filepath: Path to the .gcov file.
-
 	Run the coverage output, '.gcov', through a pipeline that renders coverable lines.
+
+	[ Parameters ]
+
+	/filepath
+		Path to the .gcov file.
 	"""
 	return _pipeline(filepath, sequence)
 

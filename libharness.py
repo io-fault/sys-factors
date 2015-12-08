@@ -1,5 +1,9 @@
 """
-Test harness foundations.
+Test execution management and status control.
+
+libharness provides management tools for the execution of tests and
+the destination of their resulting status. Status being both the fate
+of the test and any collected coverage or profile data.
 """
 import os
 import sys
@@ -109,7 +113,9 @@ class Harness(object):
 		module.__tests__ = [
 			(x.fullname, self.module_test)
 			for x in ir.subnodes()[1] # modules only; NO packages.
-			if x.identity.startswith('test_') and (not test.constraints or x.identity in test.constraints)
+			if x.identity.startswith('test_') and (
+				not test.constraints or x.identity in test.constraints
+			)
 		]
 		raise libtest.Divide(module)
 

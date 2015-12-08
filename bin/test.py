@@ -1,7 +1,5 @@
 """
-Run developer tests emitting test meta data.
-
-Each test is ran in a clone, one at a time.
+Terminal test execution for libtest.
 """
 import os
 import sys

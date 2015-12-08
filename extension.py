@@ -19,23 +19,9 @@ source_directory = 'src'
 construction = None
 enabled = True
 
-@contextlib.contextmanager
-def inhibit():
-	"""
-	Inhibit the automatic compilation and loading of
-	development.extension modules.
-
-	Used to allow extensions to be introspected.
-	"""
-	global enabled
-	try:
-		enabled = False
-		yield None
-	finally:
-		enabled = True
-
 def extension_sources(module):
-	return os.path.join(os.path.dirname(os.path.abspath(module.__file__)), source_directory)
+	fp = getattr(module, '__origin__', module.__file__)
+	return os.path.join(os.path.dirname(os.path.abspath(fp)), source_directory)
 
 def extension_cache(module, role,
 	abiflags = sys.__dict__.get('abiflags', ''),
@@ -115,6 +101,8 @@ def load(module=None, role_override=None, internal_load_dynamic=imp.load_dynamic
 			module.__dict__[k] = v
 		module.__dict__['__shared_object__'] = mod
 		mod.__path__ = module.__path__ = None
+		mod.__type__ = 'extension'
+		module__origin__ = mod.__origin__ = module.__file__
 
 	except Exception:
 		raise ImportError(module.__name__)

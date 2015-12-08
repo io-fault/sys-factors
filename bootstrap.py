@@ -229,10 +229,10 @@ class Stack(object):
 		self._data = Dictionary()
 
 	def push(self, name,
-		compile = Compile(),
-		link = Link(),
-		independent = Independent()
-	):
+			compile = Compile(),
+			link = Link(),
+			independent = Independent()
+		):
 		if name in self._data:
 			# merge entries
 			cur = self._data[name]
