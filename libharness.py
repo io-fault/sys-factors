@@ -13,7 +13,7 @@ import functools
 import types
 import importlib
 
-from ..routes import library as routeslib
+from ..routes import library as libroutes
 from . import libtest
 from . import libcore
 
@@ -109,7 +109,7 @@ class Harness(object):
 		if 'context' in dir(module):
 			module.context()
 
-		ir = routeslib.Import.from_fullname(module.__name__)
+		ir = libroutes.Import.from_fullname(module.__name__)
 		module.__tests__ = [
 			(x.fullname, self.module_test)
 			for x in ir.subnodes()[1] # modules only; NO packages.
