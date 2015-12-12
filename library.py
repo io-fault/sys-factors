@@ -2,6 +2,7 @@
 Project development interface for software engineers.
 """
 import contextlib
+import functools
 
 from . import extension
 from .core import roles
@@ -20,6 +21,13 @@ class Factor(tuple):
 		mt = getattr(module, '__type__', 'python-module')
 		return Class((mt, libroutes.Import.from_fullname(module.__name__)))
 
+	@classmethod
+	def from_fullname(Class, path, Import=libroutes.Import.from_fullname):
+		i = Import(path)
+		module = i.module()
+		mt = getattr(module, '__type__', 'python-module')
+		return Class((mt, i))
+
 	@property
 	def type(self):
 		"The module's `__type__` attribute."
@@ -29,6 +37,27 @@ class Factor(tuple):
 	def route(self):
 		"The route to the module."
 		return self[1]
+
+	@staticmethod
+	def _canonical_path(route):
+		x = route
+		while x.points:
+			m = x.module()
+			mt = getattr(m, '__type__', None)
+			if mt == 'context':
+				yield getattr(m, '__canonical__', None) or x.identity
+			else:
+				yield x.identity
+			x = x.container
+
+	@property
+	@functools.lru_cache(32)
+	def name(self, list=list, reversed=reversed):
+		"""
+		The canonical factor name.
+		"""
+		l = list(self._canonical_path(self[1]))
+		return '.'.join(reversed(l))
 
 	def sources(self):
 		"The full set of source files of the factor."
