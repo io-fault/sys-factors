@@ -38,6 +38,10 @@ class Factor(tuple):
 		"The route to the module."
 		return self[1]
 
+	@property
+	def source_route(self):
+		return (self[1].file().container / 'src')
+
 	@staticmethod
 	def _canonical_path(route):
 		x = route
@@ -62,8 +66,9 @@ class Factor(tuple):
 	def sources(self):
 		"The full set of source files of the factor."
 		if self.type == 'extension':
-			srcdir = extension.extension_sources(self.route.module())
-			fr = libroutes.File.from_absolute(srcdir)
+			#srcdir = extension.extension_sources(self.route.module())
+			#fr = libroutes.File.from_absolute(srcdir)
+			fr = self.source_route
 			return fr.tree()[1]
 		else:
 			return [libroutes.File.from_absolute(self.route.module().__file__)]
