@@ -9,7 +9,6 @@ import functools
 import types
 import importlib
 
-from ...routes import library as libroutes
 from ...fork import library as libfork
 
 from .. import library as libdev
@@ -33,7 +32,7 @@ def color_identity(identity):
 open_fate_message = color('0x1c1c1c', '|')
 close_fate_message = color('0x1c1c1c', '|')
 top_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+')
-working_fate_messages = color('0x1c1c1c', '+' + ('/\\' * 5) + '+')
+working_fate_messages = color('0x1c1c1c', '|' + (' execute  ') + '|')
 bottom_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+')
 
 class Harness(libharness.Harness):
@@ -75,11 +74,108 @@ class Harness(libharness.Harness):
 		else:
 			self.status.write("CORE: File does not exist: " + repr(corefile) + '\n')
 
+	def _print_tb(self, fate):
+		import traceback
+		try:
+			# dev.libtraceback por favor
+			from IPython.core import ultratb
+			x = ultratb.VerboseTB(ostream = sys.stderr)
+			# doesn't support chains yet, so fallback to cause traceback.
+			if fate.__cause__:
+				exc = fate.__cause__
+			else:
+				exc = fate
+			x(exc.__class__, exc, exc.__traceback__)
+		except ImportError:
+			tb = traceback.format_exception(fate.__class__, fate, fate.__traceback__)
+			tb = ''.join(tb)
+			sys.stderr.write(tb)
+
+	def dispatch(self, test):
+		faten = None
+		self._status_test_sealing(test)
+
+		# seal fate in a child process
+		seal = self.concurrently(functools.partial(self.seal, test))
+
+		l = []
+		report = seal(status_ref = l.append)
+
+		if report is None:
+			report = {'fate': 'unknown', 'impact': -1, 'interrupt': None}
+
+		pid, status = l[0]
+
+		if os.WCOREDUMP(status):
+			faten = 'core'
+			report['fate'] = 'core'
+			test.fate = self.libtest.Core(None)
+			self._report_core(test)
+			self._handle_core(libcore.corelocation(pid))
+		elif not os.WIFEXITED(status):
+			# redrum
+			import signal
+			try:
+				os.kill(pid, signal.SIGKILL)
+			except OSError:
+				pass
+
+		report['exitstatus'] = os.WEXITSTATUS(status)
+
+		# C library coverage code
+
+		if self.exit_on_failure and report['impact'] < 0 or report['interrupt']:
+			sys.exit(report['exitstatus'])
+
+		return report
+
+	def seal(self, test):
+		sys.stderr.write('\b\b\b' + str(os.getpid()))
+		sys.stderr.flush() # want to see the test being ran
+
+		test.seal()
+
+		faten = test.fate.__class__.__name__.lower()
+		parts = test.identity.split('.')
+		parts[0] = color('0x1c1c1c', parts[0])
+		if test.fate.impact >= 0:
+			parts[1:] = [color('gray', x) for x in parts[1:]]
+		else:
+			parts[1:-1] = [color('gray', x) for x in parts[1:-1]]
+
+		ident = color('red', '.').join(parts)
+		sys.stderr.write('\r{start} {fate!s} {stop} {tid}                \n'.format(
+			fate = color(test.fate.color, faten.ljust(8)),
+			tid = ident,
+			start = open_fate_message,
+			stop = close_fate_message
+		))
+
+		report = {
+			'test': test.identity,
+			'impact': test.fate.impact,
+			'fate': faten,
+			'interrupt': None,
+		}
+
+		if isinstance(test.fate, self.libtest.Divide):
+			self.execute(test.fate.content, (), division = True)
+		elif isinstance(test.fate, self.libtest.Fail):
+			if isinstance(test.fate.__cause__, KeyboardInterrupt):
+				report['interrupt'] = True
+			self._print_tb(test.fate)
+			import pdb
+			# error cases chain the exception
+			pdb.post_mortem(test.fate.__cause__.__traceback__)
+
+		report['fimports'] = list(self.fimports.items())
+		self.fimports.clear()
+
 	def execute(self, container, modules, division = None):
 		if division is None:
 			self.status.write(top_fate_messages + '\n')
 
-		super().execute(container, modules, division=division)
+		super().execute(container, modules)
 
 		if division is None:
 			self.status.write(bottom_fate_messages + '\n')
