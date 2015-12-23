@@ -8,6 +8,7 @@ import imp
 import os.path
 import sys
 import contextlib
+from . import core
 
 platform = platform.system().lower() + '.' + platform.machine().lower()
 del sys.modules['platform']
@@ -44,22 +45,6 @@ def conditions(target, sources, exists=os.path.exists, getmtime=os.path.getmtime
 	"Determine whether the extension needs to be rebuilt."
 	return (not exists(target) or getmtime(target) < getmtime(sources))
 
-def outerlocals(depth = 0):
-	"""
-	Get the locals dictionary of the calling context.
-
-	If the depth isn't specified, the locals of the caller's caller.
-	"""
-	if depth < 0:
-		raise TypeError("depth must be greater than or equal to zero")
-
-	f = sys._getframe().f_back.f_back
-	while depth:
-		depth -= 1
-		f = f.f_back
-
-	return f.f_locals
-
 def load(module=None, role_override=None, internal_load_dynamic=imp.load_dynamic):
 	"Load the libconstruct or bootstrap built extension module."
 
@@ -69,7 +54,7 @@ def load(module=None, role_override=None, internal_load_dynamic=imp.load_dynamic
 
 	if module is None:
 		# package modules defining a target don't have to define themselves.
-		ctx = outerlocals()
+		ctx = core.outerlocals()
 		module = sys.modules[ctx['__name__']]
 
 	sources = extension_sources(module)

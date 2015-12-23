@@ -2,6 +2,24 @@
 Core classes and data; dependents should access the
 functionality from the &.library module.
 """
+import sys
+
+def outerlocals(depth = 0):
+	"""
+	Get the locals dictionary of the calling context.
+
+	If the depth isn't specified, the locals of the caller's caller.
+	"""
+	global sys
+	if depth < 0:
+		raise TypeError("depth must be greater than or equal to zero")
+
+	f = sys._getframe().f_back.f_back
+	while depth:
+		depth -= 1
+		f = f.f_back
+
+	return f.f_locals
 
 roles = set([
 	'analysis',
