@@ -1,3 +1,6 @@
+/*
+ * Collect Python execution events for profiling and coverage purposes.
+ */
 #include <sys/types.h>
 #include <sys/time.h>
 #include <frameobject.h>
@@ -9,101 +12,90 @@ struct Collector {
 };
 typedef struct Collector *Collector;
 
-static PyObj event_objects[7]; /* n-event types */
+#define NEVENTS 7
+static PyObj event_objects[NEVENTS]; /* n-event types */
 
+/*
+ * Build a tuple containing the frame information.
+ */
 static PyObj
-trace(PyObj self, PyFrameObject *f, int what, PyObj arg)
+frame_info(Collector col, PyFrameObject *f)
 {
-	Collector col = (Collector) self;
-	PyObj append;
 	PyCodeObject *code;
-	PyObj rob, item;
-	PyObj event, tdelta, firstlineno = NULL, lineno = NULL;
-	PyObj module_name, class_name = NULL, name, filename;
+
+	PyObj item;
+	PyObj tdelta, firstlineno = NULL, lineno = NULL;
+	PyObj name, filename;
 
 	code = f->f_code;
 	name = code->co_name;
 	filename = code->co_filename;
-	event = event_objects[what];
-
-	tdelta = PyObject_CallObject(col->col_delta_op, NULL);
-	if (tdelta == NULL)
-		return(NULL);
 
 	lineno = PyLong_FromLong((long) f->f_lineno);
 	if (lineno == NULL)
 		goto error;
 
+	/* for python, allows immediate identification of the subfactor */
 	firstlineno = PyLong_FromLong((long) code->co_firstlineno);
 	if (firstlineno == NULL)
 		goto error;
 
-	module_name = PyMapping_GetItemString(f->f_globals, "__name__");
-	if (module_name == NULL)
-		goto error;
-
-	if (code->co_argcount > 0)
-	{
-		PyObj first = PySequence_GetItem(code->co_varnames, 0);
-		if (first == NULL)
-		{
-			PyErr_Clear();
-			class_name = Py_None;
-			Py_INCREF(class_name);
-		}
-		else
-		{
-			switch (PyMapping_HasKey(f->f_locals, first))
-			{
-				case -1:
-					PyErr_Clear();
-				case 0:
-					Py_DECREF(first);
-					class_name = Py_None;
-					Py_INCREF(class_name);
-				break;
-
-				case 1:
-					class_name = PyObject_GetItem(f->f_locals, first);
-					Py_DECREF(first);
-					if (class_name == NULL)
-					{
-						PyErr_Clear();
-						class_name = Py_None;
-						Py_INCREF(class_name);
-					}
-				break;
-			}
-		}
-	}
-	else
-	{
-		class_name = Py_None;
-		Py_INCREF(class_name);
-	}
-
-	item = PyTuple_New(9);
+	item = PyTuple_New(4);
 	if (item == NULL)
 		goto error;
 
-	PyTuple_SET_ITEM(item, 0, module_name);
-	PyTuple_SET_ITEM(item, 1, class_name);
-	PyTuple_SET_ITEM(item, 2, filename);
+	PyTuple_SET_ITEM(item, 0, filename);
 	Py_INCREF(filename);
 
-	PyTuple_SET_ITEM(item, 3, firstlineno);
-	PyTuple_SET_ITEM(item, 4, lineno);
+	PyTuple_SET_ITEM(item, 1, firstlineno);
+	PyTuple_SET_ITEM(item, 2, lineno);
 
-	PyTuple_SET_ITEM(item, 5, name);
+	/* symbol/co_name; firstlinno is used to identify the factor */
+	PyTuple_SET_ITEM(item, 3, name);
 	Py_INCREF(name);
 
-	PyTuple_SET_ITEM(item, 6, event);
+	return(item);
+
+	error:
+		Py_XDECREF(firstlineno);
+		Py_XDECREF(lineno);
+		return(NULL);
+}
+
+static int
+trace(PyObj self, PyFrameObject *f, int what, PyObj arg)
+{
+	Collector col = (Collector) self;
+	PyObj append;
+	PyCodeObject *code;
+	PyObj rob, item, current = 0;
+	PyObj event, tdelta, firstlineno = NULL, lineno = NULL;
+	PyObj name, filename;
+
+	code = f->f_code;
+	name = code->co_name;
+	filename = code->co_filename;
+
+	event = event_objects[what];
+
+	tdelta = PyObject_CallObject(col->col_delta_op, NULL);
+	if (tdelta == NULL)
+		return(-1);
+
+	current = frame_info(col, f);
+	if (current == NULL)
+		goto error;
+
+	item = PyTuple_New(3);
+	if (item == NULL)
+		goto error;
+
+	PyTuple_SET_ITEM(item, 0, current);
+
+	PyTuple_SET_ITEM(item, 1, event);
 	Py_INCREF(event);
-	if (arg == NULL)
-		arg = Py_None;
-	PyTuple_SET_ITEM(item, 7, arg);
-	Py_INCREF(arg);
-	PyTuple_SET_ITEM(item, 8, tdelta);
+
+	PyTuple_SET_ITEM(item, 2, tdelta);
 
 	rob = PyObject_CallFunction(col->col_queue_op, "(O)", item);
 	Py_DECREF(item);
@@ -117,30 +109,60 @@ trace(PyObj self, PyFrameObject *f, int what, PyObj arg)
 
 	return(0);
 
-error:
-	Py_XDECREF(firstlineno);
-	Py_XDECREF(lineno);
-	Py_XDECREF(module_name);
-	return(-1);
+	error:
+		Py_XDECREF(current);
+		Py_XDECREF(firstlineno);
+		Py_XDECREF(lineno);
+		return(-1);
 }
 
 static PyMemberDef
 collector_members[] = {
-	{"endpoint", T_OBJECT, offsetof(struct Collector, col_queue_op), READONLY, PyDoc_STR("the operation ran to record the event")},
-	{"delta", T_OBJECT, offsetof(struct Collector, col_delta_op), READONLY, PyDoc_STR("the time delta operation to use")},
+	{"endpoint", T_OBJECT, offsetof(struct Collector, col_queue_op), READONLY,
+		PyDoc_STR("The operation ran to record the event.")
+	},
+
+	{"delta", T_OBJECT, offsetof(struct Collector, col_delta_op), READONLY,
+		PyDoc_STR("The time delta operation to use.")
+	},
+
 	{NULL,},
 };
 
 static PyObj
-collector_install(PyObj self)
+collector_subscribe(PyObj self)
 {
 	PyEval_SetTrace(trace, self);
 	Py_RETURN_NONE;
 }
 
+static PyObj
+collector_profile(PyObj self)
+{
+	PyEval_SetProfile(trace, self);
+	Py_RETURN_NONE;
+}
+
+static PyObj
+collector_cancel(PyObj self)
+{
+	PyEval_SetTrace(NULL, NULL);
+	Py_RETURN_NONE;
+}
+
 static PyMethodDef
 collector_methods[] = {
-	{"install", collector_install, METH_NOARGS, PyDoc_STR("Install the collector for the thread. One collector per-thread.")},
+	{"subscribe", (PyCFunction) collector_subscribe, METH_NOARGS,
+		PyDoc_STR("Install the collector for the thread. One Collector is used per-thread.")
+	},
+
+	{"profile", (PyCFunction) collector_profile, METH_NOARGS,
+		PyDoc_STR("Install the collector for the thread for profiling.")
+	},
+
+	{"cancel", (PyCFunction) collector_cancel, METH_NOARGS,
+		PyDoc_STR("Cancel collection of trace events. Error if not ran in the same thread.")
+	},
 	{NULL},
 };
 
@@ -216,44 +238,44 @@ const char collector_doc[] = "A callable object that manages the collection of t
 PyTypeObject
 CollectorType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	QPATH("Collector"),				/* tp_name */
-	sizeof(struct Collector),		/* tp_basicsize */
-	0,										/* tp_itemsize */
-	NULL,									/* tp_dealloc */
-	NULL,									/* tp_print */
-	NULL,									/* tp_getattr */
-	NULL,									/* tp_setattr */
-	NULL,									/* tp_compare */
-	NULL,									/* tp_repr */
-	NULL,									/* tp_as_number */
-	NULL,									/* tp_as_sequence */
-	NULL,									/* tp_as_mapping */
-	NULL,									/* tp_hash */
-	collector_call,					/* tp_call */
-	NULL,									/* tp_str */
-	NULL,									/* tp_getattro */
-	NULL,									/* tp_setattro */
-	NULL,									/* tp_as_buffer */
+	QPATH("Collector"),                   /* tp_name */
+	sizeof(struct Collector),             /* tp_basicsize */
+	0,                                    /* tp_itemsize */
+	NULL,                                 /* tp_dealloc */
+	NULL,                                 /* tp_print */
+	NULL,                                 /* tp_getattr */
+	NULL,                                 /* tp_setattr */
+	NULL,                                 /* tp_compare */
+	NULL,                                 /* tp_repr */
+	NULL,                                 /* tp_as_number */
+	NULL,                                 /* tp_as_sequence */
+	NULL,                                 /* tp_as_mapping */
+	NULL,                                 /* tp_hash */
+	collector_call,                       /* tp_call */
+	NULL,                                 /* tp_str */
+	NULL,                                 /* tp_getattro */
+	NULL,                                 /* tp_setattro */
+	NULL,                                 /* tp_as_buffer */
 	Py_TPFLAGS_BASETYPE|
-	Py_TPFLAGS_DEFAULT,				/* tp_flags */
-	collector_doc,						/* tp_doc */
-	NULL,									/* tp_traverse */
-	NULL,									/* tp_clear */
-	NULL,									/* tp_richcompare */
-	0,										/* tp_weaklistoffset */
-	NULL,									/* tp_iter */
-	NULL,									/* tp_iternext */
-	collector_methods,				/* tp_methods */
-	collector_members,				/* tp_members */
-	NULL,									/* tp_getset */
-	NULL,									/* tp_base */
-	NULL,									/* tp_dict */
-	NULL,									/* tp_descr_get */
-	NULL,									/* tp_descr_set */
-	0,										/* tp_dictoffset */
-	NULL,									/* tp_init */
-	NULL,									/* tp_alloc */
-	collector_new,						/* tp_new */
+	Py_TPFLAGS_DEFAULT,                   /* tp_flags */
+	collector_doc,                        /* tp_doc */
+	NULL,                                 /* tp_traverse */
+	NULL,                                 /* tp_clear */
+	NULL,                                 /* tp_richcompare */
+	0,                                    /* tp_weaklistoffset */
+	NULL,                                 /* tp_iter */
+	NULL,                                 /* tp_iternext */
+	collector_methods,                    /* tp_methods */
+	collector_members,                    /* tp_members */
+	NULL,                                 /* tp_getset */
+	NULL,                                 /* tp_base */
+	NULL,                                 /* tp_ */
+	NULL,                                 /* tp_descr_get */
+	NULL,                                 /* tp_descr_set */
+	0,                                    /* tp_dictoffset */
+	NULL,                                 /* tp_init */
+	NULL,                                 /* tp_alloc */
+	collector_new,                        /* tp_new */
 };
 
 /* METH_O, METH_VARARGS, METH_VARKEYWORDS, METH_NOARGS */
@@ -269,6 +291,7 @@ INIT("C-Level trace support")
 
 	if (PyType_Ready(&CollectorType) != 0)
 		goto fail;
+
 	PyModule_AddObject(mod, "Collector", (PyObj) (&CollectorType));
 
 	PyModule_AddIntConstant(mod, "TRACE_CALL", PyTrace_CALL);
@@ -281,14 +304,14 @@ INIT("C-Level trace support")
 	PyModule_AddIntConstant(mod, "TRACE_C_EXCEPTION", PyTrace_C_EXCEPTION);
 	PyModule_AddIntConstant(mod, "TRACE_C_RETURN", PyTrace_C_RETURN);
 
-	event_objects[PyTrace_CALL]			= PyDict_GetItemString(__dict__, "TRACE_CALL");
-	event_objects[PyTrace_EXCEPTION]		= PyDict_GetItemString(__dict__, "TRACE_EXCEPTION");
-	event_objects[PyTrace_LINE]			= PyDict_GetItemString(__dict__, "TRACE_LINE");
-	event_objects[PyTrace_RETURN]			= PyDict_GetItemString(__dict__, "TRACE_RETURN");
+	event_objects[PyTrace_CALL]        = PyDict_GetItemString(__dict__, "TRACE_CALL");
+	event_objects[PyTrace_EXCEPTION]   = PyDict_GetItemString(__dict__, "TRACE_EXCEPTION");
+	event_objects[PyTrace_LINE]        = PyDict_GetItemString(__dict__, "TRACE_LINE");
+	event_objects[PyTrace_RETURN]      = PyDict_GetItemString(__dict__, "TRACE_RETURN");
 
-	event_objects[PyTrace_C_CALL]			= PyDict_GetItemString(__dict__, "TRACE_C_CALL");
-	event_objects[PyTrace_C_EXCEPTION]	= PyDict_GetItemString(__dict__, "TRACE_C_EXCEPTION");
-	event_objects[PyTrace_C_RETURN]		= PyDict_GetItemString(__dict__, "TRACE_C_RETURN");
+	event_objects[PyTrace_C_CALL]      = PyDict_GetItemString(__dict__, "TRACE_C_CALL");
+	event_objects[PyTrace_C_EXCEPTION] = PyDict_GetItemString(__dict__, "TRACE_C_EXCEPTION");
+	event_objects[PyTrace_C_RETURN]    = PyDict_GetItemString(__dict__, "TRACE_C_RETURN");
 
 	Py_INCREF(event_objects[PyTrace_CALL]);
 	Py_INCREF(event_objects[PyTrace_EXCEPTION]);
@@ -299,9 +322,10 @@ INIT("C-Level trace support")
 	Py_INCREF(event_objects[PyTrace_C_RETURN]);
 
 	return(mod);
-fail:
-	DROP_MODULE(mod);
-	return(NULL);
+
+	fail:
+		DROP_MODULE(mod);
+		return(NULL);
 }
 /*
  * vim: ts=3:sw=3:noet:
