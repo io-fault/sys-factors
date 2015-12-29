@@ -7,7 +7,7 @@ from .. import test as testpkg
 def test_Factor(test):
 	f = library.Factor.from_fullname(__package__)
 	test/f.name == 'fault.development.test'
-	test/f.type == 'python-module'
+	test/f.type == 'tests'
 	test/f.sources() == [libroutes.File.from_absolute(testpkg.__file__)]
 
 if __name__ == '__main__':
