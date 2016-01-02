@@ -17,7 +17,7 @@ except ImportError:
 
 class Collector(object):
 	"""
-	Python collector. &trace.Collector is used by default.
+	Python collector. &trace.Collector is used when available.
 	"""
 
 	def __init__(self, endpoint, time_delta):
@@ -79,7 +79,7 @@ def prepare(
 		Collector=(Collector if trace is None else trace.Collector),
 	):
 	"""
-	Construct trace event collection using a &collection.deque instance
+	Construct trace event collection using a &collections.deque instance
 	as the destination.
 
 	[ Return ]
