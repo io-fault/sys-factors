@@ -9,7 +9,7 @@ import functools
 import types
 import importlib
 
-from ...fork import library as libfork
+from ...system import library as libsys
 
 from .. import library as libdev
 from .. import libtest
@@ -39,7 +39,7 @@ class Harness(libharness.Harness):
 	"""
 	The collection and execution of a series of tests.
 	"""
-	concurrently = staticmethod(libfork.concurrently)
+	concurrently = staticmethod(libsys.concurrently)
 
 	def __init__(self, package, status):
 		self.package = package
@@ -191,4 +191,4 @@ def main(package, modules):
 if __name__ == '__main__':
 	package, *modules = sys.argv[1:]
 	with libcore.dumping():
-		libfork.control(functools.partial(main, package, modules))
+		libsys.control(functools.partial(main, package, modules))

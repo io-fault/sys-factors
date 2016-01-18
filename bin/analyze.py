@@ -10,7 +10,7 @@ import types
 import importlib
 
 from ...routes import library as routeslib
-from ...fork import library as forklib
+from ...system import library as libsys
 
 from .. import libtest
 from .. import libcore
@@ -187,7 +187,7 @@ class Proceeding(object):
 		self._status_test_sealing(test)
 
 		# seal fate in a child process
-		_seal = forklib.concurrently(functools.partial(self._seal, test))
+		_seal = libsys.concurrently(functools.partial(self._seal, test))
 
 		l = []
 		report = _seal(status_ref = l.append)
@@ -249,4 +249,4 @@ def main(package, modules):
 if __name__ == '__main__':
 	package, *modules = sys.argv[1:]
 	with libcore.dumping():
-		forklib.control(functools.partial(main, package, modules))
+		libsys.control(functools.partial(main, package, modules))

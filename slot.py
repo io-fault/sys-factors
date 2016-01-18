@@ -29,7 +29,7 @@ def initialize(slot_environment = slot_environment):
 	processes automatically use it regardless of how they're executed.
 
 	If a new slot should be used by a child, the environment variable should be unset
-	or set to an empty string. Using fork's Invocation interface, the environment should
+	or set to an empty string. Using fault.system's Invocation interface, the environment should
 	be altered using its environment variable parameters.
 
 	This function is automatically called when the module is imported.
