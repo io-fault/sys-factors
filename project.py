@@ -6,5 +6,5 @@ icon = '🐜'
 
 abstract = 'tools and libraries for supporting a development environment'
 
-controller = 'fault.io' # Responsible Party
-contact = 'mailto:critical@fault.io' # Contact point for the Responsible Party
+controller = 'fault.io'
+contact = 'mailto:critical@fault.io'
