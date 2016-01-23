@@ -49,9 +49,9 @@ class Factor(tuple):
 			m = x.module()
 			mt = getattr(m, '__type__', None)
 			if mt == 'context':
-				yield getattr(m, '__canonical__', None) or x.identity
+				yield getattr(m, '__canonical__', None) or x.identifier
 			else:
-				yield x.identity
+				yield x.identifier
 			x = x.container
 
 	@property

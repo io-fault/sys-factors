@@ -71,8 +71,8 @@ class Harness(object):
 		module.__tests__ = [
 			(x.fullname, self.module_test)
 			for x in ir.subnodes()[1] # modules only; NO packages.
-			if x.identity.startswith('test_') and (
-				not test.constraints or x.identity in test.constraints
+			if x.identifier.startswith('test_') and (
+				not test.constraints or x.identifier in test.constraints
 			)
 		]
 
