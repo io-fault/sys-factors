@@ -3,6 +3,7 @@ Project development interface for software engineers.
 """
 import contextlib
 import functools
+import types
 
 from . import extension
 from .core import roles
@@ -136,3 +137,24 @@ class Project(object):
 		"""
 		Modify the package to become a release.
 		"""
+
+class Sources(types.ModuleType):
+	"""
+	Base class for factors that consist of a set of source files.
+	"""
+
+	@property
+	def identifier(self):
+		"""
+		The module's basename.
+		"""
+		return self.factor.route.identifier
+
+	@property
+	def sources(self):
+		"The directory containing the Javascript sources."
+
+		return self.factor.route.file().container / 'src'
+
+	def _init(self):
+		self.factor = Factor.from_fullname(self.__name__)
