@@ -230,12 +230,13 @@ class Toolchain(object):
 		return name + '.' + suffix, (), fragment
 
 	def compile(self,
-		language, target, sources,
-		defines = (),
-		includes = (),
-		directories = (),
-		dependency = None,
-	):
+			language, target, sources,
+			defines = (),
+			includes = (),
+			directories = (),
+			dependency=None,
+			tuple=tuple,
+		):
 		"""
 		/defines
 			A sequence of key-value pairs that make up parameter defines.
@@ -270,14 +271,14 @@ class Toolchain(object):
 			+ ldirectories + ldefines + lincludes + ('-o', target, '-c') + sources
 
 	def link(self,
-		targetdir, name,
-		version, objects,
-		loader = None,
-		libraries = (),
-		directories = (),
-		frameworks = (),
-		linker = None
-	):
+			targetdir, name,
+			version, objects,
+			loader = None,
+			libraries = (),
+			directories = (),
+			frameworks = (),
+			linker = None
+		):
 		"""
 		/directories
 			A sequence of library and framework directories. (-L, -F on some systems)
@@ -325,10 +326,10 @@ class Toolchain(object):
 			]
 
 	def stage(self,
-		id, target, reference,
-		popen = subprocess.Popen,
-		exists = os.path.exists,
-	):
+			id, target, reference,
+			popen = subprocess.Popen,
+			exists = os.path.exists,
+		):
 		"""
 		Execute the stage recording progress information to the given logfile path.
 		"""
