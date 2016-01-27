@@ -1,5 +1,13 @@
 """
 Project development interface for software engineers.
+
+[ Properties ]
+
+/inhibit_construction
+	The set of module prefixes that identify modules
+	that should not be analyzed for rebuild.
+	Primarily, this is only interrogated by package modules
+	providing a Python interface to foreign resources.
 """
 import contextlib
 import functools
@@ -7,7 +15,10 @@ import types
 
 from . import extension
 from .core import roles
+
 from ..routes import library as libroutes
+
+inhibit_construction = set()
 
 class Factor(tuple):
 	"""
@@ -146,7 +157,7 @@ class Sources(types.ModuleType):
 	@property
 	def identifier(self):
 		"""
-		The module's basename.
+		The module's basename. The final part of the module's (python:attribute)`__name__`.
 		"""
 		return self.factor.route.identifier
 
