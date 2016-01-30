@@ -15,6 +15,17 @@ try:
 except ImportError:
 	trace = None
 
+event_integers = {
+	'call': 0,
+	'exception': 1,
+	'line': 2,
+	'return': 3,
+
+	'c_call': 4,
+	'c_exception': 5,
+	'c_return': 6,
+}
+
 class Collector(object):
 	"""
 	Python collector. &trace.Collector is used when available.
@@ -32,11 +43,13 @@ class Collector(object):
 			event_map=None,
 			isinstance=isinstance,
 		):
+		global event_integers
+
 		co = frame.f_code
 
 		append((
 			(co.co_filename, co.co_firstlineno, frame.f_lineno, co.co_name),
-			event, time_delta(),
+			event_integers[event], time_delta(),
 		))
 
 		# None return cancels the trace.
@@ -58,6 +71,13 @@ class Collector(object):
 	def cancel(self):
 		"Cancel the collection of data in the current thread."
 		sys.settrace(None)
+		sys.setprofile(None)
+
+	def __enter__(self):
+		self.subscribe()
+
+	def __exit__(self, *args):
+		self.cancel()
 
 sequence = (
 	'cumulative',
@@ -137,7 +157,7 @@ def measure(
 	line_counts = defaultdict(Counter)
 	exact_call_times = defaultdict(list)
 
-	# Do everything here.
+	# Do nearly everything here.
 	# It's a bit complicated because we are actually doing a few things:
 	# 1. Line counts
 	# 2. N-Function Calls, Cumulative Time and resident time of said calls.
