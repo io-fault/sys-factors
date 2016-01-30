@@ -45,8 +45,6 @@ class Harness(libharness.Harness):
 		self.package = package
 		self.status = status
 		self.selectors = []
-		self.cextensions = []
-		self.fimports = {}
 
 	def _status_test_sealing(self, test):
 		self.status.write('{working} {tid} ...'.format(
@@ -167,9 +165,6 @@ class Harness(libharness.Harness):
 			import pdb
 			# error cases chain the exception
 			pdb.post_mortem(test.fate.__cause__.__traceback__)
-
-		report['fimports'] = list(self.fimports.items())
-		self.fimports.clear()
 
 	def execute(self, container, modules, division = None):
 		if division is None:
