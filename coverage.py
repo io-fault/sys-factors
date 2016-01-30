@@ -2,7 +2,7 @@
 Coverage generation and processing functions.
 """
 import subprocess
-from ..routes import library as routeslib
+from ..routes import library as libroutes
 from . import libmeta
 
 # utility function for running processing commands
@@ -29,14 +29,14 @@ def _pipeline(inputfile, seq, popen = subprocess.Popen, pipe = subprocess.PIPE):
 # involved with instantiating Python objects. For smaller files it would be
 # okay, but for larger files, it's N passes.
 def crossed(filepath,
-	sequence = [
-		# project
-		('grep', '^ *[0-9]\+'),
-		('cut', '-s', '-d', ':', '-f' '1,2'),
-		# collapse spaces
-		('sed', 's/[\t ]*//g'),
-	],
-):
+		sequence = [
+			# project
+			('grep', '^ *[0-9]\+'),
+			('cut', '-s', '-d', ':', '-f' '1,2'),
+			# collapse spaces
+			('sed', 's/[\t ]*//g'),
+		],
+	):
 	"""
 	Run the '.gcov' file through a pipeline that renders lines suitable for libmeta
 	use.
@@ -44,15 +44,13 @@ def crossed(filepath,
 	return _pipeline(filepath, sequence)
 
 def crossable(filepath,
-	sequence = [
-		# project
-		('grep', '^[ \t]*[^-]\+:'),
-		('cut', '-s', '-d', ':', '-f' '2'),
-	],
-):
+		sequence = [
+			# project
+			('grep', '^[ \t]*[^-]\+:'),
+			('cut', '-s', '-d', ':', '-f' '2'),
+		],
+	):
 	"""
-	lines(filepath)
-
 	Run the coverage output, '.gcov', through a pipeline that renders coverable lines.
 
 	[ Parameters ]
@@ -63,11 +61,11 @@ def crossable(filepath,
 	return _pipeline(filepath, sequence)
 
 def ignored(filepath,
-	sequence = [
-		('grep', '[ \t]XCOVERAGE$'),
-		('cut', '-s', '-d', ':', '-f' '2'),
-	],
-):
+		sequence = [
+			('grep', '[ \t]XCOVERAGE$'),
+			('cut', '-s', '-d', ':', '-f' '2'),
+		],
+	):
 	"""
 	Get the lines of the source that were explicitly ignored.
 	"""
@@ -75,7 +73,7 @@ def ignored(filepath,
 
 def llvm(data, *sources):
 	"""
-	Return the system command tuple for running gcov.
+	Return the system command tuple for running llvm-cov.
 
 	[ Parameters ]
 
@@ -114,9 +112,9 @@ def render(route, source, proc = crossed):
 	ir = route
 	mod = ir.module()
 
-	libpath = routeslib.File.from_absolute(mod.__bootstrap__.dll)
+	libpath = libroutes.File.from_absolute(mod.__bootstrap__.dll)
 
-	with routeslib.File.temporary() as tr:
+	with libroutes.File.temporary() as tr:
 		# render the coverage output in a temp directory
 		filename = source.identity
 		command = garbage(libpath.suffix('.gcno').fullpath, source.fullpath)
@@ -129,7 +127,7 @@ def render(route, source, proc = crossed):
 
 def record(cause, fullname, source, metatype = 'xlines', proc=crossed, append=libmeta.append):
 	"Update the coverage meta data for the module."
-	mr = routeslib.Import.from_fullname(fullname)
+	mr = libroutes.Import.from_fullname(fullname)
 	mod = mr.modules()
 	dll = routelib.File.from_absolute(mod.__dll__)
 
@@ -146,7 +144,7 @@ def convert(fullname, identity, name = 'lines'):
 	Convert the the given module's coverage output to records stored in a slot
 	designated by @identity.
 	"""
-	ir = routeslib.Import.from_fullname(fullname)
+	ir = libroutes.Import.from_fullname(fullname)
 	mod = ir.module()
 	fr = ir.file()
 
