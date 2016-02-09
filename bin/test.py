@@ -74,20 +74,9 @@ class Harness(libharness.Harness):
 
 	def _print_tb(self, fate):
 		import traceback
-		try:
-			# dev.libtraceback por favor
-			from IPython.core import ultratb
-			x = ultratb.VerboseTB(ostream = sys.stderr)
-			# doesn't support chains yet, so fallback to cause traceback.
-			if fate.__cause__:
-				exc = fate.__cause__
-			else:
-				exc = fate
-			x(exc.__class__, exc, exc.__traceback__)
-		except ImportError:
-			tb = traceback.format_exception(fate.__class__, fate, fate.__traceback__)
-			tb = ''.join(tb)
-			sys.stderr.write(tb)
+		tb = traceback.format_exception(fate.__class__, fate, fate.__traceback__)
+		tb = ''.join(tb)
+		sys.stderr.write(tb)
 
 	def dispatch(self, test):
 		faten = None
@@ -122,7 +111,7 @@ class Harness(libharness.Harness):
 
 		# C library coverage code
 
-		if self.exit_on_failure and report['impact'] < 0 or report['interrupt']:
+		if False and report['impact'] < 0 or report['interrupt']:
 			sys.exit(report['exitstatus'])
 
 		return report

@@ -87,7 +87,11 @@ class Factor(tuple):
 			if s is not None and s.has_location:
 				return [libroutes.File.from_absolute(s.origin)]
 			else:
-				return ()
+				m = self.route.module()
+				if m.__file__:
+					return (libroutes.File.from_absolute(m.__file__),)
+				else:
+					return ()
 
 class Project(object):
 	"""

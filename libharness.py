@@ -31,15 +31,12 @@ class Harness(object):
 	Simple test runners subclass &Harness in order to manage the execution
 	and status display of an evaluation.
 	"""
-	from . import libtest
-	exit_on_failure = False
+	from . import libtest # class attribute for general access.
 
 	def __init__(self, package):
 		self.package = package
-		self.selectors = []
-		self.cextensions = []
-		self.fimports = {}
-		self.tracing = libtrace.Tracing
+
+	gather = staticmethod(libtest.gather)
 
 	def module_test(self, test):
 		"""
@@ -49,7 +46,7 @@ class Harness(object):
 		module = importlib.import_module(test.identity)
 		test/module.__name__ == test.identity
 
-		module.__tests__ = self.libtest.gather(module)
+		module.__tests__ = self.gather(module)
 		if '__test__' in dir(module):
 			# allow module to skip the entire set
 			module.__test__(test)
@@ -77,6 +74,9 @@ class Harness(object):
 		]
 
 		raise self.libtest.Divide(module)
+
+	def dispatch(self, test):
+		test.seal()
 
 	def execute(self, container, modules):
 		"""

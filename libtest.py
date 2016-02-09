@@ -208,36 +208,36 @@ class Fate(BaseException):
 		pass
 
 class Pass(Fate):
-	abstract = "the test was explicitly passed"
+	abstract = "The test was explicitly passed by a raise."
 	impact = 1
 	name = "pass"
 	code = 0
 	color = "green"
 
 class Return(Pass):
-	abstract = "the test returned; implying success"
+	abstract = "The test returned &None implying success."
 	impact = 1
 	name = "return"
 	code = 1
 	color = "green"
 
 class Explicit(Pass):
-	abstract = "the test cannot be implicitly invoked"
+	abstract = "The test must be explicitly invoked."
 	impact = 0
 	name = "explicit"
 	code = 2
 	color = "magenta"
 
 class Skip(Pass):
-	abstract = "the test was skipped"
+	abstract = "The test was skipped for a specific reason."
 	impact = 0
 	name = "skip"
 	code = 3
 	color = "cyan"
 
 class Divide(Fate):
-	abstract = "the test is a container of a set of tests"
-	impact = 0
+	abstract = "The test is a container of a set of tests."
+	impact = 1 # This is positive as the division may have performed critical imports.
 	name = "divide"
 	code = 4
 	color = "blue"
@@ -248,26 +248,26 @@ class Divide(Fate):
 		self.limit = limit
 
 class Fail(Fate):
-	abstract = "the test raised an exception or contended an absurdity"
+	abstract = "The test raised an exception or contended an absurdity."
 	impact = -1
 	name = "fail"
 	code = 5
 	color = "red"
 
 class Void(Fail):
-	abstract = "the coverage data of the test does not meet expectations"
+	abstract = "The coverage data of the test does not meet expectations."
 	name = "void"
 	code = 6
 	color = "red"
 
 class Expire(Fail):
-	abstract = "the test did not finish in the allowed time"
+	abstract = "The test did not finish in the configured time."
 	name = "expire"
 	code = 8
 	color = "yellow"
 
 class Interrupt(Fail):
-	abstract = "the test was interrupted by a control exception"
+	abstract = "The test was interrupted by a control exception."
 	name = "interrupt"
 	code = 9
 	color = "orange"
@@ -279,7 +279,8 @@ class Core(Fail):
 	This exception is used by advanced test harnesses that execute tests in subprocesses to
 	protect subsequent tests.
 	"""
-	abstract = 'the test caused a core dump or segmentation violation'
+
+	abstract = 'The test caused a core image to be produced by the operating system.'
 	name = 'core'
 	code = 90
 	color = 'orange'
@@ -420,7 +421,7 @@ class Test(object):
 
 	def trap(self):
 		"""
-		Set a trap for exceptions converting an would-be &Error fate on exit to a &Failure.
+		Set a trap for exceptions converting a would-be &Error fate on exit to a &Failure.
 
 		#!/pl/python
 			with test.trap():
@@ -437,7 +438,11 @@ class Test(object):
 	try:
 		from gc import collect
 		def garbage(self, minimum = None, collect = collect, **kw):
-			'Request collection with the expectation of a minimum unreachable.'
+			"""
+			Request collection with the expectation of a minimum unreachable.
+
+			Used by tests needing to analyze the effects garbage collection.
+			"""
 			unreachable = collect()
 			if minimum is not None and (
 				unreachable < minimum

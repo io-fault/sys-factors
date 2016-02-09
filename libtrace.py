@@ -3,9 +3,20 @@ Code coverage and profiling for use with &.libtest and &..factors.
 
 The serialization process accounts for two perspectives: the test, and the factor.
 This allows &..factors to provide actual dependents of a given factor.
+
+[ Development Tasks ]
+
+	- Refactor &measure as a stateful method that can be called during collection
+		in order to reduce memory consumption during long runs.
+	- Make use of interjection in order to perform collection maintenance
+		for &measure; cancel collection, run measure, serialize new data(?), resume.
+
+[ Properties ]
+
+/Measurements
+	A tuple of measured trace data.
 """
 import sys
-import operator
 import collections
 import functools
 import typing
@@ -15,6 +26,7 @@ try:
 except ImportError:
 	trace = None
 
+# Measure uses the integer form.
 event_integers = {
 	'call': 0,
 	'exception': 1,
@@ -80,21 +92,19 @@ class Collector(object):
 		self.cancel()
 
 sequence = (
-	'cumulative',
-	'resident',
+	'total',
 	'count',
-	'cmin',
-	'cmax',
-	'cdst',
-	'cvar',
-	'rmin',
-	'rmax',
-	'rdst',
-	'rvar',
+	'minimum',
+	'maximum',
+	'median',
+	'average',
+	'distance',
+	'variance',
+	'modes',
 )
 
 def prepare(
-		Queue=collections.deque,
+		Sequence=list,
 		Chronometer=None,
 		Collector=(Collector if trace is None else trace.Collector),
 	):
@@ -112,14 +122,19 @@ def prepare(
 		# import here to avoid import-time dependency.
 		from ..chronometry.kernel import Chronometer
 
-	events = Queue()
+	events = Sequence()
 	chronometer = Chronometer()
 	collector = Collector(events.append, chronometer.__next__)
 
 	return collector, events
 
+Measurements = typing.Tuple[
+	typing.Mapping[typing.Tuple, typing.Sequence],
+	typing.Mapping[str, collections.Counter],
+]
+
 def measure(
-		events:collections.deque,
+		events:typing.Sequence,
 
 		TRACE_LINE = trace.TRACE_LINE,
 
@@ -131,40 +146,44 @@ def measure(
 		TRACE_C_RETURN = trace.TRACE_C_RETURN,
 		TRACE_C_EXCEPTION = trace.TRACE_C_EXCEPTION,
 
-		getitem=operator.itemgetter(0),
-		list=list, str=str,
-		map=map, max=max, abs=abs, len=len,
+		IntegerSequence=list,
 		deque=collections.deque,
 		defaultdict=collections.defaultdict,
 		Counter=collections.Counter,
-	) -> (dict, dict, dict):
+	) -> Measurements:
 	"""
-	Measure exact line count and group call times.
+	Measure line counts and call times from the collected trace data.
 
 	Coverage events and profile events should be processed here.
 
+	[ Parameters ]
+
+	/events
+		The sequence of events identified as the endpoint of a &Collector instance.
+		Usually, a triple whose first key is the calling context, the second is
+		the traced events, and the third is the time index.
+
 	[ Return ]
 
-	A triple consisting of the call times, exact call times, and the line counts.
-	Each item in the tuple is a mapping. The line counts is a two-level dictionary
+	A pair consisting of the exact call times, cumulative and resident, and the line counts.
+
+	Each item in the tuple is a mapping. The line counts is a two-level mapping
 	keyed with the filename followed with the line number. The line number is a key
-	of a &collections.Counter instance.
+	to a &collections.Counter instance. The exact timings is a mapping whose keys
+	are tuples whose contents are the calling context of the time measurements. The
+	value of the mapping is a sequence of pairs describing the cumulative and resident
+	times of the call context (key).
 	"""
+
 	call_state = deque((0,))
 	subcall_state = deque((0,))
 
-	call_times = defaultdict(Counter)
-	line_counts = defaultdict(Counter)
-	exact_call_times = defaultdict(list)
+	counts = defaultdict(Counter)
+	times = defaultdict(list)
 
-	# Do nearly everything here.
-	# It's a bit complicated because we are actually doing a few things:
-	# 1. Line counts
-	# 2. N-Function Calls, Cumulative Time and resident time of said calls.
-	get = events.popleft
-	path = collections.deque()
-	while events:
-		x = get()
+	# Calculate timings and hit counts.
+	path = deque()
+	for x in events:
 		(filename, func_lineno, lineno, func_name), event, delta = x
 		call = (filename, func_lineno, func_name)
 
@@ -172,7 +191,7 @@ def measure(
 		subcall_state[-1] += delta
 
 		if event == TRACE_LINE:
-			line_counts[filename][lineno] += 1
+			counts[filename][lineno] += 1
 		elif event in {TRACE_CALL, TRACE_C_CALL}:
 			if path:
 				parent = path[-1]
@@ -180,24 +199,19 @@ def measure(
 				parent = None
 			path.append(call)
 
-			line_counts[filename][lineno] += 1
-			call_times[(parent, call)]['count'] += 1
-			# push call state
+			counts[filename][lineno] += 1
+
+			# push call state for timing measurements
 			call_state.append(0)
 			subcall_state.append(0)
 		elif event in {TRACE_RETURN, TRACE_C_RETURN}:
-			parent = None
-			if path:
-				path.pop()
-				if path:
-					parent = path[-1]
-
-			line_counts[filename][lineno] += 1
+			counts[filename][lineno] += 1
 
 			# pop call state, inherit total
 			sum = call_state.pop()
 			if not call_state:
 				call_state.append(0)
+
 			# subcall does not inherit
 			call_state[-1] += sum
 
@@ -206,81 +220,15 @@ def measure(
 			if not subcall_state:
 				subcall_state.append(0)
 
-			timing = call_times[(parent, call)]
-			timing['cumulative'] += sum
-			timing['resident'] += inner
+			# Record the cumulative and resident *parts*.
+			# They need to be summed/aggregated for reporting purposes.
+			times[(parent, call)].extend((sum, inner))
 
-			# Counter() defaults to zero, so explicitly check for existence.
-			if 'rmin' not in timing or timing['rmin'] > inner:
-				timing['rmin'] = inner
-			if 'cmin' not in timing or timing['cmin'] > inner:
-				timing['cmin'] = sum
+			# Pop parent.
+			parent = None
+			if path:
+				path.pop()
+				if path:
+					parent = path[-1]
 
-			timing['rmax'] = max(inner, timing['rmax'])
-			timing['cmax'] = max(sum, timing['cmax'])
-
-			exact_call_times[(parent, call)].append((sum, inner))
-
-	return call_times, exact_call_times, line_counts
-
-def profile_aggregate(
-		call_times:dict,
-		exact_call_times:dict,
-
-		median:bool=False,
-		mode:bool=False,
-
-		abs=abs, len=len, list=list,
-		Counter=collections.Counter,
-		get0=operator.itemgetter(0),
-		get1=operator.itemgetter(1),
-	):
-	"""
-	Update the &call_times dictionary with data from
-	&exact_call_times. Adds distance from average and variance
-	fields.
-
-	The &median and &mode keywords can be used to enable the
-	calculation of those statistics.
-	"""
-
-	# perform the calculations
-	for key, agg in call_times.items():
-		xct = exact_call_times[key]
-		n = len(xct)
-		if not n:
-			continue
-
-		cfreq = Counter()
-		rfreq = Counter()
-
-		caverage = agg['cumulative'] / n
-		raverage = agg['resident'] / n
-		for cumulative, resident in xct:
-			agg['cdst'] += abs(cumulative - caverage)
-			agg['rdst'] += abs(resident - raverage)
-			agg['cvar'] += (cumulative - caverage) ** 2
-			agg['rvar'] += (resident - raverage) ** 2
-			cfreq[cumulative] += 1
-			rfreq[resident] += 1
-
-		# mode and median does't seem to be particularly useful,
-		# so don't bother calculating them for the report.
-		if mode or median:
-			cfreq = list(cfreq.items())
-			rfreq = list(rfreq.items())
-
-		if mode:
-			# modes
-			cfreq.sort(key=get1)
-			rfreq.sort(key=get1)
-			agg['cmode'] = cfreq[0]
-			agg['rmode'] = rfreq[0]
-
-		# medians
-		if median:
-			cfreq.sort(key=get0)
-			rfreq.sort(key=get0)
-			index, remainder = divmod(n, 2)
-			agg['cmedian'] = cfreq[n//2]
-			agg['rmedian'] = rfreq[n//2]
+	return times, counts
