@@ -55,13 +55,13 @@ def dumping(size_limit=-1,
 	Typical use:
 
 	#!/pl/python
-		with dev.libcore.dumping():
+		with libcore.dumping():
 			...
 
-	Core dumps can disabled by designating zero size::
+	Core dumps can disabled by designating zero size:
 
 	#!/pl/python
-		with dev.libcore.dumping(0):
+		with libcore.dumping(0):
 			...
 	"""
 	size_limit = size_limit or 0
@@ -79,6 +79,7 @@ def debug(corefile, executable=sys.executable):
 
 	By default, the executable is the Python executable.
 	"""
+
 	debugger = shutil.which('lldb') or shutil.which('gdb')
 	p = subprocess.Popen((debugger, '--core=' + corefile, executable))
 	return p.wait()
@@ -93,10 +94,11 @@ lldb_snapshot = [
 	'thread apply all bt full',
 ]
 
-def snapshot(corefile, executable = sys.executable):
+def snapshot(corefile, executable=sys.executable):
 	"""
-	Get a text dump of the corefile.
+	Get a text dump of the corefile from either lldb or gdb.
 	"""
+
 	debugger = shutil.which('lldb')
 	if debugger:
 		commands = lldb_snapshot
@@ -104,5 +106,11 @@ def snapshot(corefile, executable = sys.executable):
 		debugger = shutil.which('gdb')
 		commands = gdb_snapshot
 
-	p = subprocess.Popen((debugger, '--core=' + corefile, executable))
+	p = subprocess.Popen(
+		(debugger, '--core=' + corefile, executable),
+		stdin=subprocess.PIPE,
+		stdout=subprocess.PIPE,
+	)
+	p.stdin.write(('\n'.join(commands)+'\n').encode('ascii'))
+	p.stdout.read()
 	p.wait()

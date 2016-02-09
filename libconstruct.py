@@ -30,16 +30,22 @@ collection = (
 
 commands = {
 	'compile': {
+		'collections': (
+			{'clange', 'gcc'},
+			('clang',),
+		),
 		'asm': (
 			{'yasm', 'nasm', 'as'},
 			('as',),
 		),
 		'c': (
-			{'cc', 'gcc', 'clang', 'egcs'},
+			{
+				'cc', 'gcc', 'clang', 'egcs', 'cl.exe'
+			},
 			('clang', 'cc',)
 		),
 		'c++': (
-			{'c++', 'gc++', 'clang++',},
+			{'c++', 'gc++', 'clang++', 'cl.exe'},
 			('clang++',)
 		)
 	},
@@ -234,7 +240,7 @@ class Toolchain(object):
 			defines = (),
 			includes = (),
 			directories = (),
-			dependency=None,
+			dependency = None,
 			tuple=tuple,
 		):
 		"""
@@ -287,6 +293,7 @@ class Toolchain(object):
 		/frameworks
 			A sequence of frameworks to use for linkage; library sets (-framework)
 		"""
+
 		basename, canons, link = self.linker(self.type, name, version = version)
 		target = os.path.join(targetdir, basename)
 
