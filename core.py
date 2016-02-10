@@ -22,7 +22,7 @@ def outerlocals(depth = 0):
 	return f.f_locals
 
 roles = set([
-	'analysis',
+	'survey',
 	'test',
 	'debug',
 	'factor',
@@ -103,14 +103,3 @@ else:
 	def cache_path(path):
 		return path[:path.rfind('.py')]
 del imp
-
-class Context(object):
-	"A toolset for constructing targets."
-
-	def __init__(self):
-		self.tools = {}
-		self.environment = {}
-
-	def map(self, targets, sources):
-		"Resolve the tool chain to build the targets from the sources"
-		pass

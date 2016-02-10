@@ -275,6 +275,8 @@ def coverage(module, counts, RangeSet=librange.RangeSet):
 	traversable = RangeSet.from_normal_sequence(traversable)
 
 	traversed = RangeSet.from_set(counts)
+	traversable = traversed.union(traversable)
+
 	untraversed = traversable - traversed
 
 	return traversable, traversed, untraversed
