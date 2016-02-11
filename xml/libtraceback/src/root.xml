@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML description of a language agnostic Traceback; a stack of frames !-->
+<grammar
+	xmlns="http://relaxng.org/ns/structure/1.0"
+	xmlns:xlink="http://www.w3.org/1999/xlink"
+	ns="https://fault.io/xml/traceback"
+	datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes"
+	xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0">
+
+	<a:documentation>
+		Grammar for representing tracebacks in a somewhat language agnostic manner.
+	</a:documentation>
+
+	<define name="libtraceback.na">
+		<a:documentation>xmL:id attribute used on most elements.</a:documentation>
+		<optional>
+			<attribute name="xml:id">
+				<data type="ID"/>
+			</attribute>
+		</optional>
+	</define>
+
+	<define name="libtraceback.snapshot">
+		<a:documentation>A set of tracebacks and exceptions.</a:documentation>
+		<element name="snapshot">
+			<zeroOrMore>
+				<ref name="libtraceback.traceback"/>
+			</zeroOrMore>
+		</element>
+	</define>
+
+	<define name="libtraceback.traceback">
+		<element name="traceback">
+			<ref name="libtraceback.na"/>
+			<attribute name="identifier"><data type="string"/></attribute>
+
+			<attribute name="origin">
+				<a:documentation>
+					The host that created the traceback
+				</a:documentation>
+				<data type="string"/>
+			</attribute>
+
+			<zeroOrMore>
+				<ref name="libtraceback.frame"/>
+			</zeroOrMore>
+		</element>
+	</define>
+
+	<define name="libtraceback.frame">
+		<element name="frame">
+			<attribute name="identifier"><data type="string"/></attribute>
+			<element name="source">
+				<attribute name="absolute"><data type="integer"/></attribute>
+				<attribute name="relative"><data type="integer"/></attribute>
+				<attribute name="file"><data type="string"/></attribute>
+				<optional>
+					<attribute name="xlink:href"><data type="string"/></attribute>
+				</optional>
+				<text/>
+			</element>
+		</element>
+	</define>
+
+	<define name="libtraceback.exception">
+		<element name="exception">
+			<a:documentation>An error that occurred at the highest position.</a:documentation>
+			<!-- xml-ified form of the exception/error -->
+			<empty/>
+		</element>
+	</define>
+
+	<define name="libtraceback.interrupt">
+		<element name="interrupt">
+			<a:documentation>An obstruction in the continuation of a flow.</a:documentation>
+			<attribute name="effect">
+				<a:documentation>The effect of the interrupt on the processing unit.</a:documentation>
+				<choice>
+					<value>inconsequential</value>
+					<value>fatal</value>
+				</choice>
+			</attribute>
+
+			<!-- exception or breakpoint -->
+			<choice>
+				<ref name="libtraceback.exception"/>
+			</choice>
+		</element>
+	</define>
+<!--
+<snapshot xmlns="https://fault.io/xml/traceback">
+ <title></title>
+ <traceback identity="">
+  <frame xlink:href="file:///.../module.py?line=100#identifier" file="" line="">identifier</frame>
+ </traceback>
+ <interrupt effect="fatal" traceback="tid">
+  <exception>
+  </exception>
+ </interrupt>
+</snapshot>
+-->
+</grammar>
