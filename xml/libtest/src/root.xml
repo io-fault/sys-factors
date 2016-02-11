@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML description of a language agnostic Traceback; a stack of frames !-->
+<grammar
+	xmlns="http://relaxng.org/ns/structure/1.0"
+	ns="https://fault.io/xml/test"
+	datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes"
+	xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0">
+
+	<a:documentation>
+		Grammar for representing test reports. (retest: TEST REports)
+	</a:documentation>
+
+	<!-- Used to represent tracebacks for test failures. -->
+	<!-- <include href="factor://...xml.libtraceback"/> -->
+	<include href="../../libtraceback/__pycache__/output.xml"/>
+
+	<define name="libtest.na">
+		<a:documentation>Name attribute used on most elements.</a:documentation>
+		<optional>
+			<attribute name="xml:id">
+				<a:documentation>
+					Fully qualified unique identifier relative to the test context.
+				</a:documentation>
+				<data type="ID"/>
+			</attribute>
+		</optional>
+		<attribute name="identifier">
+			<data type="normalizedString"/>
+		</attribute>
+	</define>
+
+	<define name="libtest.xml.space">
+		<attribute name="xml:space">
+			<choice>
+				<value>default</value>
+				<value>preserve</value>
+			</choice>
+		</attribute>
+	</define>
+
+	<define name="libtest.context">
+		<element name="context">
+			<ref name="libtest.na"/>
+
+			<zeroOrMore>
+				<ref name="libtest.test"/>
+			</zeroOrMore>
+		</element>
+	</define>
+
+	<define name="libtest.report">
+		<a:documentation>A hierarchy of test results.</a:documentation>
+		<element name="report">
+			<attribute name="timestamp">
+				<data type="dateTime"/>
+			</attribute>
+
+			<zeroOrMore>
+				<ref name="libtest.context"/>
+			</zeroOrMore>
+		</element>
+	</define>
+
+	<define name="libtest.test">
+		<element name="test">
+			<ref name="libtest.na"/>
+			<attribute name="duration">
+				<a:documentation>
+					The time in nanoseconds that transpired while the test was running.
+				</a:documentation>
+				<data type="integer"/>
+			</attribute>
+			<attribute name="fate">
+				<a:documentation>
+					String descripting the fate of the test. Pass, fail, skip, divide, etc.
+				</a:documentation>
+				<text/>
+			</attribute>
+			<attribute name="impact">
+				<a:documentation>
+					Whether the test passed or failed; zero if neither due to skips.
+				</a:documentation>
+				<choice>
+					<value>-1</value>
+					<value>0</value>
+					<value>1</value>
+				</choice>
+			</attribute>
+
+			<optional>
+				<text/>
+			</optional>
+			<optional>
+				<ref name="libtraceback.snapshot"/> <!-- traceback -->
+			</optional>
+		</element>
+	</define>
+
+	<start>
+		<ref name="libtest.report"/>
+	</start>
+</grammar>

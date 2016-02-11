@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML description of a language agnostic Traceback; a stack of frames !-->
+<grammar
+	xmlns="http://relaxng.org/ns/structure/1.0"
+	ns="https://fault.io/xml/survey#profile"
+	datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes"
+	xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0">
+
+	<a:documentation>
+		Grammar for representing survey data.
+	</a:documentation>
+
+	<!-- Used to represent tracebacks for test failures. -->
+
+	<define name="libsurvey.xml.id">
+		<a:documentation>Name attribute used on most elements.</a:documentation>
+		<optional>
+			<attribute name="xml:id">
+				<a:documentation>
+					Fully qualified unique identifier relative to the test context.
+				</a:documentation>
+				<data type="ID"/>
+			</attribute>
+		</optional>
+	</define>
+
+	<define name="libsurvey.xml.space">
+		<attribute name="xml:space">
+			<choice>
+				<value>default</value>
+				<value>preserve</value>
+			</choice>
+		</attribute>
+	</define>
+
+	<define name="libsurvey.identifier">
+		<attribute name="identifier">
+			<data type="normalizedString"/>
+		</attribute>
+	</define>
+
+	<define name="libsurvey.report">
+		<a:documentation>Set of data describing a factor or a part of a factor.</a:documentation>
+		<element name="report">
+			<attribute name="timestamp">
+				<data type="dateTime"/>
+			</attribute>
+
+			<zeroOrMore>
+				<ref name="libsurvey.measurements"/>
+			</zeroOrMore>
+		</element>
+	</define>
+
+	<define name="libsurvey.measurements">
+		<a:documentation>Data frames container.</a:documentation>
+		<element name="measurements">
+			<ref name="libsurvey.xml.id"/>
+
+			<optional>
+				<attribute name="dimensions">
+					<list>
+						<zeroOrMore>
+							<data type="Name"/>
+						</zeroOrMore>
+					</list>
+				</attribute>
+			</optional>
+
+			<optional>
+				<attribute name="fields">
+					<list>
+						<zeroOrMore>
+							<data type="Name"/>
+						</zeroOrMore>
+					</list>
+				</attribute>
+			</optional>
+
+			<zeroOrMore>
+				<ref name="libsurvey.frame"/>
+			</zeroOrMore>
+		</element>
+	</define>
+
+	<define name="libsurvey.key">
+		<element>
+			<anyName/>
+			<optional>
+				<ref name="libsurvey.identifier"/>
+			</optional>
+
+			<text/>
+		</element>
+	</define>
+
+	<define name="libsurvey.frame">
+		<element name="frame">
+			<zeroOrMore>
+				<choice>
+					<ref name="libsurvey.xml.id"/>
+					<attribute>
+						<anyName ns="https://fault.io/xml/key"/>
+						<text/>
+					</attribute>
+					<attribute>
+						<anyName>
+							<except>
+								<nsName ns="http://www.w3.org/XML/1998/namespace"/>
+								<nsName ns="https://fault.io/xml/key"/>
+							</except>
+						</anyName>
+						<choice>
+							<data type="decimal"/>
+							<text/>
+						</choice>
+					</attribute>
+				</choice>
+			</zeroOrMore>
+
+			<!-- Keys are isolated so measurements can processed independently -->
+			<zeroOrMore>
+				<ref name="libsurvey.key"/>
+			</zeroOrMore>
+		</element>
+	</define>
+
+	<start>
+		<ref name="libsurvey.report"/>
+	</start>
+</grammar>
