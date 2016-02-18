@@ -10,10 +10,10 @@ import types
 import importlib
 
 from ...system import library as libsys
+from ...system import libcore
 
 from .. import library as libdev
 from .. import libtest
-from .. import libcore
 from .. import libtrace
 
 from .. import libharness
@@ -170,5 +170,5 @@ def main(package, modules):
 
 if __name__ == '__main__':
 	package, *modules = sys.argv[1:]
-	with libcore.dumping():
+	with libcore.constraint(None):
 		libsys.control(functools.partial(main, package, modules))

@@ -43,35 +43,6 @@ def corelocation(pid, pattern = functools.partial(os.environ.get, 'COREPATTERN',
 	import getpass
 	return pattern().format(**{'pid': pid, 'uid': os.getuid(), 'user': getpass.getuser(), 'home': os.environ['HOME']})
 
-@contextlib.contextmanager
-def dumping(size_limit=-1,
-		getrlimit=resource.getrlimit,
-		setrlimit=resource.setrlimit,
-		type = resource.RLIMIT_CORE
-	):
-	"""
-	Enable or disable core dumps during the context. Useful for managing tests that may dump core.
-
-	Typical use:
-
-	#!/pl/python
-		with libcore.dumping():
-			...
-
-	Core dumps can disabled by designating zero size:
-
-	#!/pl/python
-		with libcore.dumping(0):
-			...
-	"""
-	size_limit = size_limit or 0
-	try:
-		current = getrlimit(type)
-		setrlimit(type, (size_limit, size_limit))
-		yield None
-	finally:
-		setrlimit(type, current)
-
 def debug(corefile, executable=sys.executable):
 	"""
 	Load the debugger for a given core file, `corefile` and `executable`.

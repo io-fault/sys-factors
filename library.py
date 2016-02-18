@@ -14,9 +14,19 @@ import functools
 import types
 
 from . import extension
-from .core import roles
 
 from ..routes import library as libroutes
+
+roles = {
+	'debug': 'Reduced optimizations for debugging',
+	'survey': 'Debug role with test defines and coverage',
+	'test': 'Debug role with test defines',
+
+	'factor': 'Maximum optimizations with debugging symbols separated or stripped',
+
+	'bootstrap': 'Special case for fault.io',
+	'documentation': 'Produce documentation symbols',
+}
 
 inhibit_construction = set()
 

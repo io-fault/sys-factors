@@ -6,8 +6,9 @@ import sys
 import os.path
 import subprocess
 
-# The default build role.
-role = 'debug' # default build role; can be updated.
+#from . import libtransform
+
+from ..io import library as libio
 
 # Specifically for identifying files to be compiled.
 extensions = {
@@ -24,8 +25,10 @@ for k, v in extensions.items():
 	for y in v:
 		languages[y] = k
 
-collection = (
-	'cc', 'gcc', 'msvs', 'llvm'
+collections = (
+	'clang',
+	'gcc',
+	'msvs',
 )
 
 commands = {
@@ -69,56 +72,12 @@ x = dict(
 	csource = '/Tc',
 	cxxsource = '/Tp',
 )
-
-systems = {
-
-}
-
-def select_role():
-	# use override if available; otherwise, use global role in this module
-	if role is None:
-		default_role = sys.modules[__name__].role
-		if default_role is None:
-			role = ('debug' if __debug__ else 'factor')
-		else:
-			role = default_role
-
-def gather(
-		objdir, srcdir, suffixes,
-		suffix_delimiter:str='.',
-		join=os.path.join,
-	):
-	"Recursive acquire sources for compilation and build out objects."
-	os.makedirs(objdir, exist_ok = True)
-	prefix = len(srcdir)
-
-	for path, dirs, files in os.walk(srcdir):
-		# build out sub-directories for object cache
-		for x in dirs:
-			if x == '__pycache__':
-				# there shouldn't be __pycache__ directories here, but ignore anyways
-				continue
-
-		for x in files:
-			suffix = None
-
-			suffix_position = x.rfind(suffix_delimiter)
-			if suffix_position == -1:
-				# no suffix delimiter
-				continue
-			else:
-				# extract suffix; continue if it's not a recognized language
-				suffix = x[suffix_position+1:]
-				if suffix not in languages:
-					continue
-
-			srcpath = join(srcdir, path, x)
-			src_suffix = srcpath[prefix+1:][:-(len(suffix)+len(suffix_delimiter))]
-			objpath = join(objdir, src_suffix) + '.o'
-			objpathdir = os.path.dirname(objpath)
-			if not os.path.exists(objpathdir):
-				os.makedirs(objpathdir, exist_ok = True)
-			yield languages[suffix], srcpath, objpath
+if 0:
+	Feature('optimizations', Choice('level', '-O', '0', '1', '2', '3', 's'))
+	Feature('debugging.symbols', Options(('enabled', '-g')))
+	Feature('coverage', Options(('coverage', '--coverage')))
+	Feature('machine.code.generation', Options(('position_independent', '-fPIC')))
+	Feature('link', Mapping(type={'shared': '-shared', 'static': None}))
 
 class Toolchain(object):
 	"""

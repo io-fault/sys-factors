@@ -21,28 +21,19 @@ def outerlocals(depth = 0):
 
 	return f.f_locals
 
-roles = set([
-	'survey',
-	'test',
-	'debug',
-	'factor',
-	'bootstrap',
-	'documentation',
-])
-
 # Mapping of languages to file extensions.
 file_extensions = {
-	'collection-object-archive': ('a',),
-	'colleciton-library': ('dll', 'so', 'lib'),
-	'collection-python-extension': ('pyd',),
+	'system.object.archive': ('a',),
+	'system.library': ('dll', 'so', 'lib'),
+	'python.extension': ('pyd',),
 
-	'collection-python-egg': ('egg',),
-	'collection-python-wheel': ('whl',),
-	'collection-java-jar': ('jar',),
+	'python.egg': ('egg',),
+	'python.wheel': ('whl',),
+	'java.jar': ('jar',),
 
-	'collection-files-zip': ('zip',),
-	'collection-files-tar': ('tar',),
-	'collection-files-rar': ('rar',),
+	'files.zip': ('zip',),
+	'files.tar': ('tar',),
+	'files.rar': ('rar',),
 
 	'encoding-binhex': ('hqx',),
 	'encoding-base64': ('base64','b64'),

@@ -1,8 +1,12 @@
-from .. import libcore
+from ...system import libcore
+from .. import libcore as library
 
-def test_dumping(test):
+def test_location(test):
+	"""
+	Test &.libcore's capacity to identify the location of a core image.
+	"""
 	test.explicit()
-	with test/None.__class__ as exc, libcore.dumping() as none:
+	with test/None.__class__ as exc, libcore.constraint(None):
 		import os
 		os.abort()
 

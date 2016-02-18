@@ -274,7 +274,7 @@ class Interrupt(Fail):
 
 class Core(Fail):
 	"""
-	Failure cause by a process dumping a core image or similar uncontrollable crash.
+	Failure cause by a process dropping a core image or similar uncontrollable crash.
 
 	This exception is used by advanced test harnesses that execute tests in subprocesses to
 	protect subsequent tests.

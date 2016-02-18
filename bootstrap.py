@@ -10,12 +10,12 @@ import imp
 import contextlib
 import platform
 import importlib
+import functools
 import itertools
 import collections
 
 from . import include # foundation includes
 from . import sysconfig
-from . import libcore # disabling core dumps when in Frame code
 from .core import cache_path
 
 from . import extension
@@ -278,8 +278,7 @@ class Context(object):
 		"""
 		Deploy the Probe allowing queries against the C environment to be performed.
 		"""
-		with tempfile.TemporaryDirectory() as d, \
-		libcore.dumping(0):
+		with tempfile.TemporaryDirectory() as d:
 			yield d
 
 	def __enter__(self):

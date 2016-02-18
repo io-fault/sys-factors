@@ -8,8 +8,9 @@ import sys
 import functools
 
 from .. import library as libdev
-from .. import libcore
 from .. import libsurvey
+
+from ...system import libcore
 
 def main(target_dir, packages):
 	# Set test role. Per project?
@@ -30,5 +31,5 @@ def main(target_dir, packages):
 
 if __name__ == '__main__':
 	target_dir, *packages = sys.argv[1:]
-	with libcore.dumping():
+	with libcore.constraint(None):
 		libsurvey.libsys.control(functools.partial(main, target_dir, packages))
