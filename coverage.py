@@ -3,7 +3,6 @@ Coverage generation and processing functions.
 """
 import subprocess
 from ..routes import library as libroutes
-from . import libmeta
 
 # utility function for running processing commands
 def _pipeline(inputfile, seq, popen = subprocess.Popen, pipe = subprocess.PIPE):
@@ -38,8 +37,7 @@ def crossed(filepath,
 		],
 	):
 	"""
-	Run the '.gcov' file through a pipeline that renders lines suitable for libmeta
-	use.
+	Run the '.gcov' file through a pipeline that renders the crossed lines.
 	"""
 	return _pipeline(filepath, sequence)
 
@@ -77,17 +75,18 @@ def llvm(data, *sources):
 
 	[ Parameters ]
 
-	/data
-		Path prefix of the '.gcno' and '.gcda' files.
+	/object
+		The shared library or executable that produced coverage information.
+
 	/sources
 		The list of sources.
 	"""
 	return (
-		'llvm-cov',
-		'--object-file', data
+		'llvm-cov', 'show', '-no-colors',
+		data,
 	) + sources
 
-def garbage(data, *sources):
+def gcov(data, *sources):
 	"""
 	Return the command tuple for running gcov.
 
@@ -117,7 +116,7 @@ def render(route, source, proc = crossed):
 	with libroutes.File.temporary() as tr:
 		# render the coverage output in a temp directory
 		filename = source.identity
-		command = garbage(libpath.suffix('.gcno').fullpath, source.fullpath)
+		command = gcov(libpath.suffix('.gcno').fullpath, source.fullpath)
 		p = subprocess.Popen(command, cwd = tr.fullpath, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
 		p.stdout.close() # yeah if there's a problem... good luck =\
 		p.wait()
@@ -125,7 +124,7 @@ def render(route, source, proc = crossed):
 		# extract and write coverage
 		return proc((tr/filename).suffix('.gcov').fullpath)
 
-def record(cause, fullname, source, metatype = 'xlines', proc=crossed, append=libmeta.append):
+def record(cause, fullname, source, metatype = 'xlines', proc=crossed):
 	"Update the coverage meta data for the module."
 	mr = libroutes.Import.from_fullname(fullname)
 	mod = mr.modules()
@@ -137,7 +136,7 @@ def record(cause, fullname, source, metatype = 'xlines', proc=crossed, append=li
 			tuple(map(int, x.split(b':', 1)))[2::-1]
 			for x in coverage.split(b'\n') if x
 		]
-		append(metatype, source.fullpath, [(cause, settings)])
+		return (metatype, source.fullpath, [(cause, settings)])
 
 def convert(fullname, identity, name = 'lines'):
 	"""
