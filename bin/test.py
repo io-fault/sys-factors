@@ -14,9 +14,7 @@ from ...system import library as libsys
 from .. import library as libdev
 from .. import libtest
 from .. import libcore
-from .. import libmeta
 from .. import libtrace
-from .. import coverage
 
 from .. import libharness
 
@@ -108,8 +106,6 @@ class Harness(libharness.Harness):
 				pass
 
 		report['exitstatus'] = os.WEXITSTATUS(status)
-
-		# C library coverage code
 
 		if False and report['impact'] < 0 or report['interrupt']:
 			sys.exit(report['exitstatus'])
