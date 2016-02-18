@@ -1,11 +1,28 @@
-Tools and libraries for supporting a development environment.
-Constructing, debugging, profiling, testing and deploying software.
+Constructing, testing, debugging, coverage, profiling and deployment.
+
+[ Defense ]
+-----------
+
+&..development seeks to make software development management as seamless as possible.
+Construction, testing, coverage, and profiling are integrated in order to make development
+processes easier and less fragile than systems that rely on the users to connect
+tools together.
+
+By integrating tools many development management problems cease to exist, and
+opportunities to leverage patterns become available. With the consistent format of
+extracted coverage and profile information, trends can be viewed across releases.
 
 [ Construction ]
 ----------------
 
-&.libconstruct provides the necessary functionality to process project targets into files
-usable by the host operating system.
+&..development provides support for constructing Python C-API modules and system libraries
+using a probed configuration. The configuration is known as the [development]
+(term)`Transformation Matrix` and provides an alternative to GNU autotools, automake,
+make, and libtool.
+
+! NOTE:
+	The construction portion of development is a work in progress and the documentation
+	will best be interpreted as a set of goals.
 
 [ Testing ]
 -----------
@@ -32,14 +49,28 @@ standard comparison operators:
 		import fault.development.libtest as libtest
 		import sys; libtest.execute(sys.modules[__name__])
 
-[ Skeletons ]
--------------
+[ Profiling ]
 
-&.bin.skeleton initializes a new package directory for a Python project.
+&.libtrace provides support for profiling Python. Collection of profile data can be
+arbitrarily enabled allowing production to be profiled.
+
+[ Coverage ]
+
+&.libtrace also provides support for collecting line coverage of Python modules.
+Primarily, coverage is a feature of &.bin.survey which will associate coverage
+and profile data with the tests that cause them.
+
+[ Debugging ]
+
+! WARNING:
+	Not implemented.
+
+&.libdebug provides an abstract interface to debugging arbitrary levels of a process. It
+provides an abstraction for Python and the debugger included in &/sw/llvm.
 
 [ Documentation ]
 -----------------
 
-API documentation is extracted into an XML format with &.libdocument. The XML provides
-significant details about the contents of a module and can be easily converted into a
-display format.
+API documentation and narratives are extracted into an XML format with help from &..factors.
+Used in conjunction with &.bin.survey, coverage and test results are joined into the XML for reporting into
+the HTML for human readable publication.
