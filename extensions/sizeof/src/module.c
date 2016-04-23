@@ -2,6 +2,10 @@
 #include <time.h>
 #include <sys/time.h>
 
+#include <fault/roles.h>
+#include <fault/python/environ.h>
+#include <fault/python/module.h>
+
 METHODS() = {
 	{NULL}
 };

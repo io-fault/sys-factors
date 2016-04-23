@@ -1,3 +1,7 @@
+#include <fault/roles.h>
+#include <fault/python/environ.h>
+#include <fault/python/module.h>
+
 #if TEST()
 /*
  * Symbol won't be available without TEST()

@@ -1,322 +1,292 @@
 """
-Manage the process of constructing operating system executables and libraries.
-Bootstrap is used to create the necessary dependencies for &.libconstruct.
+Management of target construction jobs using &.libprobe command Matrices.
 """
+import os
 import sys
-import os.path
 import subprocess
+import functools
+import itertools
+import lxml.etree
 
-#from . import libtransform
+from . import libfactor
+from . import libpxe
 
 from ..io import library as libio
+from ..system import libexecute
+from ..system import library as libsys
+from ..routes import library as libroutes
 
-# Specifically for identifying files to be compiled.
+class ToolError(Exception):
+	"""
+	Exception raised when a construction tools signalled failure.
+
+	[ Properties ]
+	/exit_code
+		The exit code that the tool returned.
+	/standard_error
+		The raw binary data emitted into the standard error file descriptor.
+	"""
+
+	@property
+	def xml(self):
+		"""
+		The &standard_error interpreted as an XML document for introspecting runtime errors reported
+		by the tool.
+		"""
+
+	def __init__(self, exit_code, stderr):
+		self.exit_code = exit_code
+		self.standard_error = stderr
+
+# Specifically for identifying files to be compiled and how.
 extensions = {
 	'c': ('c',),
 	'c++': ('c++', 'cxx', 'cpp'),
 	'objective-c': ('m',),
 	'ada': ('ads', 'ada'),
 	'assembly': ('asm',),
-	'bitcode': ('bc',),
+	'bitcode': ('bc',), # clang
+
+	'haskell': ('hs', 'hsc'),
 }
+
+data_fields = [
+	'ignored', # relative source paths that are not processed.
+	'language', # the set of languages with configuration
+	'libraries', # the set of libraries to link against (usually dynamic)
+]
 
 languages = {}
 for k, v in extensions.items():
 	for y in v:
 		languages[y] = k
 
-collections = (
-	'clang',
-	'gcc',
-	'msvs',
-)
-
-commands = {
-	'compile': {
-		'collections': (
-			{'clange', 'gcc'},
-			('clang',),
-		),
-		'asm': (
-			{'yasm', 'nasm', 'as'},
-			('as',),
-		),
-		'c': (
-			{
-				'cc', 'gcc', 'clang', 'egcs', 'cl.exe'
-			},
-			('clang', 'cc',)
-		),
-		'c++': (
-			{'c++', 'gc++', 'clang++', 'cl.exe'},
-			('clang++',)
-		)
-	},
-	'link': {
-		
-	}
+from . import include
+extension_compilation = {
+	'system.include.directories': (include.directory,),
 }
+del include
 
-environment = {
-	'c': 'CC',
-	'ld': 'LINKER',
-	'strip': 'STRIP',
-	'objcopy': 'OBJCOPY',
-}
-
-x = dict(
-	cwindows = 'cl.exe',
-	compile = ('cl.exe', '/c'),
-	link = ('cl.exe',),
-	debug_compile = '/Yd',
-	csource = '/Tc',
-	cxxsource = '/Tp',
-)
-if 0:
-	Feature('optimizations', Choice('level', '-O', '0', '1', '2', '3', 's'))
-	Feature('debugging.symbols', Options(('enabled', '-g')))
-	Feature('coverage', Options(('coverage', '--coverage')))
-	Feature('machine.code.generation', Options(('position_independent', '-fPIC')))
-	Feature('link', Mapping(type={'shared': '-shared', 'static': None}))
-
-class Toolchain(object):
+def roles(module):
 	"""
-	Toolchain for compiling and linking executables, shared libraries, and dynamically
-	loaded libraries.
+	Identify the role to use for the given module.
 	"""
+	return ('factor',)
 
-	# -fPIC is always used for bootstrapped python extensions
-	role_compile_flags = {
-		'factor': ('-O3', '-g'),
-		'debug': ('-O0', '-g'),
-		'test': ('-O0', '-g'),
-		'analysis': ('--coverage', '-O0', '-g'),
-	}
+def construction(matrix:libexecute.Matrix, controller=None, environment=None):
+	"""
+	Generator managing the instantiation of &libsys.KInvocation instances
+	used to create the target.
 
-	role_link_flags = {
-		'analysis': ('--coverage', '-ftest-coverage', '-fprofile-arcs'),
-		'factor': (),
-	}
+	A single temporary directory with a set of job directories created for
+	each task that's ran in order to build the target.
+	"""
+	ref = None
+	ki = None
 
-	@classmethod
-	def cdarwin(typ, t, language):
-		return (typ.default_compiler(), '-x', language)
+	with libroutes.File.temporary() as tr:
+		for job_id in itertools.count():
+			ref, *parameters = (yield ki) # Load a command to apply parameters to.
 
-	@classmethod
-	def cunix(typ, t, language):
-		return (typ.default_compiler(), '-x', language)
+			workdir = tr / str(job_id)
+			workdir.init('directory')
+			stderr = workdir / 'stderr'
 
-	@classmethod
-	def ldll(typ, t, name, version = None, loader = None):
-		"Link DLL libraries on Microsoft systems."
-		if t == 'bin':
-			tfalgs = ()
-			suffix = 'exe'
-			placement = 'precede'
-		elif t == 'lib':
-			tflags = ('/dll',)
-			suffix = 'dll'
-			placement = 'precede'
-		elif t == 'libexec':
-			tflags = ('/dll',)
-			suffix = 'dyn'
-			placement = 'precede'
+			for p in parameters:
+				for k, v in p.items():
+					ref.update(k, v)
 
-		return placement, suffix, (typ.default_linker(),)
+			cenv, route, args = ref.render()
+			env = {}
+			env.update(matrix.environment)
+			env.update(cenv)
+			env['PWD'] = str(workdir)
 
-	@classmethod
-	def ldylib(typ, t, name, version = None, loader = None):
-		"Link .dylib libraries. (macosx/darwin)"
-		if t == 'bin':
-			tflags = ('-execute', '-lcrt1.o')
-			suffix = 'exe'
-			placement = 'proceed'
-		elif t == 'lib':
-			tflags = ('-dylib', '-dead_strip_dylibs',)
-			suffix = 'dylib'
-			placement = 'precede'
-		elif t == 'libexec':
-			suffix = 'dylib'
-			placement = 'precede'
+			print(route, args, env)
+			ki = libsys.KInvocation(str(route), args, env)
+			src = ref
 
-			if loader is None:
-				# Assume unknown or unimportant.
-				# Many platforms don't require knowledge of the loader.
-				tflags = ('-bundle', '-undefined', 'dynamic_lookup',)
+	# tr gets removed on generator close()
+
+def dependencies(module, object, source):
+	"""
+	Returns a set of known dependencies of a given file.
+	"""
+	return []
+
+def load(role, route=None):
+	"""
+	Open the command matrix providing the interfaces for compilation.
+
+	[ Parameters ]
+	/role
+		The string identifying the role to load.
+	/route
+		Optional parameter specifying an exact directory containing the
+		matrix XML files.
+	"""
+	if route is None:
+		route = libroutes.File.home() / '.fault'
+		route = route / 'development-matrix'
+
+	matrixfile = route / (role + '.xml')
+	matrixdoc = lxml.etree.parse(str(matrixfile))
+
+	return libexecute.Matrix.from_xml(matrixdoc)
+
+def construct(module, roles, route=None):
+	"""
+	Construct the target of the &module for each of the given roles.
+
+	[ Parameters ]
+	/module
+		The &SystemModule defining the executable, library, module, or extension to construct.
+
+	/roles
+		The set of roles to construct.
+
+	/route
+		The directory location of the libexecute XML files that define the commands
+		to run. Merely passed on to &load.
+	"""
+	global languages, construction
+
+	sources = module.sources
+	params = {k:module.__dict__.get(k, None) for k in data_fields}
+
+	typ = module.system_object_type
+	if typ == 'library':
+		types = ('library', 'archive')
+	else:
+		types = (typ,)
+
+	if libpxe in module.__dict__.values():
+		pyext = True
+	else:
+		pyext = False
+
+	modname = module.__name__.split('.')
+	target_includes = module.includes
+	if pyext:
+		qname = ''.join(module.__name__.split('.extensions'))
+		target_defines = [
+			'MODULE_QNAME=' + qname,
+			'MODULE_BASENAME=' + modname[-1],
+			'MODULE_PACKAGE=' + '.'.join(modname[:-1]),
+		]
+	else:
+		target_defines = [
+			'MODULE_QNAME=' + module.__name__,
+			'MODULE_BASENAME=' + modname[-1],
+			'MODULE_PACKAGE=' + '.'.join(modname[:-1]),
+		]
+
+	# Iterate over and construct each role to avoid
+	# forcing the user to iterate.
+	for role in roles:
+		output = module.output(role)
+		objdir = module.objects(role)
+		matrix = load(role, route=route)
+		g = construction(matrix)
+		g.send(None)
+
+		td = list(module.dependencies())
+
+		for src in sources.tree()[1]:
+			# XXX: check modifications times/consistency
+			fnx = src.extension
+			if fnx in {'h'}:
+				# Ignore header files.
+				continue
+
+			lang = languages[src.extension]
+			obj = libroutes.File(objdir, src.points)
+			if obj.exists():
+				olm = obj.last_modified()
 			else:
-				tflags = ('-bundle', '-bundle_loader', loader,)
+				olm = 0
 
-		return placement, suffix, (typ.default_linker(), '-t') + tflags + ('-framework', 'Foundation')
+			if obj.exists():
+				if olm < src.last_modified():
+					# rebuild if object is older than source.
+					pass
+				else:
+					ignore = True
+					# check identified dependencies if any
+					for dep in dependencies(module, obj, src):
+						if olm < dep.last_modified():
+							ignore = False
+							break
+					if ignore:
+						# skip compilation as object is newer
+						# than the source and its dependencies.
+						continue
+			else:
+				obj.container.init('directory')
+			# XXX: apply project and source params
 
-	@classmethod
-	def lelf(typ, t, name, version = None, loader = None):
-		"Link ELF libraries. (shared objects on most unix systems)"
-		if t == 'bin':
-			# default is executable
-			tflags = ()
-			suffix = 'exe'
-			placement = 'proceed'
-		elif t  == 'lib' and version is not None:
-			# shared, soname'd with version ("libname.so.M.N")
-			vstr = '.'.join(map(str, version[:2]))
-			tflags = ('-shared', '-soname',  '.so.'.join((name, vstr)))
-			suffix = 'so'
-			placement = 'proceed'
+			cmd = matrix.commands['compile.' + lang]
+			ref = libexecute.Reference(matrix, cmd)
+
+			params = tuple([
+				x.compilation_parameters(role, lang) for x in td
+				if isinstance(x, libfactor.ProbeModule)
+			])
+
+			# local parameters
+			lp = cmd.allocate()
+			lp['input'].append(src)
+			lp['output'] = obj
+
+			lp['compiler.preprocessor.defines'] = [
+				'F_ROLE_ID=F_ROLE_' + role.upper() + '_ID',
+			] + target_defines
+
+			ki = g.send((ref,) + params + (lp,))
+			pid = ki(fdmap=((os.dup(0),0), (os.dup(1), 1), (os.dup(2), 2)))
+			r = os.waitpid(pid, 0)
 		else:
-			tflags = ('-shared',)
-			suffix = 'so'
-			placement = 'proceed'
+			# Aggregate the objects according to the target type.
+			output.container.init('directory')
+			libdir = module.libraries(role)
+			libdir.init('directory')
+			libs = []
 
-		return placement, suffix, (typ.default_linker(),) + tflags + ('-framework', 'Foundation')
+			for x in td:
+				if x.system_object_type == 'system.library':
+					# Explicit link of factor.
+					libdep = x.output(role)
+					lib = libdir / ('lib' + x.name + '.so')
+					if not lib.exists():
+						lib.link(libdep)
 
-	if sys.platform == 'darwin':
-		compiler = cdarwin
-		_linker = ldylib
-	elif sys.platform == 'win32':
-		#compiler = cwin
-		_linker = ldll
-	else:
-		compiler = cunix
-		_linker = lelf
+					libs.append(x.name)
+				else:
+					pass
 
-	def linker(self, t, name, version = None, **kw):
-		kw['version'] = version
-		version_place, suffix, fragment = self._linker(t, name, **kw)
+			dynlinks = []
 
-		if version is not None:
-			vstr = tuple(map(str, version))
-			if version_place == 'proceed':
-				pass
-			elif version_place == 'precede':
-				pass
-		else:
-			pass
+			for typ in types:
+				cmd = matrix.commands['link.' + typ]
 
-		return name + '.' + suffix, (), fragment
+				params = tuple([
+					x.link_parameters(role, typ) for x in td
+					if isinstance(x, libfactor.ProbeModule)
+				])
 
-	def compile(self,
-			language, target, sources,
-			defines = (),
-			includes = (),
-			directories = (),
-			dependency = None,
-			tuple=tuple,
-		):
-		"""
-		/defines
-			A sequence of key-value pairs that make up parameter defines.
-		/includes
-			A sequence of files that will be directly included in the source.
-		/directories
-			A sequence of include and framework directories. (-I and -F on applicable platforms)
-		"""
-		flags = ('-v', '-fPIC',)
+				ref = libexecute.Reference(matrix, cmd)
+				lp = cmd.allocate()
+				lp['input'].extend(objdir.tree()[1])
+				lp['output'] = output
+				lp['system.libraries'].append('c')
+				lp['system.libraries'].extend(dynlinks) # explicit dynamic links
+				lp['system.libraries'].extend(libs) # from refrenced factor modules
 
-		cc = self.compiler(self.type, language)
+				lp['system.library.directories'].append(libdir)
+				lp['macosx.version.minimum'] = ['10.11']
 
-		ldirectories = ()
-		ldirectories += tuple(['-I' + x for x in directories])
-
-		ldefines = tuple([
-			'-D' + (k if v is None else k + '=' + v)
-			for k, v in defines
-		])
-
-		lincludes = []
-		for x in includes:
-			lincludes.extend(('-include', x,))
-		lincludes = tuple(lincludes)
-
-		if dependency is not None:
-			dflags = ('-MD', '-MT', 'none', '-MF', dependency)
-		else:
-			dflags = ()
-
-		return cc + flags + dflags + self.role_compile_flags.get(self.role, ()) \
-			+ ldirectories + ldefines + lincludes + ('-o', target, '-c') + sources
-
-	def link(self,
-			targetdir, name,
-			version, objects,
-			loader = None,
-			libraries = (),
-			directories = (),
-			frameworks = (),
-			linker = None
-		):
-		"""
-		/directories
-			A sequence of library and framework directories. (-L, -F on some systems)
-		/libraries
-			A sequence of libraries to dynamically link against the target. (-l)
-		/frameworks
-			A sequence of frameworks to use for linkage; library sets (-framework)
-		"""
-
-		basename, canons, link = self.linker(self.type, name, version = version)
-		target = os.path.join(targetdir, basename)
-
-		ldirectories = tuple(['-L' + x for x in directories])
-		llibraries = tuple(['-l' + x for x in libraries])
-
-		role_flags = self.role_link_flags.get(self.role, ())
-
-		return (
-			target, canons,
-			link + role_flags + ldirectories + \
-			llibraries + ('-v', '-o', target) + tuple(objects)
-		)
-
-	if sys.platform == 'darwin':
-		def isolate(self, target):
-			dtarget = target + '.dSYM'
-			return dtarget, [
-				('dsymutil', target, '-o', dtarget)
-			]
-	else:
-		def isolate(self, target):
-			"""
-			Isolate debugging information from the target.
-			"""
-			oc = self.default_objcopy()
-			strip = self.default_strip()
-
-			d = os.path.dirname(target)
-			b = os.path.basename(target)
-			debug = b + '.debug'
-
-			return [
-				(oc, '--only-keep-debug', target, os.path.join(d, debug)),
-				(strip, '--strip-debug', '--strip-unneeded', target),
-				(oc, '--add-gnu-debuglink', target, debug),
-			]
-
-	def stage(self,
-			id, target, reference,
-			popen = subprocess.Popen,
-			exists = os.path.exists,
-		):
-		"""
-		Execute the stage recording progress information to the given logfile path.
-		"""
-		# stdout/stderr sent to the logfile.
-		logfile = target + '.' + id + '.log'
-
-		with open(logfile, 'w') as log:
-			pass
-
-		for x in reference:
-			with open(logfile, 'a') as log:
-				log.write('\n--------\n')
-				log.write(' '.join(x))
-				log.write('\n--------\n\n')
-				log.flush()
-
-				r = popen(x, stdout = log, stderr = subprocess.STDOUT, stdin = None)
-				if r.wait() != 0:
-					raise abstract.ToolError(id, target, log)
-
-		if not exists(target):
-			with open(logfile, 'rb') as f:
-				log = f.read().decode('utf-8', errors='replace').strip()
-			raise abstract.ToolError(id, target, log)
+				ki = g.send((ref, lp) + params)
+				pid = ki(fdmap=((os.dup(0),0), (os.dup(1), 1), (os.dup(2), 2)))
+				r = os.waitpid(pid, 0)
+				print(r)
+				g.close()

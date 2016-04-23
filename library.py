@@ -24,6 +24,9 @@ roles = {
 
 	'factor': 'Maximum optimizations with debugging symbols separated or stripped',
 
+	'coverage': 'Coverage without test role inheritance',
+	'profile': 'Profiling enabled binaries',
+
 	'bootstrap': 'Special case for fault.io',
 	'documentation': 'Produce documentation symbols',
 }
@@ -177,7 +180,9 @@ class Sources(types.ModuleType):
 
 	@property
 	def sources(self):
-		"The directory containing the Javascript sources."
+		"""
+		The directory containing the sources of the factor.
+		"""
 
 		return self.factor.route.file().container / 'src'
 

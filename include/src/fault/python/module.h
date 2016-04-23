@@ -1,69 +1,6 @@
-#define PY_SSIZE_T_CLEAN
-
-#include <Python.h>
-#include <structmember.h>
-#include <pythread.h>
-
 /*
- * Symbol for filting coverage results.
+ * Included once by the source file defining module initialization.
  */
-#define XCOVERAGE
-
-#define FACET(PROBE_NAME) (xxFACETxxx##PROBE_NAME)
-#define FEATURE(FEATURE_NAME) (xxFEATURExxx##FEATURE_NAME)
-
-#define xxROLE(R, OPT) (xxx##R##xxx & xxx##R##x##OPT)
-
-#define TEST(y)      xxROLE(TEST, y)
-#define DEBUG(y)     xxROLE(DEBUG, y)
-#define FACTOR(y)    xxROLE(FACTOR, y)
-#define INSPECT(y)   xxROLE(INSPECT, y)
-#define BOOTSTRAP(y) xxROLE(BOOTSTRAP, y)
-
-#define ROLE_OPTION(r, x) (xxx##r##xxx & xxx##r##x##OPT)
-#define FACTOR_ROLE(r) xxROLE(r)
-
-#define F_ROLE(N)
-#define F_FEATURE(F) (xXx##F##xXx & xxxF_##O##FEATURE)
-#define F_OPTION(O) (xxx##O##xxx & xxxF_##O##OPT)
-
-#if TEST()
-	#define ROLE TEST
-#elif DEBUG()
-	#define ROLE DEBUG
-#elif FACTOR()
-	#define ROLE FACTOR
-#elif INSPECT()
-	#define ROLE INSPECT
-#elif BOOTSTRAP()
-	#define ROLE BOOTSTRAP
-#else
-	#error unknown role; compiler was not configured with target role define
-#endif
-
-#define include_docstr (1L)
-
-#ifdef MODULE_QNAME
-	#define QPATH(tail) MODULE_QNAME "." tail
-#endif
-
-/*
- * Don't inherit Python's doc-string configuration for non-optimized builds.
- */
-#if FACTOR(DOCSTRINGS)
-	#undef PyDoc_STR
-	#define PyDoc_STR(x) x
-#elif FACTOR()
-	#undef PyDoc_STR
-	#define PyDoc_STR(x) ""
-#endif
-
-/*
- * Cover for its absence.
- */
-#ifndef Py_RETURN_NONE
-	#define Py_RETURN_NONE do { Py_INCREF(Py_None); return(Py_None); } while(0)
-#endif
 
 #if TEST()
 	/*
@@ -73,71 +10,31 @@
 	extern PyObj __PYTHON_RECEPTACLE__;
 #endif
 
-typedef PyObject * PyObj;
+/* Appropriate way to define the method table for the module */
+#define METHODS() \
+	static PyMethodDef methods[]
 
-#ifdef MODULE_QNAME
-	extern PyObj __dict__;
-	static PyMethodDef methods[];
-	static struct PyModuleDef module;
+/* Used to destroy the module in error cases. */
+#define DROP_MODULE(MOD) \
+do { \
+	Py_DECREF(MOD); \
+	__dict__ = NULL; \
+} while(0)
 
-	/* Appropriate way to define the method table for the module */
-	#define METHODS() \
-		static PyMethodDef methods[]
-
-	/* Used to destroy the module in error cases. */
-	#define DROP_MODULE(MOD) \
-	do { \
-		Py_DECREF(MOD); \
-		__dict__ = NULL; \
-	} while(0)
-
-	#if TEST()
-		#define DEFINE_MODULE_GLOBALS \
-			PyObj __ERRNO_RECEPTACLE__; \
-			PyObj __PYTHON_RECEPTACLE__; \
-			PyObj __dict__ = NULL;
-	#else
-		#define DEFINE_MODULE_GLOBALS \
-			PyObj __dict__ = NULL;
-	#endif
+#if TEST()
+	#define DEFINE_MODULE_GLOBALS \
+		PyObj __ERRNO_RECEPTACLE__; \
+		PyObj __PYTHON_RECEPTACLE__; \
+		PyObj __dict__ = NULL;
+#else
+	#define DEFINE_MODULE_GLOBALS \
+		PyObj __dict__ = NULL;
 #endif
 
-#define PyAllocate(TYP) (((PyTypeObject *) TYP)->tp_alloc((PyTypeObject *) TYP, 0))
-
-static inline PyObj
-_PyLoop_DictionaryItems(PyObj d)
-{
-	PyObj iterable, iterator;
-	iterable = PyDict_Items(d);
-	iterator = PyObject_GetIter(iterable);
-	Py_DECREF(iterable);
-	return(iterator);
-}
-
-static inline PyObj
-PyImport_ImportAdjacent(const char *modname, const char *attribute)
-{
-	PyObj is_m, is_ob, is_fromlist;
-
-	is_fromlist = Py_BuildValue("(s)", attribute);
-	if (is_fromlist == NULL)
-		return(NULL);
-
-   is_m = PyImport_ImportModuleLevel(modname, __dict__, __dict__, is_fromlist, 1);
-
-	Py_DECREF(is_fromlist);
-	if (is_m == NULL)
-		return(NULL);
-
-	is_ob = PyObject_GetAttrString(is_m, attribute);
-	Py_DECREF(is_m);
-
-	return(is_ob);
-}
-#define import_sibling PyImport_ImportAdjacent
+#define _py_INIT_FUNC_X(BN) CONCAT_IDENTIFIER(PyInit_, BN)
+#define _py_INIT_FUNC _py_INIT_FUNC_X(MODULE_BASENAME)
 
 #if PY_MAJOR_VERSION > 2
-
 /*
  * Python 3.x
  */
@@ -147,14 +44,14 @@ PyImport_ImportAdjacent(const char *modname, const char *attribute)
 	static struct PyModuleDef \
 	module = { \
 		PyModuleDef_HEAD_INIT, \
-		MODULE_QNAME, \
+		MODULE_QNAME_STR, \
 		DOCUMENTATION, \
 		-1, \
 		methods \
 	}; \
 	\
 	PyMODINIT_FUNC \
-	INIT_FUNCTION(void)
+	_py_INIT_FUNC(void)
 
 #define CREATE_MODULE(MOD) \
 do { \
@@ -174,7 +71,7 @@ do { \
 	} \
 } while(0)
 #else
-
+#define _py_INIT_COMPAT CONCAT_IDENTIFIER(init, MODULE_BASENAME)
 /*
  * Python 2.x
  */
@@ -185,20 +82,21 @@ do { \
  */
 #define INIT(DOCUMENTATION) \
 	DEFINE_MODULE_GLOBALS \
-	static PyObject * INIT_FUNCTION(void); /* prototype */ \
-	PyMODINIT_FUNC INIT_FUNCTION_COMPAT(void) \
-	{ PyObj mod; mod = INIT_FUNCTION(); /* for consistent return() signature */ } \
-	static PyObject * INIT_FUNCTION(void)
+	static PyObject * _py_INIT_FUNC(void); /* prototype */ \
+	PyMODINIT_FUNC _py_INIT_COMPAT(void) \
+	{ PyObj mod; mod = _py_INIT_FUNC(); /* for consistent return() signature */ } \
+	static PyObject * _py_INIT_FUNC(void)
 
 #define CREATE_MODULE(MOD) \
 	do { \
-		PyObj _MOD = Py_InitModule(MODULE_QNAME, methods); \
+		PyObj _MOD = Py_InitModule(MODULE_QNAME_STR, methods); \
 		if (_MOD) { \
 			__dict__ = PyModule_GetDict(_MOD); \
 			if (__dict__ == NULL) { Py_DECREF(_MOD); *MOD = NULL; } \
 			else *MOD = _MOD; \
 		} \
 	} while(0)
+
 #endif
 
 /*
@@ -316,4 +214,3 @@ do { \
 	#define PYTHON_RECEPTACLE(ID, RETURN, CALL, ...) \
 		*((PyObj *) RETURN) = (PyObj) CALL(__VA_ARGS__)
 #endif
-
