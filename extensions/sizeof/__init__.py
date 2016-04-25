@@ -1,6 +1,3 @@
-#from ...context import import_extension_module
-#import_extension_module()
-#del import_extension_module
-from ... import libfactor
-from ... import libpxe
+from ....development import libfactor
+from ....development.probes import libpython
 libfactor.load('system.extension')
