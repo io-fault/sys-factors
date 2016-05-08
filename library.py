@@ -1,37 +1,23 @@
 """
-Project development interface for software engineers.
-
-[ Properties ]
-
-/inhibit_construction
-	The set of module prefixes that identify modules
-	that should not be analyzed for rebuild.
-	Primarily, this is only interrogated by package modules
-	providing a Python interface to foreign resources.
+Project development interfaces for software engineers.
 """
-import contextlib
 import functools
 import types
-
-from . import extension
+import typing
 
 from ..routes import library as libroutes
 
 roles = {
-	'debug': 'Reduced optimizations for debugging',
-	'survey': 'Debug role with test defines and coverage',
-	'test': 'Debug role with test defines',
+	'debug': 'Reduced optimizations and defines for debugging',
+	'survey': 'Test role for profiling and full coverage',
+	'test': 'Debug role with test defines for supporting a complete test set',
 
 	'factor': 'Maximum optimizations with debugging symbols separated or stripped',
 
-	'coverage': 'Coverage without test role inheritance',
-	'profile': 'Profiling enabled binaries',
+	'profile': 'Profiling enabled targets',
 
-	'bootstrap': 'Special case for fault.io',
-	'documentation': 'Produce documentation symbols',
+	'introspection': 'Role for structuring source files into XML',
 }
-
-inhibit_construction = set()
 
 class Factor(tuple):
 	"""
@@ -88,11 +74,13 @@ class Factor(tuple):
 		l = list(self._canonical_path(self[1]))
 		return '.'.join(reversed(l))
 
-	def sources(self):
-		"The full set of source files of the factor."
-		if self.type == 'extension':
-			#srcdir = extension.extension_sources(self.route.module())
-			#fr = libroutes.File.from_absolute(srcdir)
+	def sources(self) -> typing.Sequence[libroutes.File]:
+		"""
+		The full set of source files of the factor.
+		"""
+		types = {'system.executable', 'system.extension', 'system.library', 'system.object'}
+
+		if self.type in types:
 			fr = self.source_route
 			return fr.tree()[1]
 		else:
@@ -113,6 +101,9 @@ class Project(object):
 
 	The project's outermost package module must identify itself as the bottom
 	in order for &Project to function properly.
+
+	! WARNING:
+		Do not use. Currently, a conceptual note.
 	"""
 
 	def __init__(self, route):
@@ -185,6 +176,17 @@ class Sources(types.ModuleType):
 		"""
 
 		return self.factor.route.file().container / 'src'
+
+	def dependencies(self):
+		"""
+		Collect and yield a sequence of dependencies identified by
+		the dependent's presence in the module's globals.
+		"""
+		global Sources
+
+		for k, v in self.__dict__.items():
+			if isinstance(v, Sources):
+				yield v
 
 	def _init(self):
 		self.factor = Factor.from_fullname(self.__name__)

@@ -195,6 +195,7 @@ def includes(
 		compiler:collections.abc.Hashable,
 		includes:typing.Sequence[str],
 		directories:typing.Sequence[str]=(),
+		requisites:typing.Sequence[str]=(),
 	) -> bool:
 	"""
 	Search for &includes present in the environment described by &matrix.
@@ -220,11 +221,14 @@ def includes(
 	"""
 
 	main = "\nint main(int argc, char *argv[]) { return 0; }"
+	reqs = ''.join([
+		('#include <%s>\n' * len(requisites)) %requisites
+	])
 	includes = ''.join([
 		('#include <%s>\n' * len(includes)) %includes
 	])
 
-	runtime(matrix, compiler, includes+main, (), compile_only=True)
+	runtime(matrix, compiler, reqs+includes+main, (), compile_only=True)
 	return True
 
 if __name__ == '__main__':

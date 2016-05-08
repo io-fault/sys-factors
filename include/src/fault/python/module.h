@@ -2,14 +2,6 @@
  * Included once by the source file defining module initialization.
  */
 
-#if TEST()
-	/*
-	 * Test global declarations.
-	 */
-	extern PyObj __ERRNO_RECEPTACLE__; \
-	extern PyObj __PYTHON_RECEPTACLE__;
-#endif
-
 /* Appropriate way to define the method table for the module */
 #define METHODS() \
 	static PyMethodDef methods[]

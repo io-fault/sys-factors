@@ -372,8 +372,8 @@ class Harness(libharness.Harness):
 	concurrently = staticmethod(libsys.concurrently)
 
 	def __init__(self, measurements, package, status):
+		super().__init__(package, role='test')
 		self.measurements = measurements
-		self.package = package
 		self.status = status
 
 	def _status_test_sealing(self, test):

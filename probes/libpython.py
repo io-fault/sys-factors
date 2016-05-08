@@ -14,6 +14,12 @@ import sysconfig
 from .. import libfactor
 from .. import libprobe
 
+# Marker used by libconstruct to identify that
+# it is an extension module for *this* Python.
+context_extension_probe = True
+
+libfactor.load('system.probe')
+
 python_version_string = '.'.join(map(str, sys.version_info[:2]))
 python_abi_flags = sys.abiflags
 
@@ -24,14 +30,12 @@ python_library = 'python' + python_library_suffix
 python_include_directory = sysconfig.get_config_var('INCLUDEPY')
 python_library_directory = sysconfig.get_config_var('LIBDIR')
 
-libraries = [
-	python_library
-]
+def report(probe, module, role):
+	return {
+		'system.library.set': (python_library,),
+		'system.library.directories': (python_library_directory,),
+		'system.include.directories': (python_include_directory,),
+	}
 
-library_directories = [
-	python_library_directory
-]
-
-if not libfactor.load('probe'):
-	# Probe does not have cache for the combination.
+def deploy(probe, module, role, executable=None):
 	pass

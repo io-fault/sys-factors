@@ -1,6 +1,9 @@
 /*
  * Symbol for filting coverage results.
  */
+#ifndef _FAULT_ROLES_H_
+#define _FAULT_ROLES_H_
+
 #define XCOVERAGE
 #define _CPP_QUOTE(x) #x
 #define STRING_FROM_IDENTIFIER(X) _CPP_QUOTE(X)
@@ -11,6 +14,7 @@
 #define MODULE_PACKAGE_STR STRING_FROM_IDENTIFIER(MODULE_PACKAGE)
 #define QPATH(NAME) MODULE_QNAME_STR "." NAME
 
+#define F_ROLE_STR STRING_FROM_IDENTIFIER(F_ROLE)
 #define F_ROLE_TEST_ID 5
 #define F_ROLE_SURVEY_ID 10
 #define F_ROLE_FACTOR_ID 1
@@ -25,4 +29,6 @@
 
 #ifndef F_ROLE_ID
 	#error compilation driver was not given a F_ROLE_ID preprocessor definition
+#endif
+
 #endif

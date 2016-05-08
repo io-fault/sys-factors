@@ -8,6 +8,16 @@
 
 typedef PyObject * PyObj;
 
+#ifdef TESTING
+	#if TESTING()
+		/*
+		 * Test global declarations.
+		 */
+		extern PyObj __ERRNO_RECEPTACLE__; \
+		extern PyObj __PYTHON_RECEPTACLE__;
+	#endif
+#endif
+
 /*
  * Cover in case of absence
  */

@@ -40,7 +40,7 @@ class Harness(libharness.Harness):
 	concurrently = staticmethod(libsys.concurrently)
 
 	def __init__(self, package, status):
-		self.package = package
+		super().__init__(package, role='test')
 		self.status = status
 		self.selectors = []
 
@@ -161,8 +161,6 @@ class Harness(libharness.Harness):
 			self.status.write(bottom_fate_messages + '\n')
 
 def main(package, modules):
-	# Set test role. Per project?
-	# libconstruct.role = 'test'
 	p = Harness(package, sys.stderr)
 	p.execute(p.root(libdev.Factor.from_fullname(package)), modules)
 

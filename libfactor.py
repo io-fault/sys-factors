@@ -22,10 +22,6 @@ from . import core
 from . import library as libdev
 from ..computation import libmatch
 
-import platform
-platform = platform.system().lower() + '.' + platform.machine().lower()
-del sys.modules['platform']
-
 selections = None
 
 _factor_role_patterns = None
@@ -80,9 +76,13 @@ def role(module, default_role='factor'):
 
 	return default_role
 
-def cache_directory(module, role, subject, platform=platform):
+def cache_directory(module, context, role, subject):
+	"""
+	Get the relevant context-role directory inside the associated
+	(fs-directory)`__pycache__` directory.
+	"""
 	# Get a route to a directory in __pycache__.
-	return module.factor.route.cache() / subject / platform / role
+	return module.factor.route.cache() / context / role / subject
 
 class ProbeModule(libdev.Sources):
 	"""
@@ -95,44 +95,57 @@ class ProbeModule(libdev.Sources):
 	"""
 
 	@property
-	def system_object_type(self):
+	def parameters(self):
+		"""
+		Attribute set by probe modules declaring parameters accepted by the probe.
+		Probe parameters allow defaults to be overridden in a well-defined manner.
+		"""
 		return None
 
-	def reports(self, role=None):
+	def cache(self, context=None, role=None):
 		"""
-		Return the route to the probe's report.
+		Return the route to the probe's recorded report.
 		"""
-		return cache_directory(self, role, 'reports')
+		return cache_directory(self, context, role, 'report')
 
-	def record(self, report, role=None):
+	def record(self, report, context=None, role=None):
 		"""
 		Record the report for subsequent runs.
 		"""
-		rf = self.reports(role)
+		rf = self.cache(context, role)
+		rf.init('file')
 		import pickle
 		pickle.dump(data, str(rf))
 
-	def compilation_parameters(self, role, language):
-		import sys, os.path
-		exe = sys.executable
+	def retrieve(self, report, context=None, role=None):
+		"""
+		Retrieve the stored data collected by the sensor.
+		"""
+		import pickle
+		return pickle.load(str(self.cache(context, role)))
 
-		return {
-			'includes': [],
-			'system.include.directories': [
-				self.python_include_directory
-			]
-		}
+	@staticmethod
+	def report(probe, module, role):
+		"""
+		Return the report data of the given probe.
 
-	def link_parameters(self, role, type):
-		import sys, os.path
-		exe = sys.executable
+		This method is called whenever a dependency accesses the report for supporting
+		the construction of a target. Probe modules can override this method in
+		order to provide parameter sets that depend on the target that is requesting them.
+		"""
+		return {}
 
-		return {
-			'system.libraries': self.libraries,
-			'system.library.directories': self.library_directories,
-		}
+	@staticmethod
+	def deploy(probe, module, role):
+		"""
+		Cause the probe to activate its sensors to collect compilation and link parameters
+		from the system.
 
-class HeadersModule(libdev.Sources):
+		Probe modules usually define this as a function in the module body.
+		"""
+		pass
+
+class IncludesModule(libdev.Sources):
 	"""
 	A collections of headers referenced by a system object.
 
@@ -143,39 +156,39 @@ class HeadersModule(libdev.Sources):
 	directories that the compiler will use.
 	"""
 
+	def output(self, context=None, role=None):
+		return None
+
+	def objects(self, context=None, role=None):
+		return None
+
 class SystemModule(libdev.Sources):
 	"""
 	Module class representing a system object: executable, shared library, static library, and
 	archive files.
 	"""
 
-	def dependencies(self):
+	def extension_name(self):
 		"""
-		Collect and yield a sequence of dependencies identified by
-		the dependent's presence in the module's globals.
-
-		&SystemModule, &ProbeModule, and &IncludeModule can be dependencies.
+		The name that the extension module is bound to.
+		Only used when constructing a Python extension module.
 		"""
-		types = (SystemModule, ProbeModule)
+		return ''.join(self.__name__.split('.extensions'))
 
-		for k, v in self.__dict__.items():
-			if isinstance(v, types):
-				yield v
-
-	def output(self, role=None):
+	def output(self, context=None, role=None):
 		"""
 		The target file of the construction.
 		The file is relative to the Python cache directory of the package module
 		identifying itself as a system module: (fs-path)`factor/{platform}/{role}`.
 		"""
-		return cache_directory(self, role, 'factor')
+		return cache_directory(self, context, role, 'factor')
 
-	def libraries(self, role=None):
+	def libraries(self, context=None, role=None):
 		"""
 		The route to the libraries that this target depends upon.
 		Only used for linking against other targets.
 		"""
-		return cache_directory(self, role, 'lib')
+		return cache_directory(self, context, role, 'lib')
 
 	@property
 	def includes(self):
@@ -184,105 +197,44 @@ class SystemModule(libdev.Sources):
 		"""
 		return self.sources.container / 'include'
 
-	def objects(self, role=None):
+	def objects(self, context=None, role=None):
 		"""
 		The route to the objects directory inside the cache.
 		"""
-		return cache_directory(self, role, 'objects')
-
-	def imported(self, role=None):
-		"""
-		Executed by &load when any necessary construction is complete and the module
-		has finished importing.
-		"""
-		pass
+		return cache_directory(self, context, role, 'objects')
 
 	def compilation_parameters(self, role, language):
 		return {}
-
-class Extension(SystemModule):
-	"""
-	A Python extension module constructed from a set of sources.
-	An &Extension is a &SystemModule whose target is a runtime-loaded library.
-	"""
-
-	def imported(self, role=None):
-		global imp
-		mod = imp.internal_load_dynamic(module.__name__, self.output(role))
-
-		# rewrite the package module contents with that of the extension module
-		for k, v in mod.__dict__.items():
-			if k.startswith('__'):
-				continue
-			module.__dict__[k] = v
-		module.__dict__['__shared_object__'] = mod
-		mod.__path__ = module.__path__ = None
-		mod.__type__ = 'extension'
-		module__origin__ = mod.__origin__ = module.__file__
-
-class ResourceModule(types.ModuleType):
-	"""
-	"""
-
-def find_parameters(module_dict, sys_types=(SystemModule, ResourceModule, ProbeModule)):
-	"""
-	Used by &load to identify modules that are to be used as parameters to the construction
-	process.
-	"""
-
-	return [
-		(name, obj) for name, obj in module_dict.items()
-		if isinstance(obj, type) and issubclass(obj, sys_types)
-	]
-
-def probe(module):
-	# Probe don't inherit based on imports like system objects do.
-	import pickle
-	route = module.reports(role(module))
-
-	if route.exists():
-		with open(str(route)) as f:
-			report = pickle.load(f)
-			module.__dict__.update(report)
 
 def load(typ):
 	"""
 	Load a development factor performing a build when needed.
 	"""
+	global ProbeModule, IncludesModule, SystemModule
 
 	# package modules defining a target don't have to define themselves.
 	ctx = core.outerlocals()
 	module = sys.modules[ctx['__name__']]
-	if typ == 'probe':
+
+	if typ == 'system.probe':
 		module.__class__ = ProbeModule
-		module._init()
-		return probe(module)
-
-	module.__class__ = SystemModule
-	module._init()
-	module.system_object_type = typ
-
-	build = None
-	module_role = role(module.__name__)
-	output = module.output(module_role) # XXX: select factor as needed
-
-	if output.exists():
-		srcdir = module.sources
-		for x in srcdir.since(output.last_modified()):
-			build = True
-			break
-		else:
-			build = False
+	elif typ == 'system.includes':
+		module.__class__ = IncludesModule
 	else:
-		build = True
+		module.__class__ = SystemModule
+		if typ == 'system.extension':
+			for x in module.__dict__.values():
+				if isinstance(x, libdev.Sources):
+					# context_extension_probe is a name set in
+					# the libpython probe in order to identify a
+					# given system extension as being intended for
+					# the Python that is currently running the software.
+					if getattr(x, 'context_extension_probe', None):
+						module.execution_context_extension = True
+						break
+			else:
+				module.execution_context_extension = False
 
-	try:
-		if build:
-			from . import libconstruct
-			libconstruct.construct(module, (module_role,))
-		else:
-			module.imported()
-	except Exception:
-		raise ImportError(module.__name__)
+	module.system_object_type = typ
+	module._init()
 
-	module.__dict__.pop('libfactor', None)

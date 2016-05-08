@@ -2,7 +2,7 @@
 #include <fault/python/environ.h>
 #include <fault/python/module.h>
 
-#if TEST()
+#if SURVEY()
 /*
  * Symbol won't be available without TEST()
  */

@@ -44,16 +44,10 @@ darwin_framework_directories = Feature.construct(
 	libexecute.Directory,
 )
 
-macosx_version_minimum = Feature.construct(
-	'macosx.version.minimum',
-	functools.partial(Sequencing.precede, signal='-macosx_min_version'),
-	libexecute.String,
-)
-
 # /usr/bin/ld
 unix_linker_v1 = [
 	Feature.construct(
-		'system.libraries',
+		'system.library.set',
 		functools.partial(Sequencing.prefix, signal='-l'),
 		libexecute.File,
 	),
@@ -81,9 +75,10 @@ unix_linker_v1 = [
 	Feature.construct(
 		'type',
 		functools.partial(Sequencing.selection,
-			executable='',
+			executable=('' if sys.platform != 'darwin' else '-execute'),
 			library=('-shared' if sys.platform != 'darwin' else '-dylib'),
 			extension=('-shared' if sys.platform != 'darwin' else '-bundle'),
+			partial='-r',
 		),
 		libexecute.String,
 	),
@@ -117,7 +112,26 @@ unix_linker_v1 = [
 		functools.partial(Sequencing.precede, signal='-u'),
 		libexecute.String,
 	),
+
+	Feature.construct(
+		'system.include.directories',
+		Sequencing.void,
+		libexecute.String
+	),
+
+	Feature.construct(
+		'system.include.set',
+		Sequencing.void,
+		libexecute.String
+	),
+
 ]
+
+macosx_version_minimum = Feature.construct(
+	'macosx.version.minimum',
+	functools.partial(Sequencing.precede, signal='-macosx_version_min'),
+	libexecute.String,
+)
 
 if sys.platform == 'darwin':
 	unix_linker_v1.append(macosx_version_minimum)
@@ -128,13 +142,25 @@ else:
 
 unix_c_compiler_v1 = [
 	Feature.construct(
+		'system.library.directories',
+		Sequencing.void,
+		libexecute.String
+	),
+
+	Feature.construct(
+		'system.library.set',
+		Sequencing.void,
+		libexecute.String
+	),
+
+	Feature.construct(
 		'system.include.directories',
 		functools.partial(Sequencing.prefix, signal='-I'),
 		libexecute.Directory,
 	),
 
 	Feature.construct(
-		'includes',
+		'system.include.set',
 		functools.partial(Sequencing.precede, signal='-include'),
 		libexecute.File,
 	),
@@ -149,10 +175,19 @@ unix_c_compiler_v1 = [
 		'compiler.options',
 		functools.partial(Sequencing.options,
 			debug='-g',
-			coverage='--coverage',
+			# gcc
+			coverage='-fcoverage-mapping',
+			#profile='-fprofile-arcs',
+			profile='-fprofile-instr-generate',
+			# clang
+			#profile='-fprofile-instr-generate',
+			#coverage='-fcoverage-mapping',
 			assembly='-c',
 			position_independent='-fPIC',
 			wrap_signed_overflow='-fwrapv',
+			emit_dependencies='-M',
+			exclude_system_dependencies='-MM',
+			freebsd_reentrant='-D_REENTRANT',
 		),
 		bool,
 	),
@@ -317,8 +352,7 @@ pyrex_compilers = {
 
 if 0:
 	# Darwin
-	('-execute', '-lcrt1.o')
-	('-dylib', '-dead_strip_dylibs')
+	#'-dead_strip_dylibs'
 
 	# dynamic links
 	if loader is None:
@@ -343,9 +377,6 @@ def isolate(self, target):
 	"""
 	Isolate debugging information from the target.
 	"""
-
-	oc = self.default_objcopy()
-	strip = self.default_strip()
 
 	d = os.path.dirname(target)
 	b = os.path.basename(target)
@@ -372,12 +403,9 @@ def compiler(ident, route, language, features, role, standard=None):
 			'position_independent': True,
 		},
 		'system.include.directories': (),
-		'compiler.preprocessor.defines': (
-			'ROLE_NAME=' + str(role),
-			'ROLE_STRING="' + str(role) + '"',
-		),
+		'system.include.set': (),
+		'compiler.preprocessor.defines': (),
 		'compiler.preprocessor.undefines': (),
-		'includes': (),
 		'input': (),
 	}
 
@@ -397,7 +425,7 @@ def linker(identifier, route, features, target):
 
 	defaults = {
 		'system.library.directories': [],
-		'system.libraries': [],
+		'system.library.set': [],
 		'darwin.framework.directories': [],
 		'input': [],
 	}
@@ -410,45 +438,6 @@ def linker(identifier, route, features, target):
 	cmd.define(command_input)
 
 	return cmd
-
-def testing(m):
-	cmd = m.commands['compile.c']
-	r = libexecute.Reference(m, cmd)
-	params = cmd.allocate()
-	params['input'].extend(['s1.c', 's2.c'])
-	obj = params['output'] = libroutes.File.from_path('file.out')
-
-	ordered = list(params.items())
-	ordered.sort(key=(lambda x: x[0]))
-
-	for k, v in ordered:
-		r.update(k, v)
-
-	cmd = m.commands['link.system.executable']
-	r = libexecute.Reference(m, cmd)
-	params = cmd.allocate()
-	params['input'].append(obj)
-	params['output'] = libroutes.File.from_path('f.exe')
-
-	ordered = list(params.items())
-	ordered.sort(key=(lambda x: x[0]))
-
-	for k, v in ordered:
-		r.update(k, v)
-
-	testc = r"""
-	#include <stdio.h>
-	#include <openssl/ssl.h>
-	int
-	main(int argc, char *argv[])
-	{
-		printf("TEST!\n");
-	}
-	"""
-
-	r = libprobe.runtime(m, 'compile.c', testc, ('m',))
-	r = libprobe.includes(m, 'compile.c', ('stdio.h', 'math.h'))
-	print(repr(r))
 
 c_languages = [
 	'c', 'c++', 'objective-c',
@@ -490,6 +479,16 @@ def matrix(role, paths, identifier='system.development'):
 		cmd.defaults['compiler.options']['wrap_signed_overflow'] = True
 		m.commands[cmd.identifier] = cmd
 
+		if role == 'optimal':
+			cmd.defaults['compiler.optimization.target'] = ('2',)
+		elif role == 'debug':
+			cmd.defaults['compiler.optimization.target'] = ('0',)
+		elif role == 'test' or role == 'survey':
+			cmd.defaults['compiler.optimization.target'] = ('0',)
+			if role == 'survey':
+				cmd.defaults['compiler.options']['profile'] = True
+				cmd.defaults['compiler.options']['coverage'] = True
+
 	present, absent = libprobe.executables(paths, linkers)
 	lpath = present.pop('ld')
 
@@ -515,13 +514,27 @@ def matrix(role, paths, identifier='system.development'):
 	d = cmd.defaults
 	d['type'] = 'extension'
 
+	# partial link objects; used for organizing areas of an executable or library
+	lx = 'link.system.object'
+	cmd = linker(lx, lpath, unix_linker_v1, 'partial')
+	m.commands[cmd.identifier] = cmd
+	d = cmd.defaults
+	d['type'] = 'partial'
+
+	m.context['role'] = role
+	m.context['libraries'] = [
+		'System',
+	]
+	if role == 'survey':
+		m.context['runtime'] = '/x/realm/lib/clang/3.8.0/lib/darwin/libclang_rt.profile_osx.a'
+
 	return m
 
 def main(name, args, paths=None):
 	import os
 	slots = [
-		'factor',
-		'debug', # factor with low optimizations for enhanced debugging
+		'optimal',
+		'debug', # optimal with low optimizations for enhanced debugging
 		'test', # debug with test role defines for enabling dependency injection
 		'survey', # test + coverage + profile
 		'profile',
