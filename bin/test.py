@@ -39,8 +39,8 @@ class Harness(libharness.Harness):
 	"""
 	concurrently = staticmethod(libsys.concurrently)
 
-	def __init__(self, package, status):
-		super().__init__(package, role='test')
+	def __init__(self, package, status, role='test'):
+		super().__init__(package, role=role)
 		self.status = status
 		self.selectors = []
 
@@ -160,13 +160,13 @@ class Harness(libharness.Harness):
 		if division is None:
 			self.status.write(bottom_fate_messages + '\n')
 
-def main(package, modules):
-	p = Harness(package, sys.stderr)
+def main(package, modules, role='test'):
+	p = Harness(package, sys.stderr, role=role)
 	p.execute(p.root(libdev.Factor.from_fullname(package)), modules)
 
 	raise SystemExit(0)
 
 if __name__ == '__main__':
-	package, *modules = sys.argv[1:]
+	command, package, *modules = sys.argv
 	with libcore.constraint(None):
 		libsys.control(functools.partial(main, package, modules))
