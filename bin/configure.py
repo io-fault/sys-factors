@@ -522,11 +522,14 @@ def matrix(role, paths, identifier='system.development'):
 	d['type'] = 'partial'
 
 	m.context['role'] = role
-	m.context['libraries'] = [
-		'System',
-	]
-	if role == 'survey':
-		m.context['runtime'] = '/x/realm/lib/clang/3.8.0/lib/darwin/libclang_rt.profile_osx.a'
+	if sys.platform == 'darwin':
+		m.context['libraries'] = ['System']
+		if role == 'survey':
+			m.context['runtime'] = '/x/realm/lib/clang/3.8.0/lib/darwin/libclang_rt.profile_osx.a'
+	else:
+		m.context['libraries'] = ['c', 'm', 'pthread']
+		if role == 'survey':
+			m.context['runtime'] = ''
 
 	return m
 
