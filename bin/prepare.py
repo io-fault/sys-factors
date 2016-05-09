@@ -6,6 +6,7 @@ import os
 import sys
 import contextlib
 import itertools
+import py_compile
 import importlib.machinery
 
 from .. import libconstruct
@@ -81,15 +82,8 @@ def main(*args, role='optimal', mount_extensions=True):
 			sys.dont_write_bytecode = False
 
 			for x in itertools.chain(roots, packages, modules):
-				name = str(x)
-				if name in sys.modules:
-					# Primarily for cases where fault is preparing itself
-					# and a dependency has been imported already.
-					del sys.modules[name]
-
-				with status(name):
-					# TODO: Use py_compile module to build bytecode files.
-					compiled = x.module()
+				with status(str(x)):
+					py_compile.compile(str(x.file()))
 
 		for target in packages:
 			tm = target.module()
