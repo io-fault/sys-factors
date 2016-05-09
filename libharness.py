@@ -47,7 +47,7 @@ class Harness(object):
 	"""
 	from . import libtest # class attribute for general access.
 
-	def __init__(self, package, role = None):
+	def __init__(self, package, role=None):
 		global collections
 
 		self.package = package
@@ -84,6 +84,7 @@ class Harness(object):
 		ir = libroutes.Import.from_fullname(module.__name__)
 
 		# Preload all extensions inside the package.
+		# Empty when .role is None
 		for x in self.extensions.get(str(ir.bottom()), ()):
 			self.preload_extension(x)
 
@@ -157,16 +158,17 @@ class Harness(object):
 
 		if f.type == 'project':
 			extpkg = base_route / 'extensions'
-			if extpkg.exists():
+			if extpkg.exists() and self.role is not None:
 				self.extensions[str(base_route)].extend(self._collect_targets(extpkg))
 
 			m.__tests__ = [(f.route.fullname + '.test', self.package_test)]
 		elif f.type == 'context':
 			pkg, mods = base_route.subnodes()
-			for x in pkg:
-				extpkg = x / 'extensions'
-				if extpkg.exists():
-					self.extensions[str(x)].extend(self._collect_targets(extpkg))
+			if self.role is not None:
+				for x in pkg:
+					extpkg = x / 'extensions'
+					if extpkg.exists():
+						self.extensions[str(x)].extend(self._collect_targets(extpkg))
 
 			m.__tests__ = [
 				(str(x) + '.test', self.package_test)
