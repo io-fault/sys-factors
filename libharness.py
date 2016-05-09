@@ -27,6 +27,10 @@ from ..routes import library as libroutes
 from . import libcore
 from . import library as libdev
 
+python_triplet = libdev.python_context(
+	sys.implementation.name, sys.version_info, sys.abiflags, sys.platform
+)
+
 class Harness(object):
 	"""
 	The collection and execution of a set of tests.
@@ -119,13 +123,19 @@ class Harness(object):
 		global importlib, sys
 
 		target_module = import_object.module()
-		dll = target_module.output(self.role)
+		dll = target_module.output(python_triplet, self.role)
 		name = target_module.extension_name()
 
 		# Get the loader for the extension file.
 		loader = importlib.machinery.ExtensionFileLoader(name, str(dll))
-		mod = sys.modules[name] = loader.load_module()
-		print('preloaded', name, mod)
+		current = sys.modules.pop(name, None)
+		mod = loader.load_module()
+
+		# Update containing package dictionary and sys.modules
+		sys.modules[name] = mod
+		route = libroutes.Import.from_fullname(name)
+		parent = importlib.import_module(str(route.container))
+		setattr(parent, route.identifier, mod)
 
 	@staticmethod
 	def _collect_targets(route):
@@ -149,7 +159,6 @@ class Harness(object):
 			extpkg = base_route / 'extensions'
 			if extpkg.exists():
 				self.extensions[str(base_route)].extend(self._collect_targets(extpkg))
-				print(self.extensions)
 
 			m.__tests__ = [(f.route.fullname + '.test', self.package_test)]
 		elif f.type == 'context':

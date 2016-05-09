@@ -24,6 +24,7 @@ import lxml.etree
 
 from . import libfactor
 from . import include
+from . import library as libdev
 
 from ..io import library as libio
 from ..system import libexecute
@@ -44,15 +45,9 @@ def library_filename(platform, name):
 	global library_extensions
 	return 'lib' + name.lstrip('lib') + '.' + library_extensions.get(platform, 'so')
 
-def python_context(implementation, version_info, abiflags, platform):
-	"""
-	Construct the triplet representing the Python context for the platform.
-	Used to define the context for Python extension modules.
-	"""
-	pyversion = ''.join(map(str, version_info[:2]))
-	return '-'.join((implementation, pyversion + abiflags, platform))
-
-python_triplet = python_context(sys.implementation.name, sys.version_info, sys.abiflags, sys.platform)
+python_triplet = libdev.python_context(
+	sys.implementation.name, sys.version_info, sys.abiflags, sys.platform
+)
 
 def compile_bytecode(target, source):
 	global importlib
