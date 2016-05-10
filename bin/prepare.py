@@ -83,7 +83,9 @@ def main(*args, role='optimal', mount_extensions=True):
 
 			for x in itertools.chain(roots, packages, modules):
 				with status(str(x)):
-					py_compile.compile(str(x.file()))
+					fp = str(x.file())
+					if fp.endswith('.py'):
+						py_compile.compile(fp)
 
 		for target in packages:
 			tm = target.module()
