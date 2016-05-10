@@ -3,14 +3,35 @@ Executable module taking a single parameter that emits the compilation
 transcript to standard out.
 """
 import sys
-import pkgutil
-from .. import bootstrap
+import importlib
+
+from .. import libfactor
+from ...routes import library as libroutes
 
 if __name__ == '__main__':
-	modpath = sys.argv[1]
-	mloader = pkgutil.get_loader(modpath)
-	bootstrap.role = sys.argv[2]
-	for x in mloader.stages:
-		with open(mloader.logfile(x), 'rb') as logfile:
-			sys.stdout.buffer.write(logfile.read())
-	sys.stdout.write("\n")
+	command, module_fullname, context, role, *files = sys.argv
+	if context == '-':
+		from ..libconstruct import python_triplet as context
+
+	ir = libroutes.Import.from_fullname(module_fullname)
+	target_module = importlib.import_module(str(ir)) # import "$1"
+	logdir = libfactor.cache_directory(target_module, context, role, 'log')
+
+	if files:
+		files = [logdir.extend(x.split('/')) for x in files]
+	else:
+		files = logdir.tree()[1]
+
+	for logfile in files:
+		sys.stdout.write('[' + str(logfile) + ']\n')
+		if not logfile.exists():
+			sys.stdout.write('! ERROR: File does not exist.\n')
+			continue
+
+		with logfile.open('rb') as f:
+			log = f.read()
+			if log:
+				sys.stdout.buffer.write(log)
+				sys.stdout.write("\n")
+			else:
+				sys.stdout.write('! NOTE: Empty logfile.\n')
