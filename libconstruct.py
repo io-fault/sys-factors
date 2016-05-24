@@ -520,6 +520,7 @@ def initialize(context:str, role:str, module:libdev.Sources):
 		else:
 			refs.append(x)
 
+	work = libfactor.cache_directory(module, context, role, 'x').container
 	parameters = {
 		'module': module,
 		'role': role,
@@ -543,7 +544,7 @@ def initialize(context:str, role:str, module:libdev.Sources):
 		'reduction': module.output(context, role),
 		'locations': {
 			'sources': module.sources,
-			'work': libfactor.cache_directory(module, context, role, 'x').container,
+			'work': work,
 			'objects': libfactor.cache_directory(module, context, role, 'objects'),
 			'libraries': libfactor.cache_directory(module, context, role, 'lib'),
 			'logs': libfactor.cache_directory(module, context, role, 'log'),
@@ -701,6 +702,7 @@ class Construction(libio.Processor):
 	"""
 
 	def __init__(self, context, modules):
+		self.non_zero_exits = 0
 		self.cxnctx = context
 		self.modules = modules
 		# Manages the dependency order.
@@ -778,6 +780,10 @@ class Construction(libio.Processor):
 
 		typ, cmd, log = descriptor
 		pid, status = processor.only
+		exit_method, exit_code, core_produced = status
+		if exit_code != 0:
+			self.non_zero_exits += 1
+
 		with log.open('a') as f:
 			f.write('\n[Profile]\n')
 			f.write('/factor\n\t%s\n' %(module.__name__,))
@@ -867,6 +873,7 @@ class Construction(libio.Processor):
 			elif x[0] == 'link':
 				cmd, src, dst = x
 				dst.link(src)
+				self.progress[module] += 1
 			else:
 				print('unknown instruction', x)
 
