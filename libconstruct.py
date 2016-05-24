@@ -13,19 +13,24 @@ Management of target construction jobs using &.libprobe command Matrices.
 """
 import os
 import sys
+import copy
+import builtins
 import subprocess
 import functools
 import itertools
 import collections
 import contextlib
 import importlib
+import importlib.machinery
 
 import lxml.etree
 
 from . import libfactor
 from . import include
 from . import library as libdev
+from .probes import libpython
 
+from ..chronometry import library as libtime
 from ..io import library as libio
 from ..system import libexecute
 from ..system import library as libsys
@@ -45,6 +50,7 @@ def library_filename(platform, name):
 	global library_extensions
 	return 'lib' + name.lstrip('lib') + '.' + library_extensions.get(platform, 'so')
 
+# Used as the context name for extension modules.
 python_triplet = libdev.python_context(
 	sys.implementation.name, sys.version_info, sys.abiflags, sys.platform
 )
@@ -52,13 +58,6 @@ python_triplet = libdev.python_context(
 def compile_bytecode(target, source):
 	global importlib
 	pyc_cache = importlib.util.cache_from_source(source)
-
-class Parameters(object):
-	"""
-	Construction parameters collections for managing compilation and link parameters.
-
-	Provides adaption methods for collecting parameters for a specific compilation stage.
-	"""
 
 # Specifically for identifying files to be compiled and how.
 extensions = {
@@ -83,41 +82,6 @@ for k, v in extensions.items():
 	for y in v:
 		languages[y] = k
 
-def construction(matrix:libexecute.Matrix, controller=None, environment=None):
-	"""
-	Generator managing the instantiation of &libsys.KInvocation instances
-	used to create the target.
-
-	A single temporary directory with a set of job directories created for
-	each task that's ran in order to build the target.
-	"""
-	ref = None
-	ki = None
-
-	with libroutes.File.temporary() as tr:
-		for job_id in itertools.count():
-			workdir = tr / str(job_id)
-			workdir.init('directory')
-			ref, *parameters = (yield workdir, ki) # Load a command to apply parameters to.
-
-			workdir.init('directory')
-			stderr = workdir / 'stderr'
-
-			for p in parameters:
-				for k, v in p.items():
-					ref.update(k, v)
-
-			cenv, route, args = ref.render()
-			env = {}
-			env.update(matrix.environment)
-			env.update(cenv)
-			env['PWD'] = str(workdir)
-
-			ki = libsys.KInvocation(str(route), args, env)
-			src = ref
-
-	# tr gets removed on generator close()
-
 def load(role, route=None):
 	"""
 	Open the command matrix providing the interfaces for compilation.
@@ -138,6 +102,46 @@ def load(role, route=None):
 
 	return libexecute.Matrix.from_xml(matrixdoc)
 
+def mount(role, route, target, ext_suffixes=importlib.machinery.EXTENSION_SUFFIXES):
+	"""
+	Mount an execution context extension module so that the constructed binary can be
+	used by the context (Python).
+
+	After extension modules have been constructed, they may not be available for use.
+	The &mount function performs the necessary filesystem modifications in order expose
+	the extension modules for use.
+	"""
+	# system.extension being built for this Python
+	# construct links to optimal.
+	# ece's use a special context derived from the Python install
+	# usually consistent with the triplet of the first ext suffix.
+	global python_triplet
+
+	outfile = target.output(context=python_triplet, role=role)
+
+	# peel until it's outside the first extensions directory.
+	pkg = route
+	while pkg.identifier != 'extensions':
+		pkg = pkg.container
+	names = route.absolute[len(pkg.absolute):]
+	pkg = pkg.container
+
+	link_target = pkg.file().container.extend(names)
+	for suf in ext_suffixes + ['.pyd', '.dylib']:
+		rmf = link_target.suffix(suf)
+		if rmf.exists():
+			print('removing', str(rmf))
+			rmf.void()
+
+	dsym = link_target.suffix('.so.dSYM')
+	if dsym.exists():
+		print('removing', str(dsym))
+		dsym.void()
+
+	link_target = link_target.suffix(ext_suffixes[0])
+	print('linking', outfile, '->', link_target)
+	link_target.link(outfile, relative=True)
+
 def collect(module, types=(libfactor.SystemModule, libfactor.ProbeModule)):
 	"""
 	Return the set of dependencies that the given module has.
@@ -152,22 +156,554 @@ def traverse(working, tree, inverse, module):
 	module's dependencies.
 
 	System object factor modules import their dependencies into their global
-	dictionary. The imported system object factor modules are identified as dependencies
-	that need to manifested in order to process the subject module.
+	dictionary forming a directed graph. The imported system object factor
+	modules are identified as dependencies that need to manifested in order
+	to process the subject module. The inverted graph is constructed to manage
+	completion signalling for processing purposes.
 	"""
+	global collect
+
 	deps = set(collect(module))
 	if not deps:
+		# No dependencies, add to working set and return.
 		working.add(module)
 		return
+	elif module in tree:
+		# It's already been traversed in a previous run.
+		return
 
-	# no dependencies, add to working set.
+	# dependencies present, assign them inside the tree.
 	tree[module] = deps
 
 	for x in deps:
 		inverse[x].add(module)
 		traverse(working, tree, inverse, x)
 
-def construct(module, roles, route=None, context=None):
+def sequence(modules):
+	"""
+	Generator maintaining the state of sequencing a traversed factor depedency
+	graph. This generator emits factors as they are ready to be processed and receives
+	factors that have completed processing.
+	"""
+	global collections
+
+	tree = dict()
+	inverse = collections.defaultdict(set)
+	working = set()
+	for factor in modules:
+		traverse(working, tree, inverse, factor)
+
+	new = working
+
+	while working:
+		completion = (yield tuple(new))
+		new = set() # &completion triggers new additions to &working
+
+		for module in completion:
+			# completed.
+			working.discard(module)
+
+			for deps in inverse[module]:
+				tree[deps].discard(module)
+				if not tree[deps]:
+					# Add to both; new is the set reported to caller,
+					# and working tracks when the graph has been fully sequenced.
+					new.add(deps)
+					working.add(deps)
+					del tree[deps]
+
+def identity(module):
+	"""
+	Discover the base identity of the target.
+
+	Primarily, used to identify the proper basename of a library.
+	The (python:attribute)`name` attribute on a target module provides an explicit
+	override. If the `name` is not present, then the first `'lib'` prefix
+	is removed from the module's name if any. The result is returned as the identity.
+	"""
+	na = getattr(module, 'name', None)
+	if na is not None:
+		# explicit name attribute providing an override.
+		return na
+
+	idx = module.__name__.rfind('.')
+	basename = module.__name__[idx+1:]
+	if module.system_object_type == 'library':
+		if basename.startswith('lib'):
+			# strip the leading lib from module identifier.
+			# 'libNAME' returns 'NAME'
+			return basename[3:]
+
+	return basename
+
+def render(matrix:libexecute.Matrix, ref, *parameters):
+	"""
+	Generator managing the instantiation of &libsys.KInvocation instances
+	used to create the target.
+
+	A single temporary directory with a set of job directories created for
+	each task that's ran in order to build the target.
+	"""
+	for p in parameters:
+		for k, v in p.items():
+			ref.update(k, v)
+
+	cenv, route, args = ref.render()
+	env = {}
+	env.update(matrix.environment)
+	env.update(cenv)
+
+	return route, args, env
+
+def unix_compiler_collection(context, output, inputs,
+		collection=True, # Assume the command is a compiler collection.
+		verbose=True, # Enable verbose output.
+		language=None, # The selected language.
+		emit_dependencies=False,
+
+		verbose_flag='-v',
+		language_flag='-x', standard_flag='-std',
+		emit_dependencies_flag='-M',
+
+		output_flag='-o',
+		compile_flag='-c',
+		sid_flag='-I', si_flag='-include',
+		debug_flag='-g',
+		pic_flag='-fPIC',
+		co_flag='-O', define_flag='-D',
+		overflow_map = {
+			'wrap': '-fwrapv',
+			'none': '-fstrict-overflow',
+			'undefined': '-fno-strict-overflow',
+		},
+		dependency_options = (
+			('exclude_system_dependencies', '-MM', True),
+		),
+		optimizations = {
+			'optimal': '3',
+			'survey': '1',
+			'debug': '0',
+			'test': '0',
+			'profile': '3',
+			'size': 's',
+		}
+	):
+	"""
+	Construct an argument sequence for a common compiler collection command.
+
+	&unix_compiler_collection is the interface for constructing compilation
+	commands for a compiler collection.
+	"""
+	get = context.get
+	role = get('role')
+	command = [get('compiler', '/x/realm/bin/clang'), compile_flag]
+	if verbose:
+		command.append(verbose_flag)
+
+	if collection:
+		if language is not None:
+			command.extend((language_flag, language))
+
+	if 'standards' in context:
+		standard = get('standards', None).get(language, None)
+		if standard is not None and standard_flag is not None:
+			command.append(standard_flag + '=' + standard)
+
+	# -fPIC or not.
+	link_type = get('type', 'dynamic')
+	if link_type == 'dynamic':
+		command.append(pic_flag)
+
+	# Compiler optimization target: -O0, -O1, ..., -Ofast, -Os, -Oz
+	co = optimizations[role]
+	command.append(co_flag + co)
+
+	# Include debugging symbols.
+	command.append(debug_flag)
+
+	overflow_spec = get('overflow')
+	if overflow_spec is not None:
+		command.append(overflow_map[overflow_spec])
+
+	# coverage options for survey and profile roles.
+	coverage = get('coverage', False)
+	if role in {'survey', 'profile'}:
+		command.extend(('-fprofile-instr-generate', '-fcoverage-mapping'))
+
+	# Include Directories; -I option.
+	sid = list(get('system.include.directories', ()))
+	command.extend([sid_flag + str(x) for x in sid])
+
+	# -include files. Forced inclusion.
+	sis = get('include.set', ())
+	for x in sis:
+		command.extend((si_flag, x))
+
+	module = get('module')
+
+	# -D defines.
+	sp = [define_flag + '='.join(x) for x in get('compiler.preprocessor.defines', ())]
+	command.extend(sp)
+
+	# -U undefines.
+	spo = ['-U' + x for x in get('compiler.preprocessor.undefines', ())]
+	command.extend(spo)
+
+	if emit_dependencies:
+		command.append(emit_dependencies_flag)
+		for k, v, default in dependency_options:
+			setting = get(k)
+			if setting or setting is None and default:
+				command.append(v)
+
+	command.extend(get('command.option.injection', ()))
+
+	# finally, the output file and the inputs as the remainder.
+	command.extend((output_flag, output))
+	command.extend(inputs)
+
+	return command
+compiler_collection = unix_compiler_collection
+
+def windows_link_editor(context, output, inputs):
+	pass
+
+def macosx_link_editor(context, output, inputs,
+		filepath=str,
+		link_flag='-l', libdir_flag='-L',
+		rpath_flag='-rpath',
+		output_flag='-o',
+		type_map = {
+			'executable': '-execute',
+			'library': '-dylib',
+			'extension': '-bundle',
+			'collection': '-r',
+		},
+	):
+	"""
+	Command constructor for Mach-O link editor provided on Apple MacOS X systems.
+	"""
+	get = context.get
+	command = [get('reducer', '/usr/bin/ld')]
+
+	typ = get('system.type')
+	loutput_type = type_map[typ]
+	command.append(loutput_type)
+
+	command.extend([libdir_flag+filepath(x) for x in context['system.library.directories']])
+
+	command.extend((output_flag, filepath(output)))
+	if typ == 'executable':
+		command.append('/usr/lib/crt1.o')
+
+	command.extend(inputs)
+
+	command.extend([link_flag+filepath(x) for x in context.get('system.library.set', ())])
+	command.append('-lSystem')
+	return command
+
+def legacy_link_editor(context, output, inputs,
+		verbose=True,
+		filepath=str,
+		verbose_flag='-v',
+		link_flag='-l', libdir_flag='-L',
+		rpath_flag='-rpath',
+		soname_flag='-soname',
+		output_flag='-o',
+		type_map = {
+			'executable': None,
+			'library': '-shared',
+			'extension': '-shared',
+			'collection': '-r',
+		},
+	):
+	"""
+	Command constructor for the unix link editors.
+
+	GNU ld has an insane characteristic that forces the user to decide what
+	the appropriate order of archives are. The
+	(system:command[posix])`lorder` was apparently built long ago to alleviate this while
+	leaving the interface to (system:command[posix])`ld` to be continually unforgiving.
+
+	[ Parameters ]
+	/filepath
+		Override to adjust the selected path. File paths passed are &libroutes.File
+		instances that are absolute paths. In cases where scripts are being generated,
+		the path may need modification in order to represented in a portable fashion.
+
+	/verbose
+		Enable or disable the verbosity of the command. Defaults to &True.
+	"""
+	get = context.get
+	command = [get('reducer', 'ld')]
+	add = command.append
+	iadd = command.extend
+
+	if verbose:
+		add(verbose_flag)
+
+	loutput_type = type_map[get('system.type')]
+	if loutput_type:
+		add(loutput_type)
+
+	sld = get('system.library.directories', ())
+	libdirs = [libdir_flag + filepath(x) for x in sld]
+
+	sls = get('system.library.set', ())
+	libs = [link_flag + filepath(x) for x in sls]
+
+	return command + [output_flag, output] + list(map(filepath, inputs)) + libs
+
+def llvm_link_editor(context):
+	"""
+	Abstraction for a sane link editor. Order of libraries, static or dynamic is
+	irrelevant.
+	"""
+	pass
+
+if sys.platform == 'darwin':
+	link_editor = macosx_link_editor
+else:
+	link_editor = legacy_link_editor
+
+def updated(obj, src, depfile):
+	"""
+	Return whether or not the &obj needs to be updated.
+	"""
+	if not obj.exists():
+		# No such object, not updated.
+		return False
+
+	olm = obj.last_modified()
+	if olm < src.last_modified():
+		# rebuild if object is older than source.
+		return False
+
+	if depfile is not None and depfile.exists():
+		# Alter to only pay attention to project and context files.
+
+		# check identified dependencies if any
+		with depfile.open('r') as f:
+			pmd = parse_make_dependencies(f.read())
+			deps = list(map(libroutes.File.from_absolute, pmd))
+
+		for dep in deps:
+			if olm < dep.last_modified():
+				return False
+
+	# object has already been updated.
+	return True
+
+def factor_defines(module_fullname, exe_ctx_extension=False):
+	modname = module_fullname.split('.')
+
+	return [
+		('FACTOR_QNAME', module_fullname),
+		('FACTOR_BASENAME', modname[-1]),
+		('FACTOR_PACKAGE', '.'.join(modname[:-1])),
+	]
+
+def execution_context_extension_defines(module_fullname, target_fullname):
+	mp = module_fullname.rfind('.')
+	tp = target_fullname.rfind('.')
+
+	return [
+		('FACTOR_QNAME', module_fullname),
+		('FACTOR_BASENAME', module_fullname[mp+1:]),
+		('FACTOR_PACKAGE', module_fullname[:mp]),
+
+		('MODULE_QNAME', target_fullname),
+		('MODULE_PACKAGE', target_fullname[:tp]),
+	]
+
+def initialize(context:str, role:str, module:libdev.Sources):
+	"""
+	Initialize a context for use by &transform and &reduce.
+
+	Given a &context name and a &role, initialize a construction context for producing the
+	target of the given &module.
+	"""
+
+	# Factor dependencies stated by imports.
+	td = list(module.dependencies())
+
+	# Categorize the module's dependencies.
+	incdirs = [include.directory]
+	probes = []
+	libs = []
+	refs = []
+	for x in td:
+		if isinstance(x, libfactor.IncludesModule):
+			incdirs.append(x.sources)
+		elif isinstance(x, libfactor.ProbeModule):
+			probes.append(x)
+		elif isinstance(x, libfactor.SystemModule) and x.system_object_type == 'library':
+			libs.append(x)
+		else:
+			refs.append(x)
+
+	parameters = {
+		'module': module,
+		'role': role,
+		'name': context,
+		'system.type': getattr(module, 'system_object_type', None),
+
+		'probes': probes,
+		'libraries': libs,
+		'references': refs,
+
+		'transform': compiler_collection,
+		'system.include.directories': incdirs,
+		'system.library.directories': [],
+		'system.library.set': set(),
+
+		'compiler.preprocessor.defines': [
+			('F_ROLE', role),
+			('F_ROLE_ID', 'F_ROLE_' + role.upper() + '_ID'),
+		],
+
+		'reduction': module.output(context, role),
+		'locations': {
+			'sources': module.sources,
+			'work': libfactor.cache_directory(module, context, role, 'x').container,
+			'objects': libfactor.cache_directory(module, context, role, 'objects'),
+			'libraries': libfactor.cache_directory(module, context, role, 'lib'),
+			'logs': libfactor.cache_directory(module, context, role, 'log'),
+			'dependencies': libfactor.cache_directory(module, context, role, 'dl'),
+		}
+	}
+	libdir = parameters['locations']['libraries']
+
+	# Full set of regular files in the sources location.
+	if parameters['locations']['sources'].exists():
+		parameters['sources'] = parameters['locations']['sources'].tree()[1]
+
+	# Local dependency set comes first.
+	parameters['system.library.directories'] = [parameters['locations']['libraries']]
+
+	for probe in probes:
+		report = probe.report(probe, context)
+		libfactor.merge(parameters, report) # probe parameter merge
+
+	for lib in libs:
+		libname = identity(lib)
+		parameters['system.library.set'].add(libname)
+
+	if libpython in probes:
+		parameters['execution_context_extension'] = True
+		men = parameters['mount_point'] = module.extension_name()
+		idefines = execution_context_extension_defines(module.__name__, men)
+	else:
+		parameters['execution_context_extension'] = False
+		idefines = factor_defines(module.__name__)
+
+	parameters['compiler.preprocessor.defines'].extend(idefines)
+
+	return parameters
+
+def transform(context, type, filtered=(lambda x,y,z: False)):
+	"""
+	Using the given set of &processors, prepare the parameters to be given to the
+	processor from the probes referenced &module.
+
+	The &context and &role parameters define the perspective that the target is to
+	be built for; cache directories are referenced and created using these parameters.
+
+	[ Parameters ]
+	/context
+		The construction context to base the transformation on.
+	/type
+		The type of transformation to perform.
+	"""
+	global languages, include
+
+	if 'sources' not in context:
+		return
+
+	loc = context['locations']
+	emitted = set([loc['logs'], loc['objects']])
+
+	yield ('directory', loc['logs'])
+	yield ('directory', loc['objects'])
+	xf = context.get('transform')
+
+	commands = []
+	for src in context['sources']:
+		fnx = src.extension
+		if fnx in {'h'}:
+			# Ignore header files.
+			continue
+
+		lang = languages.get(src.extension)
+		obj = libroutes.File(loc['objects'], src.points)
+		depfile = libroutes.File(loc['dependencies'], src.points)
+
+		if filtered(obj, src, depfile):
+			continue
+
+		logfile = libroutes.File(loc['logs'], src.points)
+
+		for x in (obj, depfile, logfile):
+			d = x.container
+			if d not in emitted:
+				emitted.add(d)
+				yield ('directory', d)
+
+		genobj = functools.partial(xf, language=lang)
+
+		# compilation
+		go = {}
+		compilation = genobj(context, obj, (src,))
+
+		yield ('execute', compilation, logfile)
+
+def reduce(context):
+	"""
+	Construct the operations for reducing the object files created by &transform
+	instructions into a set of targets that can satisfy
+	the set of dependents.
+
+	[ Parameters ]
+	/context
+		The construction context created by &initialize.
+	"""
+
+	role = context['role']
+	# target library directory containing links to dependencies
+	locs = context['locations']
+	libdir = locs['libraries']
+	output = context['reduction']
+
+	if 'sources' not in context:
+		# Nothing to reduce.
+		return
+
+	yield ('directory', output.container)
+	yield ('directory', libdir)
+
+	libs = []
+
+	for x in context['libraries']:
+		# Create symbolic links inside the target's local library directory.
+		# This is done to avoid a large number of -L options in targets
+		# with a large number of dependencies.
+
+		# Explicit link of factor.
+		libdep = x.output(context['name'], role)
+		li = identity(x)
+		lib = libdir / library_filename(sys.platform, li)
+		yield ('link', libdep, lib)
+		libs.append(li)
+
+	# Discover the known sources in order to identify which objects should be selected.
+	objdir = locs['objects']
+	objects = [
+		libroutes.File(objdir, x.points) for x in context['sources']
+	]
+
+	yield ('execute', link_editor(context, output, objects), locs['logs'] / 'reduction')
+
+def construct(stack, module, role, route=None, context=None, reconstruct=False):
 	"""
 	Construct the target of the &module for each of the given roles.
 
@@ -175,14 +711,17 @@ def construct(module, roles, route=None, context=None):
 	/module
 		The &SystemModule defining the executable, library, module, or extension to construct.
 
-	/roles
-		The set of roles to construct.
+	/role
+		The role to construct.
 
 	/route
 		The directory location of the libexecute XML files that define the commands
 		to run. Merely passed on to &load.
 	"""
-	global languages, construction, include
+	global languages, include
+
+	job_id_generator = itertools.count()
+	tr = stack.enter_context(libroutes.File.temporary())
 
 	sources = module.sources
 	params = {k:module.__dict__.get(k, None) for k in data_fields}
@@ -190,11 +729,6 @@ def construct(module, roles, route=None, context=None):
 	typ = getattr(module, 'system_object_type', None)
 	if typ in {None, 'system.probe', 'system.includes'}:
 		return
-
-	if typ == 'library':
-		types = ('library', 'partial')
-	else:
-		types = (typ,)
 
 	pyext = getattr(module, 'execution_context_extension', None)
 
@@ -227,182 +761,157 @@ def construct(module, roles, route=None, context=None):
 
 	# Iterate over and construct each role to avoid
 	# forcing the user to iterate.
-	for role in roles:
-		compiled = 0
-		output = module.output(context, role)
-		if output is None:
+	compiled = 0
+	output = module.output(context, role)
+	if output is None:
+		return
+
+	objdir = module.objects(context, role)
+	logdir = libfactor.cache_directory(module, context, role, 'log')
+	depdir = libfactor.cache_directory(module, context, role, 'dl')
+	incdir = [include.directory]
+
+	known_sources = set()
+
+	probe_parameters = {
+		probe: probe.report(probe, {}) for probe in probes
+	}
+
+	for x in (logdir, objdir, depdir):
+		x.init('directory')
+
+	matrix = load(role, route=route)
+
+	for x in td:
+		if isinstance(x, libfactor.IncludesModule):
+			# Explicit link of factor.
+			incdir.append(x.sources)
+		else:
+			pass
+
+	for src, job_id in zip(sources.tree()[1], job_id_generator):
+		workdir = tr / str(job_id)
+		workdir.init('directory')
+
+		fnx = src.extension
+		if fnx in {'h'}:
+			# Ignore header files.
 			continue
 
-		objdir = module.objects(context, role)
-		logdir = libfactor.cache_directory(module, context, role, 'log')
-		depdir = libfactor.cache_directory(module, context, role, 'odl')
-		incdir = [include.directory]
+		lang = languages[src.extension]
+		obj = libroutes.File(objdir, src.points)
+		depfile = libroutes.File(depdir, src.points)
+		logfile = libroutes.File(logdir, src.points)
+		known_sources.add(src.points)
 
-		known_sources = set()
-
-		probe_parameters = {
-			probe: probe.report(probe, module, role) for probe in probes
-		}
-
-		for x in (logdir, objdir, depdir):
-			x.init('directory')
-
-		matrix = load(role, route=route)
-		g = construction(matrix); g.send(None)
-
-		for x in td:
-			if isinstance(x, libfactor.IncludesModule):
-				# Explicit link of factor.
-				incdir.append(x.sources)
-			else:
-				pass
-
-		for src in sources.tree()[1]:
-			# XXX: check modifications times/consistency
-			fnx = src.extension
-			if fnx in {'h'}:
-				# Ignore header files.
+		if not recon:
+			if updated(obj, src, depfile):
 				continue
 
-			lang = languages[src.extension]
-			obj = libroutes.File(objdir, src.points)
-			depfile = libroutes.File(depdir, src.points)
-			logfile = libroutes.File(logdir, src.points)
-			known_sources.add(src.points)
+		obj.container.init('directory')
+		depfile.container.init('directory')
+		logfile.container.init('directory')
 
-			if obj.exists():
-				olm = obj.last_modified()
-			else:
-				olm = 0
+		# XXX: apply project and source params
 
-			if not recon and obj.exists():
-				if olm < src.last_modified():
-					# rebuild if object is older than source.
-					pass
-				elif depfile.exists():
-					# Alter to only pay attention to project and context files.
+		cmd = matrix.commands['compile.' + lang]
+		ref = libexecute.Reference(matrix, cmd)
 
-					ignore = True
-					# check identified dependencies if any
-					with depfile.open('r') as f:
-						pmd = parse_make_dependencies(f.read())
-						deps = list(map(libroutes.File.from_absolute, pmd))
+		params = tuple(probe_parameters.values())
 
-					for dep in deps:
-						if olm < dep.last_modified():
-							ignore = False
-							break
+		defines = [
+			'F_ROLE=' + role,
+			'F_ROLE_ID=F_ROLE_' + role.upper() + '_ID',
+		] + target_defines
 
-					if ignore:
-						# skip compilation as object is newer
-						# than the source and its dependencies.
-						continue
-			else:
-				# object does not exist, compile into linker input.
-				pass
+		# compilation
+		lp = cmd.allocate()
+		lp['input'].append(src)
+		lp['output'] = obj
 
-			obj.container.init('directory')
-			depfile.container.init('directory')
-			logfile.container.init('directory')
+		lp['compiler.preprocessor.defines'] = defines
+		lp['system.include.directories'].extend(incdir)
 
-			# XXX: apply project and source params
+		compilation = render(matrix, ref, *(params + (lp,))) + (obj, depfile, logfile)
 
-			cmd = matrix.commands['compile.' + lang]
-			ref = libexecute.Reference(matrix, cmd)
+		# dependencies
+		ref = libexecute.Reference(matrix, cmd)
+		lp = cmd.allocate()
+		lp['input'].append(src)
+		lp['output'] = depfile
 
-			params = tuple(probe_parameters.values())
+		lp['compiler.preprocessor.defines'] = defines
+		lp['system.include.directories'].extend(incdir)
+		lp['compiler.options']['emit_dependencies'] = True
+		lp['compiler.options']['exclude_system_dependencies'] = True
+		generate_deps = render(matrix, ref, *(params + (lp,))) + (obj, depfile, logfile.suffix('.dep'))
 
-			defines = [
-				'F_ROLE=' + role,
-				'F_ROLE_ID=F_ROLE_' + role.upper() + '_ID',
-			] + target_defines
+		yield workdir, generate_deps
+		yield workdir, compilation
+		compiled += 1
 
-			# compilation
-			lp = cmd.allocate()
-			lp['input'].append(src)
-			lp['output'] = obj
+	# Aggregate the objects according to the target type.
+	job_id = next(job_id_generator)
+	workdir = tr / str(job_id)
+	workdir.init('directory')
 
-			lp['compiler.preprocessor.defines'] = defines
-			lp['system.include.directories'].extend(incdir)
+	if not compiled:
+		# Nothing compiled, no new link to perform.
+		return
 
-			compilation = g.send((ref,) + params + (lp,)) + (obj, depfile, logfile)
+	output.container.init('directory')
 
-			# dependencies
-			ref = libexecute.Reference(matrix, cmd)
-			lp = cmd.allocate()
-			lp['input'].append(src)
-			lp['output'] = depfile
+	# target library directory containing links to dependencies
+	libdir = module.libraries(context, role)
+	libdir.init('directory')
+	libs = []
+	data = (getattr(module, 'parameters', None) or {})
 
-			lp['compiler.preprocessor.defines'] = defines
-			lp['system.include.directories'].extend(incdir)
-			lp['compiler.options']['emit_dependencies'] = True
-			lp['compiler.options']['exclude_system_dependencies'] = True
-			generate_deps = g.send((ref,) + params + (lp,)) + (obj, depfile, logfile.suffix('.dep'))
+	for x in td:
+		# Check each target dependency (development factor module imports)
+		# and create symbolic links inside the target's local library directory.
+		# This is done to avoid a large number of -L options in targets
+		# with a large number of dependencies.
 
-			yield generate_deps
-			yield compilation
-			compiled += 1
+		if x.system_object_type in {'system.library', 'system.object'}:
+			# Explicit link of factor.
+			libdep = x.output(context, role)
+			lib = libdir / library_filename(sys.platform, x.name)
+			if not lib.exists():
+				lib.link(libdep)
+
+			libs.append(x.name)
 		else:
-			# Aggregate the objects according to the target type.
-			if not compiled:
-				# Nothing compiled, no new link to perform.
-				continue
+			pass
 
-			output.container.init('directory')
+	dynlinks = []
 
-			# target library directory containing links to dependencies
-			libdir = module.libraries(context, role)
-			libdir.init('directory')
-			libs = []
-			data = (getattr(module, 'parameters', None) or {})
+	cmd = matrix.commands['link.' + typ]
 
-			for x in td:
-				# Check each target dependency (development factor module imports)
-				# and create symbolic links inside the target's local library directory.
-				# This is done to avoid a large number of -L options in targets
-				# with a large number of dependencies.
+	params = tuple(probe_parameters.values())
 
-				if x.system_object_type in {'system.library', 'system.object'}:
-					# Explicit link of factor.
-					libdep = x.output(context, role)
-					lib = libdir / library_filename(sys.platform, x.name)
-					if not lib.exists():
-						lib.link(libdep)
+	ref = libexecute.Reference(matrix, cmd)
+	lp = cmd.allocate()
+	lp['input'].extend([x for x in objdir.tree()[1] if x.points in known_sources])
+	rt = matrix.context.get('runtime')
+	if rt is not None:
+		lp['input'].append(rt)
 
-					libs.append(x.name)
-				else:
-					pass
+	lp['output'] = output
+	lp['system.library.set'].extend(dynlinks) # explicit dynamic links
+	lp['system.library.set'].extend(libs) # from refrenced factor modules
+	lp['system.library.set'].extend(matrix.context['libraries'])
 
-			dynlinks = []
+	lp['system.library.directories'].append(libdir)
+	try:
+		from ..stack import apple
+		mv = apple.macos_version()
+		mv = mv.rsplit('.', 1)[0] + '.0'
+		lp['macosx.version.minimum'] = (mv,)
+	except ImportError:
+		pass
 
-			for typ in types:
-				cmd = matrix.commands['link.' + typ]
-
-				params = tuple(probe_parameters.values())
-
-				ref = libexecute.Reference(matrix, cmd)
-				lp = cmd.allocate()
-				lp['input'].extend([x for x in objdir.tree()[1] if x.points in known_sources])
-				rt = matrix.context.get('runtime')
-				if rt is not None:
-					lp['input'].append(rt)
-
-				lp['output'] = output
-				lp['system.library.set'].extend(dynlinks) # explicit dynamic links
-				lp['system.library.set'].extend(libs) # from refrenced factor modules
-				lp['system.library.set'].extend(matrix.context['libraries'])
-
-				lp['system.library.directories'].append(libdir)
-				try:
-					from ..stack import apple
-					mv = apple.macos_version()
-					mv = mv.rsplit('.', 1)[0] + '.0'
-					lp['macosx.version.minimum'] = (mv,)
-				except ImportError:
-					pass
-
-				yield g.send((ref,) + params + (lp,)) + (output, None, (logdir / 'link'))
-				g.close()
+	yield workdir, render(matrix, ref, *(params + (lp,))) + (output, None, (logdir / 'link'))
 
 def parse_make_dependencies(make_rule_str):
 	"""
@@ -417,9 +926,11 @@ def parse_make_dependencies(make_rule_str):
 	next(files); next(files) # ignore the target rule portion and the self pointer.
 	return list(files)
 
-def update(role, module, reconstruct=False):
+def update(stack, role, module, reconstruct=False):
 	"""
-	Update the target module's cache if necessary.
+	Update the target module's cache if necessary. Update presumes dependencies have been
+	processed and have been updated. &manage performs &update in the necessary order based
+	on the dependency graph defined by system module imports.
 
 	For a given role and module, check if the sources or dependencies have been modified since
 	the factor was created.
@@ -430,36 +941,248 @@ def update(role, module, reconstruct=False):
 
 	cwd = os.getcwd()
 	try:
-		for pwd, ki, out, dep, log in construct(module, (role,)):
-			os.chdir(str(pwd))
+		for workdir, (route, args, env, out, dep, log) in construct(stack, module, role):
+			os.chdir(str(workdir))
+			ki = libsys.KInvocation(str(route), args, env)
 
 			with contextlib.ExitStack() as xs:
-				lf = xs.enter_context(open(str(log), 'wb'))
+				with open(str(log), 'w') as f:
+					f.write(' '.join(args))
+					f.write('\n')
+
+				lf = xs.enter_context(open(str(log), 'ab'))
 				ni = xs.enter_context(open('/dev/null', 'rb'))
 				no = xs.enter_context(open('/dev/null', 'wb'))
 
 				pid = ki(fdmap=((ni.fileno(),0), (no.fileno(), 1), (lf.fileno(), 2)))
-
+			os.chdir(cwd)
 			r = os.waitpid(pid, 0)
 	finally:
 		os.chdir(cwd)
 
-def manage(root, *roles):
-	global update
+def mapmodules(process, stack, root, roles):
+	"""
+	Process the graph of source modules according to their dependency order.
 
+	Essentially a &functools.map implementation that performs &process on each
+	&libdev.Sources module according to its position in the graph.
+	"""
 	tree = dict()
 	inverse = collections.defaultdict(set)
 	working = set()
 	traverse(working, tree, inverse, root)
 
 	while working:
-		module = next(iter(working))
-		for x in roles:
-			update(x, module)
-		working.discard(module)
+		route = next(iter(working))
+		module = importlib.import_module(str(route))
+		process(stack, roles[0], module)
+		working.discard(route)
+		yield route
 
 		for deps in inverse[module]:
 			tree[deps].discard(module)
 			if not tree[deps]:
 				working.add(deps)
 				del tree[deps]
+
+class Construction(libio.Processor):
+	"""
+	Construction process manager. Maintains the set of target modules to construct and
+	dispatches the work to be performed for completion.
+	"""
+
+	def __init__(self, context, modules):
+		self.cxnctx = context
+		self.modules = modules
+		# Manages the dependency order.
+		self.sequence = sequence([x[1] for x in modules])
+
+		self.tracking = collections.defaultdict(list) # module -> sequence of sets of tasks
+		self.progress = collections.Counter()
+
+		self.process_count = 0 # Track available subprocess slots.
+		self.process_limit = 4
+		self.command_queue = collections.deque()
+
+		self.continued = False
+		self.activity = set()
+		super().__init__()
+
+	def actuate(self):
+		super().actuate()
+		try:
+			modules = next(self.sequence) # WorkingSet
+		except StopIteration:
+			self.terminate()
+			return
+
+		for x in modules:
+			self.collect(x)
+
+		self.drain_process_queue()
+		self.actuated = True
+
+	def collect(self, module):
+		"""
+		Collect all the work to be done for building the desired targets.
+		"""
+		ctx = initialize('inherit', 'optimal', module)
+		xf = list(transform(ctx, None))
+		rd = list(reduce(ctx))
+		self.tracking[module].extend((xf, rd))
+
+		if self.tracking[module]:
+			self.progress[module] = -1
+			self.dispatch(module)
+		else:
+			self.activity.add(module)
+
+			if self.continued is False:
+				# Consolidate loading of the next set of processors.
+				self.continued = True
+				self.context.enqueue(self.continuation)
+
+	def process_execute(self, instruction):
+		module, (typ, cmd, log) = instruction
+		assert typ == 'execute'
+		strcmd = tuple(map(str, cmd))
+
+		with log.open('wb') as f:
+			f.write(b'[Command]\n')
+			f.write(' '.join(strcmd).encode('utf-8'))
+			f.write(b'\n\n[Standard Error]\n')
+
+			ki = libsys.KInvocation(str(cmd[0]), strcmd)
+			with open('/dev/null', 'rb') as ci, open('/dev/null', 'wb') as co:
+				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(),1), (f.fileno(),2)))
+				sp = libio.Subprocess(pid)
+
+		self.sector.dispatch(sp)
+		sp.atexit(functools.partial(self.process_exit, start=libtime.now(), descriptor=(typ, cmd, log), module=module))
+
+	def process_exit(self, processor, start=None, module=None, descriptor=None):
+		assert module is not None
+		assert descriptor is not None
+		self.progress[module] += 1
+		self.process_count -= 1
+		self.activity.add(module)
+
+		typ, cmd, log = descriptor
+		pid, status = processor.only
+		with log.open('a') as f:
+			f.write('\n[Profile]\n')
+			f.write('/factor\n\t%s\n' %(module.__name__,))
+
+			if log.points[-1] != 'reduction':
+				f.write('/subject\n\t%s\n' %('/'.join(log.points),))
+			else:
+				f.write('/subject\n\treduction\n')
+
+			f.write('/pid\n\t%d\n' %(pid,))
+			f.write('/status\n\t%s\n' %(str(status),))
+			f.write('/start\n\t%s\n' %(start.select('iso'),))
+			f.write('/stop\n\t%s\n' %(libtime.now().select('iso'),))
+
+		if self.continued is False:
+			# Consolidate loading of the next set of processors.
+			self.continued = True
+			self.context.enqueue(self.continuation)
+
+	def drain_process_queue(self):
+		# Process slots may have been cleared, run more if possible.
+		nitems = len(self.command_queue)
+		if nitems > 0:
+			# Identify number of processes to spawn.
+			# &process_exit decrements the process_count, so the available
+			# logical slots are normally the selected count. Minimize
+			# on the number of items in the &command_queue.
+			pcount = min(self.process_limit - self.process_count, nitems)
+			for x in range(pcount):
+				cmd = self.command_queue.popleft()
+				self.process_execute(cmd)
+				self.process_count += 1
+
+	def continuation(self):
+		"""
+		Process exits occurred, manage continuation of work.
+		"""
+		# Reset continuation
+		self.continued = False
+		modules = list(self.activity)
+		self.activity.clear()
+
+		completions = set()
+
+		for x in modules:
+			tracking = self.tracking[x]
+			if not tracking:
+				# Empty tracking sets.
+				completions.add(x)
+				continue
+
+			if self.progress[x] >= len(tracking[0]):
+				# Pop action set.
+				del tracking[0]
+				self.progress[x] = -1
+
+				if not tracking:
+					# Complete.
+					completions.add(x)
+				else:
+					# dispatch new set of instructions.
+					self.dispatch(x)
+			else:
+				# Nothing to be done; likely waiting on more
+				# process exits in order to complete the task set.
+				pass
+
+		if completions:
+			self.finish(completions)
+
+		self.drain_process_queue()
+
+	def dispatch(self, module):
+		"""
+		Process the collected work for the module.
+		"""
+		assert self.progress[module] == -1
+		self.progress[module] = 0
+
+		for x in self.tracking[module][0]:
+			if x[0] == 'execute':
+				self.command_queue.append((module, x))
+			elif x[0] == 'directory':
+				for y in x[1:]:
+					y.init('directory')
+				self.progress[module] += 1
+			elif x[0] == 'link':
+				cmd, src, dst = x
+				dst.link(src)
+			else:
+				print('unknown instruction', x)
+
+		if self.progress[module] >= len(self.tracking[module][0]):
+			self.activity.add(module)
+
+			if self.continued is False:
+				self.continued = True
+				self.context.enqueue(self.continuation)
+
+	def finish(self, modules):
+		try:
+			for x in modules:
+				del self.progress[x]
+				del self.tracking[x]
+
+			new = self.sequence.send(modules)
+			for x in new:
+				self.collect(x)
+		except StopIteration:
+			self.terminate()
+
+	def terminate(self, by=None):
+		# Manages the dispatching of processes,
+		# so termination is immediate.
+		self.terminating = False
+		self.terminated = True
+		self.controller.exited(self)

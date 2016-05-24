@@ -8,6 +8,8 @@ import contextlib
 import itertools
 import py_compile
 import importlib.machinery
+import functools
+import collections
 
 from .. import libconstruct
 from .. import library as libdev
@@ -29,44 +31,22 @@ def status(message):
 		ms = duration.select('millisecond', 'second')
 		sys.stderr.write(' ' + str(seconds) + '.' + str(ms) + '\n')
 
-def mount(role, route, target, ext_suffixes=importlib.machinery.EXTENSION_SUFFIXES):
-	# system.extension being built for this Python
-	# construct links to optimal.
-	# ece's use a special context derived from the Python install
-	# usually consistent with the triplet of the first ext suffix.
-
-	outfile = target.output(context=libconstruct.python_triplet, role=role)
-
-	# peel until it's outside the first extensions directory.
-	pkg = route
-	while pkg.identifier != 'extensions':
-		pkg = pkg.container
-	names = route.absolute[len(pkg.absolute):]
-	pkg = pkg.container
-
-	link_target = pkg.file().container.extend(names)
-	for suf in ext_suffixes:
-		rmf = link_target.suffix(suf)
-		if rmf.exists():
-			print('removing', str(rmf))
-			rmf.void()
-
-	dsym = link_target.suffix('.so.dSYM')
-	if dsym.exists():
-		print('removing', str(dsym))
-		dsym.void()
-
-	link_target = link_target.suffix(ext_suffixes[0])
-	print('linking', outfile, '->', link_target)
-	link_target.link(outfile, relative=True)
-
-def main(*args, role='optimal', mount_extensions=True):
+def main(sector, role='optimal', mount_extensions=True):
 	"""
 	Prepare the entire package building factor targets and writing bytecode.
 	"""
-	dont_write_bytecode = os.environ.get('PYTHONDONTWRITEBYTECODE') == '1'
-	reconstruct = os.environ.get('FAULT_RECONSTRUCT') == '1'
-	role = os.environ.get('FAULT_ROLE', role) or role
+	proc = sector.context.process
+	args = proc.invocation.parameters['system']['arguments']
+	env = proc.invocation.parameters['system'].get('environment')
+	if not env:
+		env = os.environ
+
+	dont_write_bytecode = env.get('PYTHONDONTWRITEBYTECODE') == '1'
+	reconstruct = env.get('FAULT_RECONSTRUCT') == '1'
+
+	process = functools.partial(libconstruct.update, reconstruct=reconstruct)
+	role = env.get('FAULT_ROLE', role) or role
+	stack = contextlib.ExitStack()
 
 	# collect packages to prepare from positional parameters
 	roots = [
@@ -87,14 +67,43 @@ def main(*args, role='optimal', mount_extensions=True):
 					if fp.endswith('.py'):
 						py_compile.compile(fp)
 
-		for target in packages:
-			tm = target.module()
-			if isinstance(tm, libdev.Sources):
-				with status(str(target)):
-					libconstruct.update(role, tm, reconstruct=reconstruct)
+		# Identify all system modules in project/context package.
+		root_system_modules = []
 
-				if mount_extensions and getattr(tm, 'execution_context_extension', None):
-					mount(role, target, tm)
+		for target in packages:
+			tm = importlib.import_module(str(target))
+			if isinstance(tm, libdev.Sources) and getattr(tm, 'constructed', None):
+				# libdev.Sources and is identified as being constructed.
+				root_system_modules.append((target, tm))
+
+		if mount_extensions:
+			# Construct a separate list of Python extensions for subsequent mounting.
+			exe_ctx_extensions = []
+
+			# Collect extensions to be mounted into a package module.
+			for target, tm in root_system_modules:
+				if getattr(tm, 'execution_context_extension', None):
+					exe_ctx_extensions.append((target, tm))
+		else:
+			exe_ctx_extensions = ()
+
+		if 1:
+			cxn = libconstruct.Construction(None, root_system_modules)
+			sector.dispatch(cxn)
+		else:
+			completed = set()
+			with status(str(route)):
+				for target, tm in root_system_modules:
+					if str(target) in completed:
+						continue
+
+					for x in libconstruct.mapmodules(process, stack, target, (role,)):
+						# process = libconstruct.update
+						completed.add(str(x))
+
+			for target, tm in exe_ctx_extensions:
+				libconstruct.mount(role, target, tm)
 
 if __name__ == '__main__':
-	main(*sys.argv[1:])
+	from ...io import libcommand
+	libcommand.execute()

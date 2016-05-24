@@ -1,15 +1,15 @@
 """
 Update a project's factors and perform its tests.
 """
+import sys
 import functools
 from . import prepare
 from . import test
 
 def main(*args):
-	global prepare, test
-	prepare.main(*args, role='test', mount_extensions=False)
-	for pkg in args:
-		test.main(pkg, ())
+	return
+	prepcmd = '.'.join((__package__, 'prepare'))
+	testcmd = '.'.join((__package__, 'test'))
 
 if __name__ == '__main__':
 	import sys

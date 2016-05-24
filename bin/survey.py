@@ -7,6 +7,8 @@ directory, surveyed information, and the remainder being packages to test.
 import sys
 import functools
 
+from . import prepare
+
 from .. import library as libdev
 from .. import libsurvey
 
@@ -15,6 +17,8 @@ from ...system import libcore
 def main(target_dir, packages):
 	# Set test role. Per project?
 	# libconstruct.role = 'test'
+	prepare.main(*packages, role='survey', mount_extensions=False)
+
 	target_fsdict = libsurvey.libfs.Dictionary.create(
 		libsurvey.libfs.Hash('fnv1a_32', depth=1), target_dir
 	)

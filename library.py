@@ -22,7 +22,7 @@ roles = {
 def python_context(implementation, version_info, abiflags, platform):
 	"""
 	Construct the triplet representing the Python context for the platform.
-	Used to define the context for Python extension modules.
+	Used to define the construction context for Python extension modules.
 	"""
 	pyversion = ''.join(map(str, version_info[:2]))
 	return '-'.join((implementation, pyversion + abiflags, platform))
@@ -169,6 +169,7 @@ class Sources(types.ModuleType):
 	"""
 	Base class for factors that consist of a set of source files.
 	"""
+	constructed = False
 
 	@property
 	def identifier(self):
@@ -182,8 +183,7 @@ class Sources(types.ModuleType):
 		"""
 		The directory containing the sources of the factor.
 		"""
-
-		return self.factor.route.file().container / 'src'
+		return libroutes.File.from_absolute(self.__file__).container / 'src'
 
 	def dependencies(self):
 		"""

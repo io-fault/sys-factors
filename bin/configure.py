@@ -23,7 +23,7 @@ from ...system import libexecute
 from ...xml import library as libxml
 from .. import libprobe
 
-Sequencing = libprobe.Sequencing
+Sequencing = libexecute.Sequencing
 Feature = libexecute.Feature
 
 command_output = Feature.construct(
@@ -71,6 +71,17 @@ unix_linker_v1 = [
 		)),
 		libexecute.File,
 	),
+
+	Feature.construct(
+		'options',
+		functools.partial(Sequencing.options,
+			strip='-dead_strip_dylibs',
+			log_links=('' if sys.platform != 'darwin' else '-t'),
+		),
+		libexecute.String,
+	),
+
+	#('-undefined', 'dynamic_lookup',)
 
 	Feature.construct(
 		'type',
@@ -176,12 +187,11 @@ unix_c_compiler_v1 = [
 		functools.partial(Sequencing.options,
 			debug='-g',
 			# gcc
-			coverage='-fcoverage-mapping',
+			#coverage='-ftest-coverage',
 			#profile='-fprofile-arcs',
-			profile='-fprofile-instr-generate',
 			# clang
-			#profile='-fprofile-instr-generate',
-			#coverage='-fcoverage-mapping',
+			profile='-fprofile-instr-generate',
+			coverage='-fcoverage-mapping',
 			assembly='-c',
 			position_independent='-fPIC',
 			wrap_signed_overflow='-fwrapv',
@@ -350,23 +360,6 @@ pyrex_compilers = {
 	'cython': pyrex_compiler_v1,
 }
 
-if 0:
-	# Darwin
-	#'-dead_strip_dylibs'
-
-	# dynamic links
-	if loader is None:
-		# Assume unknown or unimportant.
-		# Many platforms don't require knowledge of the loader.
-		tflags = ('-bundle', '-undefined', 'dynamic_lookup',)
-	else:
-		tflags = ('-bundle', '-bundle_loader', loader,)
-
-if 0:
-	# shared, soname'd with version ("libname.so.M.N")
-	vstr = '.'.join(map(str, version[:2]))
-	tflags = ('-shared', '-soname',  '.so.'.join((name, vstr)))
-
 def isolate(self, target):
 	dtarget = target + '.dSYM'
 	return dtarget, [
@@ -383,9 +376,9 @@ def isolate(self, target):
 	debug = b + '.debug'
 
 	return [
-		(oc, '--only-keep-debug', target, os.path.join(d, debug)),
+		(objcopy, '--only-keep-debug', target, os.path.join(d, debug)),
 		(strip, '--strip-debug', '--strip-unneeded', target),
-		(oc, '--add-gnu-debuglink', target, debug),
+		(objcopy, '--add-gnu-debuglink', target, debug),
 	]
 
 def compiler(ident, route, language, features, role, standard=None):
@@ -427,6 +420,9 @@ def linker(identifier, route, features, target):
 		'system.library.directories': [],
 		'system.library.set': [],
 		'darwin.framework.directories': [],
+		'options': {
+			'log_links': True,
+		},
 		'input': [],
 	}
 
@@ -467,7 +463,7 @@ def matrix(role, paths, identifier='system.development'):
 	else:
 		# no preferred compiler
 		if not present:
-			print("No C compiler executable found; LLVM's clang is recommended")
+			print("No C compiler executable found; LLVM's clang is recommendeded")
 			raise SystemExit(202)
 		else:
 			# no preferred compilers available.
@@ -500,7 +496,7 @@ def matrix(role, paths, identifier='system.development'):
 	d['input'].append('/usr/lib/crt1.o')
 	d['type'] = 'executable'
 
-	# library weak link
+	# link time reference code sets
 	ll = 'link.system.library'
 	cmd = linker(ll, lpath, unix_linker_v1, 'library')
 	m.commands[cmd.identifier] = cmd

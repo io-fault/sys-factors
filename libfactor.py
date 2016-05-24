@@ -82,7 +82,7 @@ def cache_directory(module, context, role, subject):
 	(fs-directory)`__pycache__` directory.
 	"""
 	# Get a route to a directory in __pycache__.
-	return module.factor.route.cache() / context / role / subject
+	return module.sources.container / '__pycache__' / context / role / subject
 
 class ProbeModule(libdev.Sources):
 	"""
@@ -107,6 +107,7 @@ class ProbeModule(libdev.Sources):
 		Return the route to the probe's recorded report.
 		"""
 		return cache_directory(self, context, role, 'report')
+	output=cache
 
 	def record(self, report, context=None, role=None):
 		"""
@@ -125,9 +126,9 @@ class ProbeModule(libdev.Sources):
 		return pickle.load(str(self.cache(context, role)))
 
 	@staticmethod
-	def report(probe, module, role):
+	def report(probe, context):
 		"""
-		Return the report data of the given probe.
+		Return the report data of the probe for the given &context.
 
 		This method is called whenever a dependency accesses the report for supporting
 		the construction of a target. Probe modules can override this method in
@@ -136,10 +137,10 @@ class ProbeModule(libdev.Sources):
 		return {}
 
 	@staticmethod
-	def deploy(probe, module, role):
+	def deploy(probe, context):
 		"""
-		Cause the probe to activate its sensors to collect compilation and link parameters
-		from the system.
+		Cause the probe to activate its sensors to collect information
+		from the system that will be later fetched with &report.
 
 		Probe modules usually define this as a function in the module body.
 		"""
@@ -167,6 +168,7 @@ class SystemModule(libdev.Sources):
 	Module class representing a system object: executable, shared library, static library, and
 	archive files.
 	"""
+	constructed = True
 
 	def extension_name(self):
 		"""
@@ -206,6 +208,40 @@ class SystemModule(libdev.Sources):
 	def compilation_parameters(self, role, language):
 		return {}
 
+merge_operations = {
+	set: set.update,
+	dict: dict.update,
+	list: list.extend,
+	int: int.__add__,
+	tuple: (lambda x, y: x + tuple(y)),
+	str: (lambda x, y: y), # override strings
+	tuple: (lambda x, y: y), # override tuple sequences
+	None.__class__: (lambda x, y: y),
+}
+
+def merge(parameters, source, operations = merge_operations):
+	"""
+	Merge the given &source into &self applying merge operations
+	defined for keys or the classes of the destinations' keys.
+	"""
+	for key in source:
+		if key in parameters:
+			if key in operations:
+				# merge operation overloaded by key
+				mokey = key
+			else:
+				# merge parameters by class
+				mokey = parameters[key].__class__
+
+			merge_op = operations[mokey]
+
+			# DEFECT: The manipulation methods often return None.
+			r = merge_op(parameters[key], source[key])
+			if r is not parameters[key] and r is not None:
+				parameters[key] = r
+		else:
+			parameters[key] = source[key]
+
 def load(typ):
 	"""
 	Load a development factor performing a build when needed.
@@ -218,8 +254,10 @@ def load(typ):
 
 	if typ == 'system.probe':
 		module.__class__ = ProbeModule
+		module.system_object_type = 'probe'
 	elif typ == 'system.includes':
 		module.__class__ = IncludesModule
+		module.system_object_type = 'includes'
 	else:
 		module.__class__ = SystemModule
 		if typ == 'system.extension':
@@ -234,7 +272,6 @@ def load(typ):
 						break
 			else:
 				module.execution_context_extension = False
+		module.system_object_type = typ[typ.find('.')+1:]
 
-	module.system_object_type = typ
 	module._init()
-

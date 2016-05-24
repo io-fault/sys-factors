@@ -184,12 +184,6 @@ def sysctl(route, names):
 	pass
 	# <x:limit/>
 
-class Sequencing(libexecute.Sequencing):
-	"""
-	Command Sequencing methods for &.libconstruct.
-	"""
-	pass
-
 def includes(
 		matrix:libexecute.Matrix,
 		compiler:collections.abc.Hashable,

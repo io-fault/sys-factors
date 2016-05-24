@@ -24,7 +24,7 @@ do { \
 #endif
 
 #define _py_INIT_FUNC_X(BN) CONCAT_IDENTIFIER(PyInit_, BN)
-#define _py_INIT_FUNC _py_INIT_FUNC_X(MODULE_BASENAME)
+#define _py_INIT_FUNC _py_INIT_FUNC_X(FACTOR_BASENAME)
 
 #if PY_MAJOR_VERSION > 2
 /*
@@ -63,7 +63,7 @@ do { \
 	} \
 } while(0)
 #else
-#define _py_INIT_COMPAT CONCAT_IDENTIFIER(init, MODULE_BASENAME)
+#define _py_INIT_COMPAT CONCAT_IDENTIFIER(init, FACTOR_BASENAME)
 /*
  * Python 2.x
  */
