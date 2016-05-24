@@ -44,7 +44,6 @@ def main(sector, role='optimal', mount_extensions=True):
 	dont_write_bytecode = env.get('PYTHONDONTWRITEBYTECODE') == '1'
 	reconstruct = env.get('FAULT_RECONSTRUCT') == '1'
 
-	process = functools.partial(libconstruct.update, reconstruct=reconstruct)
 	role = env.get('FAULT_ROLE', role) or role
 	stack = contextlib.ExitStack()
 
@@ -87,22 +86,11 @@ def main(sector, role='optimal', mount_extensions=True):
 		else:
 			exe_ctx_extensions = ()
 
-		if 1:
-			cxn = libconstruct.Construction(None, root_system_modules)
-			sector.dispatch(cxn)
-		else:
-			completed = set()
-			with status(str(route)):
-				for target, tm in root_system_modules:
-					if str(target) in completed:
-						continue
+		for target, tm in exe_ctx_extensions:
+			libconstruct.mount(role, target, tm)
 
-					for x in libconstruct.mapmodules(process, stack, target, (role,)):
-						# process = libconstruct.update
-						completed.add(str(x))
-
-			for target, tm in exe_ctx_extensions:
-				libconstruct.mount(role, target, tm)
+		cxn = libconstruct.Construction(None, root_system_modules)
+		sector.dispatch(cxn)
 
 if __name__ == '__main__':
 	from ...io import libcommand
