@@ -678,6 +678,7 @@ def reduce(context):
 	objdir = locs['objects']
 	objects = [
 		libroutes.File(objdir, x.points) for x in context['sources']
+		if x.extension not in {'h'}
 	]
 
 	yield ('execute', link_editor(context, output, objects), locs['logs'] / 'reduction')
