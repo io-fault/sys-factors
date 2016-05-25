@@ -31,6 +31,12 @@ def status(message):
 		ms = duration.select('millisecond', 'second')
 		sys.stderr.write(' ' + str(seconds) + '.' + str(ms) + '\n')
 
+def set_exit_code(cxn, unit=None):
+	"""
+	Report the number of failures.
+	"""
+	unit.result = min(cxn.non_zero_exits, 201)
+
 def main(sector, role='optimal', mount_extensions=True):
 	"""
 	Prepare the entire package building factor targets and writing bytecode.
@@ -91,6 +97,7 @@ def main(sector, role='optimal', mount_extensions=True):
 
 		cxn = libconstruct.Construction(None, root_system_modules)
 		sector.dispatch(cxn)
+		cxn.atexit(functools.partial(set_exit_code, unit=sector.unit))
 
 if __name__ == '__main__':
 	from ...io import libcommand
