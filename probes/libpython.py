@@ -27,12 +27,12 @@ python_library = 'python' + python_library_suffix
 python_include_directory = sysconfig.get_config_var('INCLUDEPY')
 python_library_directory = sysconfig.get_config_var('LIBDIR')
 
-def report(probe, context):
+def report(probe, role, module):
 	return {
 		'system.library.set': (python_library,),
 		'system.library.directories': (python_library_directory,),
 		'system.include.directories': (python_include_directory,),
 	}
 
-def deploy(probe, context):
+def deploy(probe, role, module):
 	pass

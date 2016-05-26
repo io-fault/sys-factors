@@ -21,6 +21,7 @@ import types
 from . import core
 from . import library as libdev
 from ..computation import libmatch
+from ..routes import library as libroutes
 
 selections = None
 
@@ -94,20 +95,22 @@ class ProbeModule(libdev.Sources):
 	but referenced by the module body itself as resources used to define or support sensors.
 	"""
 
-	@property
-	def parameters(self):
-		"""
-		Attribute set by probe modules declaring parameters accepted by the probe.
-		Probe parameters allow defaults to be overridden in a well-defined manner.
-		"""
-		return None
-
 	def cache(self, context=None, role=None):
 		"""
 		Return the route to the probe's recorded report.
 		"""
-		return cache_directory(self, context, role, 'report')
+		f = libroutes.File.from_absolute(self.__cached__)
+		last_dot = self.__name__.rfind('.')
+		path = f.container / self.__name__[last_dot+1:] / context / role
+		return path
 	output=cache
+
+	@staticmethod
+	def key(probe, role, module):
+		"""
+		The key used to cache the report (&deploy results) at.
+		"""
+		return None
 
 	def record(self, report, context=None, role=None):
 		"""
@@ -126,7 +129,7 @@ class ProbeModule(libdev.Sources):
 		return pickle.load(str(self.cache(context, role)))
 
 	@staticmethod
-	def report(probe, context):
+	def report(probe, role, module):
 		"""
 		Return the report data of the probe for the given &context.
 
@@ -137,7 +140,7 @@ class ProbeModule(libdev.Sources):
 		return {}
 
 	@staticmethod
-	def deploy(probe, context):
+	def deploy(probe, role, module):
 		"""
 		Cause the probe to activate its sensors to collect information
 		from the system that will be later fetched with &report.

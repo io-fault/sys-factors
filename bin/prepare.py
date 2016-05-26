@@ -35,7 +35,8 @@ def set_exit_code(cxn, unit=None):
 	"""
 	Report the number of failures.
 	"""
-	unit.result = min(cxn.non_zero_exits, 201)
+	# Restrict revealed count to 201. The exit code is rather small.
+	unit.result = min(cxn.failures, 201)
 
 def main(sector, role='optimal', mount_extensions=True):
 	"""
@@ -50,6 +51,7 @@ def main(sector, role='optimal', mount_extensions=True):
 	dont_write_bytecode = env.get('PYTHONDONTWRITEBYTECODE') == '1'
 	reconstruct = env.get('FAULT_RECONSTRUCT') == '1'
 
+	context_name = None
 	role = env.get('FAULT_ROLE', role) or role
 	stack = contextlib.ExitStack()
 
@@ -95,7 +97,7 @@ def main(sector, role='optimal', mount_extensions=True):
 		for target, tm in exe_ctx_extensions:
 			libconstruct.mount(role, target, tm)
 
-		cxn = libconstruct.Construction(None, root_system_modules)
+		cxn = libconstruct.Construction(context_name, role, root_system_modules)
 		sector.dispatch(cxn)
 		cxn.atexit(functools.partial(set_exit_code, unit=sector.unit))
 

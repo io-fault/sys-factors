@@ -1,5 +1,6 @@
 """
-Management of target construction jobs using &.libprobe command Matrices.
+Management of target construction jobs for creating system [context] executable,
+libraries, and extensions.
 
 [ Properties ]
 
@@ -214,25 +215,6 @@ def identity(module):
 
 	return basename
 
-def render(matrix:libexecute.Matrix, ref, *parameters):
-	"""
-	Generator managing the instantiation of &libsys.KInvocation instances
-	used to create the target.
-
-	A single temporary directory with a set of job directories created for
-	each task that's ran in order to build the target.
-	"""
-	for p in parameters:
-		for k, v in p.items():
-			ref.update(k, v)
-
-	cenv, route, args = ref.render()
-	env = {}
-	env.update(matrix.environment)
-	env.update(cenv)
-
-	return route, args, env
-
 def unix_compiler_collection(context, output, inputs,
 		collection=True, # Assume the command is a compiler collection.
 		verbose=True, # Enable verbose output.
@@ -313,7 +295,7 @@ def unix_compiler_collection(context, output, inputs,
 	command.extend([sid_flag + str(x) for x in sid])
 
 	# -include files. Forced inclusion.
-	sis = get('include.set', ())
+	sis = get('include.set') or ()
 	for x in sis:
 		command.extend((si_flag, x))
 
@@ -561,7 +543,7 @@ def initialize(context:str, role:str, module:libdev.Sources):
 	parameters['system.library.directories'] = [parameters['locations']['libraries']]
 
 	for probe in probes:
-		report = probe.report(probe, context)
+		report = probe.report(probe, role, module)
 		libfactor.merge(parameters, report) # probe parameter merge
 
 	for lib in libs:
@@ -700,11 +682,17 @@ class Construction(libio.Processor):
 	"""
 	Construction process manager. Maintains the set of target modules to construct and
 	dispatches the work to be performed for completion.
+
+	! DEVELOPER:
+		Primarily, this class traverses the directed graph constructed by imports
+		performed by the target modules being built. It works specifically with
+		&.libfactor.load modules, and should be generalized.
 	"""
 
-	def __init__(self, context, modules):
-		self.non_zero_exits = 0
-		self.cxnctx = context
+	def __init__(self, context, role, modules):
+		self.failures = 0
+		self.cx_context = context
+		self.cx_role = role
 		self.modules = modules
 		# Manages the dependency order.
 		self.sequence = sequence([x[1] for x in modules])
@@ -721,7 +709,6 @@ class Construction(libio.Processor):
 		super().__init__()
 
 	def actuate(self):
-		super().actuate()
 		try:
 			modules = next(self.sequence) # WorkingSet
 		except StopIteration:
@@ -732,16 +719,31 @@ class Construction(libio.Processor):
 			self.collect(x)
 
 		self.drain_process_queue()
-		self.actuated = True
+		return super().actuate()
 
 	def collect(self, module):
 		"""
 		Collect all the work to be done for building the desired targets.
 		"""
-		ctx = initialize('inherit', 'optimal', module)
-		xf = list(transform(ctx, None))
-		rd = list(reduce(ctx))
-		self.tracking[module].extend((xf, rd))
+		context = self.cx_context # [construction] context name
+		if context is None:
+			if getattr(module, 'execution_context_extension', False):
+				context = python_triplet
+			else:
+				# Default 'host' context.
+				context = 'inherit'
+		else:
+			# context was explicitly stated meaning
+			# extension modules are built for mounting.
+			pass
+
+		if isinstance(module, libfactor.ProbeModule):
+			module.deploy(module, None, self.cx_role)
+		else:
+			ctx = initialize(context, self.cx_role, module)
+			xf = list(transform(ctx, None))
+			rd = list(reduce(ctx))
+			self.tracking[module].extend((xf, rd))
 
 		if self.tracking[module]:
 			self.progress[module] = -1
@@ -752,7 +754,7 @@ class Construction(libio.Processor):
 			if self.continued is False:
 				# Consolidate loading of the next set of processors.
 				self.continued = True
-				self.context.enqueue(self.continuation)
+				self.fio_enqueue(self.continuation)
 
 	def process_execute(self, instruction):
 		module, (typ, cmd, log) = instruction
@@ -783,7 +785,7 @@ class Construction(libio.Processor):
 		pid, status = processor.only
 		exit_method, exit_code, core_produced = status
 		if exit_code != 0:
-			self.non_zero_exits += 1
+			self.failures += 1
 
 		with log.open('a') as f:
 			f.write('\n[Profile]\n')
@@ -802,7 +804,7 @@ class Construction(libio.Processor):
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.
 			self.continued = True
-			self.context.enqueue(self.continuation)
+			self.fio_enqueue(self.continuation)
 
 	def drain_process_queue(self):
 		# Process slots may have been cleared, run more if possible.
@@ -883,7 +885,7 @@ class Construction(libio.Processor):
 
 			if self.continued is False:
 				self.continued = True
-				self.context.enqueue(self.continuation)
+				self.fio_enqueue(self.continuation)
 
 	def finish(self, modules):
 		try:
