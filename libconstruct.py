@@ -208,7 +208,7 @@ def sequence(modules):
 	new = working
 
 	while working:
-		completion = (yield tuple(new))
+		completion = (yield tuple(new), {x: tuple(inverse[x]) for x in new if inverse[x]})
 		new = set() # &completion triggers new additions to &working
 
 		for module in completion:
@@ -744,22 +744,24 @@ class Construction(libio.Processor):
 
 	def actuate(self):
 		try:
-			modules = next(self.sequence) # WorkingSet
+			modules, deps = next(self.sequence) # WorkingSet
 		except StopIteration:
 			self.terminate()
 			return
 
 		for x in modules:
-			self.collect(x)
+			self.collect(x, deps.get(x, ()))
 
 		self.drain_process_queue()
 		return super().actuate()
 
-	def collect(self, module):
+	def collect(self, module, dependencies=()):
 		"""
 		Collect all the work to be done for building the desired targets.
 		"""
 		context = self.cx_context # [construction] context name
+		tracks = self.tracking[module]
+
 		if context is None:
 			if getattr(module, 'execution_context_extension', False):
 				context = python_triplet
@@ -772,14 +774,17 @@ class Construction(libio.Processor):
 			pass
 
 		if isinstance(module, libfactor.ProbeModule):
-			module.deploy(module, None, self.cx_role)
+			# Needs to be transformed into a job.
+			# Probes are deployed per dependency.
+			probe_set = [('probe', module, x) for x in dependencies]
+			tracks.append(probe_set)
 		else:
 			ctx = initialize(context, self.cx_role, module)
 			xf = list(transform(ctx, None))
 			rd = list(reduce(ctx))
-			self.tracking[module].extend((xf, rd))
+			tracks.extend((xf, rd))
 
-		if self.tracking[module]:
+		if tracks:
 			self.progress[module] = -1
 			self.dispatch(module)
 		else:
@@ -789,6 +794,27 @@ class Construction(libio.Processor):
 				# Consolidate loading of the next set of processors.
 				self.continued = True
 				self.fio_enqueue(self.continuation)
+
+	def probe_execute(self, module, instruction):
+		assert instruction[0] == 'probe'
+
+		sector = self.sector
+		dep = instruction[2]
+
+		key = module.key(module, self.cx_context or 'inherit', self.cx_role, dep)
+		reports = module.retrieve(self.cx_context or 'inherit', self.cx_role)
+
+		if key in reports:
+			# Needed report is cached.
+			self.progress[module] += 1
+		else:
+			xreport = module.deploy(module, self.cx_context or 'inherit', self.cx_role, dep)
+			reports[key] = xreport
+			if xreport is not None:
+				# &None indicates constant probe; &report will build on demand.
+				module.record(reports, self.cx_context or 'inherit', self.cx_role)
+
+			self.progress[module] += 1
 
 	def process_execute(self, instruction):
 		module, (typ, cmd, log) = instruction
@@ -911,6 +937,8 @@ class Construction(libio.Processor):
 				cmd, src, dst = x
 				dst.link(src)
 				self.progress[module] += 1
+			elif x[0] == 'probe':
+				self.probe_execute(module, x)
 			else:
 				print('unknown instruction', x)
 
@@ -927,9 +955,9 @@ class Construction(libio.Processor):
 				del self.progress[x]
 				del self.tracking[x]
 
-			new = self.sequence.send(modules)
+			new, deps = self.sequence.send(modules)
 			for x in new:
-				self.collect(x)
+				self.collect(x, deps.get(x, ()))
 		except StopIteration:
 			self.terminate()
 

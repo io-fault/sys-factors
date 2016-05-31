@@ -105,31 +105,38 @@ class ProbeModule(libdev.Sources):
 		return path
 	output=cache
 
-	@staticmethod
-	def key(probe, role, module):
-		"""
-		The key used to cache the report (&deploy results) at.
-		"""
-		return None
-
-	def record(self, report, context=None, role=None):
+	def record(self, reports, context=None, role=None):
 		"""
 		Record the report for subsequent runs.
 		"""
 		rf = self.cache(context, role)
 		rf.init('file')
-		import pickle
-		pickle.dump(data, str(rf))
 
-	def retrieve(self, report, context=None, role=None):
+		import pickle
+		with rf.open('wb') as f:
+			pickle.dump(reports, f)
+
+	def retrieve(self, context=None, role=None):
 		"""
 		Retrieve the stored data collected by the sensor.
 		"""
 		import pickle
-		return pickle.load(str(self.cache(context, role)))
+		rf = self.cache(context, role)
+		with rf.open('rb') as f:
+			try:
+				return pickle.load(f) or {}
+			except (FileNotFoundError, EOFError):
+				return {}
 
 	@staticmethod
-	def report(probe, role, module):
+	def key(probe, context, role, module):
+		"""
+		Construct a storage key for the report returned by &deploy.
+		"""
+		return None
+
+	@staticmethod
+	def report(probe, context, role, module):
 		"""
 		Return the report data of the probe for the given &context.
 
@@ -137,7 +144,9 @@ class ProbeModule(libdev.Sources):
 		the construction of a target. Probe modules can override this method in
 		order to provide parameter sets that depend on the target that is requesting them.
 		"""
-		return {}
+		key = probe.key(probe, context, role, module)
+		reports = probe.retrieve(context, role)
+		return reports[key]
 
 	@staticmethod
 	def deploy(probe, role, module):
