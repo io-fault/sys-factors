@@ -867,6 +867,11 @@ class Construction(libio.Processor):
 			self.fio_enqueue(self.continuation)
 
 	def drain_process_queue(self):
+		"""
+		After process slots have been cleared by &process_exit,
+		&continuation is called and performs this method to execute
+		system processes enqueued in &command_queue.
+		"""
 		# Process slots may have been cleared, run more if possible.
 		nitems = len(self.command_queue)
 		if nitems > 0:
@@ -882,7 +887,9 @@ class Construction(libio.Processor):
 
 	def continuation(self):
 		"""
-		Process exits occurred, manage continuation of work.
+		Process exits occurred that may trigger an addition to the working set of tasks.
+		Usually called indirectly by &process_exit, this manages the collection
+		of further work identified by the sequenced dependency tree managed by &sequence.
 		"""
 		# Reset continuation
 		self.continued = False
