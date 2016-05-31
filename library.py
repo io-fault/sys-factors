@@ -167,7 +167,7 @@ class Project(object):
 
 class Sources(types.ModuleType):
 	"""
-	Base class for factors that consist of a set of source files.
+	Class for factor modules that represent a set of source files.
 	"""
 	constructed = False
 
@@ -183,6 +183,7 @@ class Sources(types.ModuleType):
 		"""
 		The directory containing the sources of the factor.
 		"""
+		global libroutes
 		return libroutes.File.from_absolute(self.__file__).container / 'src'
 
 	def dependencies(self):
@@ -207,6 +208,7 @@ class DevelopmentException(Exception):
 	used to define errors that are ultimately caused by the development process
 	itself.
 	"""
+
 	def __init__(self, reference, message, **paramters):
 		self.reference = reference
 		self.message = message
