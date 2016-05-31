@@ -54,6 +54,40 @@ python_triplet = libdev.python_context(
 	sys.implementation.name, sys.version_info, sys.abiflags, sys.platform
 )
 
+merge_operations = {
+	set: set.update,
+	dict: dict.update,
+	list: list.extend,
+	int: int.__add__,
+	tuple: (lambda x, y: x + tuple(y)),
+	str: (lambda x, y: y), # override strings
+	tuple: (lambda x, y: y), # override tuple sequences
+	None.__class__: (lambda x, y: y),
+}
+
+def merge(parameters, source, operations = merge_operations):
+	"""
+	Merge the given &source into &self applying merge operations
+	defined for keys or the classes of the destinations' keys.
+	"""
+	for key in source:
+		if key in parameters:
+			if key in operations:
+				# merge operation overloaded by key
+				mokey = key
+			else:
+				# merge parameters by class
+				mokey = parameters[key].__class__
+
+			merge_op = operations[mokey]
+
+			# DEFECT: The manipulation methods often return None.
+			r = merge_op(parameters[key], source[key])
+			if r is not parameters[key] and r is not None:
+				parameters[key] = r
+		else:
+			parameters[key] = source[key]
+
 def compile_bytecode(target, source):
 	global importlib
 	pyc_cache = importlib.util.cache_from_source(source)
@@ -483,6 +517,7 @@ def initialize(context:str, role:str, module:libdev.Sources):
 	Given a &context name and a &role, initialize a construction context for producing the
 	target of the given &module.
 	"""
+	global merge
 
 	# Factor dependencies stated by imports.
 	td = list(module.dependencies())
@@ -543,8 +578,8 @@ def initialize(context:str, role:str, module:libdev.Sources):
 	parameters['system.library.directories'] = [parameters['locations']['libraries']]
 
 	for probe in probes:
-		report = probe.report(probe, role, module)
-		libfactor.merge(parameters, report) # probe parameter merge
+		report = probe.report(probe, 'inherit', role, module)
+		merge(parameters, report) # probe parameter merge
 
 	for lib in libs:
 		libname = identity(lib)

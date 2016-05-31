@@ -211,40 +211,6 @@ class SystemModule(libdev.Sources):
 	def compilation_parameters(self, role, language):
 		return {}
 
-merge_operations = {
-	set: set.update,
-	dict: dict.update,
-	list: list.extend,
-	int: int.__add__,
-	tuple: (lambda x, y: x + tuple(y)),
-	str: (lambda x, y: y), # override strings
-	tuple: (lambda x, y: y), # override tuple sequences
-	None.__class__: (lambda x, y: y),
-}
-
-def merge(parameters, source, operations = merge_operations):
-	"""
-	Merge the given &source into &self applying merge operations
-	defined for keys or the classes of the destinations' keys.
-	"""
-	for key in source:
-		if key in parameters:
-			if key in operations:
-				# merge operation overloaded by key
-				mokey = key
-			else:
-				# merge parameters by class
-				mokey = parameters[key].__class__
-
-			merge_op = operations[mokey]
-
-			# DEFECT: The manipulation methods often return None.
-			r = merge_op(parameters[key], source[key])
-			if r is not parameters[key] and r is not None:
-				parameters[key] = r
-		else:
-			parameters[key] = source[key]
-
 def load(typ):
 	"""
 	Load a development factor performing a build when needed.
