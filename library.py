@@ -198,3 +198,24 @@ class Sources(types.ModuleType):
 
 	def _init(self):
 		self.factor = Factor.from_fullname(self.__name__)
+
+class DevelopmentException(Exception):
+	"""
+	Base class for exceptions that are related to the development of software.
+
+	Development exceptions are used to classify a set of exceptions that are
+	used to define errors that are ultimately caused by the development process
+	itself.
+	"""
+	def __init__(self, reference, message, **paramters):
+		self.reference = reference
+		self.message = message
+		self.parameters = paramters
+
+	def __str__(self):
+		return self.message
+
+class PendingImplementationError(DevelopmentException):
+	"""
+	Raised in cases where the software does not yet exist.
+	"""
