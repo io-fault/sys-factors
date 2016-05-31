@@ -6,15 +6,21 @@ import sys
 import importlib
 
 from .. import libfactor
+from ..probes import libpython
+
 from ...routes import library as libroutes
 
 if __name__ == '__main__':
 	command, module_fullname, context, role, *files = sys.argv
-	if context == '-':
-		from ..libconstruct import python_triplet as context
 
 	ir = libroutes.Import.from_fullname(module_fullname)
 	target_module = importlib.import_module(str(ir)) # import "$1"
+	if context == '-':
+		if libpython in target_module.__dict__.values():
+			from ..libconstruct import python_triplet as context
+		else:
+			context = 'inherit'
+
 	logdir = libfactor.cache_directory(target_module, context, role, 'log')
 
 	if files:
