@@ -31,7 +31,6 @@ from .probes import libpython
 
 from ..chronometry import library as libtime
 from ..io import library as libio
-from ..system import libexecute
 from ..system import library as libsys
 from ..routes import library as libroutes
 
