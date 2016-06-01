@@ -4,6 +4,10 @@ libraries, and extensions.
 
 [ Properties ]
 
+/roles
+	Dictionary of construction roles used by libconstruct to manage different
+	transformations of &libdev.Sources modules.
+
 /library_extensions
 	Used by &library_filename to select the appropriate extension
 	for `system.library` and `system.extension` factors.
@@ -33,6 +37,19 @@ from ..chronometry import library as libtime
 from ..io import library as libio
 from ..system import library as libsys
 from ..routes import library as libroutes
+
+roles = {
+	'optimal': 'Maximum optimizations with debugging symbols separated or stripped',
+
+	'debug': 'Reduced optimizations and defines for debugging',
+	'test': 'Debug role with minor optimizations and support for injections',
+	'profile': 'Raw profiling for custom collections',
+	'coverage': 'Raw coverage for custom collections',
+
+	'survey': 'Test role with profiling and coverage collection enabled',
+
+	'introspection': 'Role for structuring coefficients (sources) into XML',
+}
 
 library_extensions = {
 	'msw': 'dll',

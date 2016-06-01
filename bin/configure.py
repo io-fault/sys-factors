@@ -33,10 +33,10 @@ compiler_collections = {
 	),
 }
 
-compiler_collection_preference = ('clang', 'cc',)
+compiler_collection_preference = ('clang', 'gcc', 'cl.exe')
 
 haskell_compilers = {
-	'ghc',
+	'ghc': ('haskell',),
 }
 
 assemblers = {
@@ -55,15 +55,6 @@ environment = {
 pyrex_compilers = {
 	'cython',
 }
-
-roles = (
-	'optimal', # Highest reasonable optimization level; subjective (size vs performance)
-	'debug', # Optimal with reduced optimizations for clear debugging.
-	'test', # debug with test role defines for enabling dependency injection
-	'profile', # raw profiling
-	'coverage', # raw coverage collection
-	'survey', # test + fault coverage + fault profile
-)
 
 def debug_isolate(self, target):
 	dtarget = target + '.dSYM'

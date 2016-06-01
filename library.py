@@ -7,18 +7,6 @@ import typing
 
 from ..routes import library as libroutes
 
-roles = {
-	'debug': 'Reduced optimizations and defines for debugging',
-	'survey': 'Test role for profiling and full coverage',
-	'test': 'Debug role with test defines for supporting a complete test set',
-
-	'factor': 'Maximum optimizations with debugging symbols separated or stripped',
-
-	'profile': 'Profiling enabled targets',
-
-	'introspection': 'Role for structuring source files into XML',
-}
-
 def python_context(implementation, version_info, abiflags, platform):
 	"""
 	Construct the triplet representing the Python context for the platform.
