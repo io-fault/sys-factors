@@ -407,12 +407,27 @@ def legacy_link_editor(context, output, inputs,
 		rpath_flag='-rpath',
 		soname_flag='-soname',
 		output_flag='-o',
-		type_map = {
+		type_map={
 			'executable': None,
 			'library': '-shared',
 			'extension': '-shared',
-			'collection': '-r',
+			'fragment': '-r',
 		},
+
+		static='-Bstatic',
+		shared='-Bshareable',
+
+		exe='crt1.o',
+		pie='Scrt1.o',
+
+		staticlib_start='crtbeginT.o',
+		static_end='crtend.o',
+
+		sharedlib_start='crtbeginS.o',
+		sharedlib_stop='crtendS.o',
+
+		libstart='crti.o',
+		libstop='crtn.o',
 	):
 	"""
 	Command constructor for the unix link editors.
