@@ -257,10 +257,12 @@ def unix_compiler_collection(context, output, inputs,
 		verbose_flag='-v',
 		language_flag='-x', standard_flag='-std',
 		emit_dependencies_flag='-M',
+		visibility='-fvisibility=hidden',
 
 		output_flag='-o',
 		compile_flag='-c',
-		sid_flag='-I', si_flag='-include',
+		sid_flag='-isystem',
+		id_flag='-I', si_flag='-include',
 		debug_flag='-g',
 		pic_flag='-fPIC',
 		co_flag='-O', define_flag='-D',
@@ -302,6 +304,8 @@ def unix_compiler_collection(context, output, inputs,
 		if standard is not None and standard_flag is not None:
 			command.append(standard_flag + '=' + standard)
 
+	command.append(visibility) # Encourage use of SYMBOL() define.
+
 	# -fPIC or not.
 	link_type = get('type', 'dynamic')
 	if link_type == 'dynamic':
@@ -325,7 +329,7 @@ def unix_compiler_collection(context, output, inputs,
 
 	# Include Directories; -I option.
 	sid = list(get('system.include.directories', ()))
-	command.extend([sid_flag + str(x) for x in sid])
+	command.extend([id_flag + str(x) for x in sid])
 
 	# -include files. Forced inclusion.
 	sis = get('include.set') or ()
