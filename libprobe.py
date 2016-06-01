@@ -45,8 +45,8 @@ import itertools
 import collections.abc
 import typing
 
+from . import libconstruct
 from ..routes import library as libroutes
-from ..system import libexecute
 
 def executables(
 		search_paths, xset:typing.Set[str]
@@ -79,7 +79,7 @@ def executables(
 	return rob, ws
 
 def libraries(
-		matrix:libexecute.Matrix,
+		interface,
 		libraries:typing.Sequence[str],
 		symbols:typing.Sequence[str],
 	):
@@ -97,8 +97,8 @@ def libraries(
 	pass
 
 def runtime(
-		matrix:libexecute.Matrix,
-		compiler:collections.abc.Hashable,
+		interface,
+		language:collections.abc.Hashable,
 		source:str,
 		libraries:typing.Sequence[str],
 		directories:typing.Sequence[str]=(),
@@ -141,17 +141,6 @@ def runtime(
 		lparams['input'].append(obj)
 		lparams['output'] = exe
 
-		compile_ref = libexecute.Reference(matrix, ccmd)
-		for k, p in params.items():
-			compile_ref.update(k, p)
-
-		if compile_only:
-			link_ref = None
-		else:
-			link_ref = libexecute.Reference(matrix, lcmd)
-			for k, p in lparams.items():
-				link_ref.update(k, p)
-
 		for ref in (compile_ref, link_ref):
 			if ref is None:
 				break
@@ -182,11 +171,10 @@ def sysctl(route, names):
 		The settings to get.
 	"""
 	pass
-	# <x:limit/>
 
 def includes(
-		matrix:libexecute.Matrix,
-		compiler:collections.abc.Hashable,
+		context,
+		language:collections.abc.Hashable,
 		includes:typing.Sequence[str],
 		directories:typing.Sequence[str]=(),
 		requisites:typing.Sequence[str]=(),
@@ -202,10 +190,10 @@ def includes(
 	perform the check.
 
 	[ Parameters ]
-	/matrix
-		The execution matrix with the desired environment and compiler command.
-	/compiler
-		The identifier of the &libexecute.Command instance in the &matrix.
+	/interface
+		The interface to the execution.
+	/language
+		The identifier of the language that is to be compiled.
 	/includes
 		A sequence of includes to test for. A sequence is used so that
 		dependencies may be included prior to the actual header or headers of interest.
@@ -222,7 +210,7 @@ def includes(
 		('#include <%s>\n' * len(includes)) %includes
 	])
 
-	runtime(matrix, compiler, reqs+includes+main, (), compile_only=True)
+	runtime(interface, language, reqs+includes+main, (), compile_only=True)
 	return True
 
 if __name__ == '__main__':
