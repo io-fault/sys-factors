@@ -1,6 +1,7 @@
 /*
  * Included once by the source file defining module initialization.
  */
+#include "../symbols.h"
 
 /* Appropriate way to define the method table for the module */
 #define METHODS() \
@@ -42,7 +43,7 @@ do { \
 		methods \
 	}; \
 	\
-	PyMODINIT_FUNC \
+	_fault_reveal_symbol PyMODINIT_FUNC \
 	_py_INIT_FUNC(void)
 
 #define CREATE_MODULE(MOD) \
@@ -75,7 +76,7 @@ do { \
 #define INIT(DOCUMENTATION) \
 	DEFINE_MODULE_GLOBALS \
 	static PyObject * _py_INIT_FUNC(void); /* prototype */ \
-	PyMODINIT_FUNC _py_INIT_COMPAT(void) \
+	_fault_reveal_symbol PyMODINIT_FUNC _py_INIT_COMPAT(void) \
 	{ PyObj mod; mod = _py_INIT_FUNC(); /* for consistent return() signature */ } \
 	static PyObject * _py_INIT_FUNC(void)
 
