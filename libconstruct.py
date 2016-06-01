@@ -644,8 +644,8 @@ def transform(context, type, filtered=(lambda x,y,z: False)):
 	commands = []
 	for src in context['sources']:
 		fnx = src.extension
-		if fnx in {'h'}:
-			# Ignore header files.
+		if fnx in {'h'} or src.identifier.startswith('.'):
+			# Ignore header files and dot-files.
 			continue
 
 		lang = languages.get(src.extension)
@@ -713,7 +713,7 @@ def reduce(context):
 	objdir = locs['objects']
 	objects = [
 		libroutes.File(objdir, x.points) for x in context['sources']
-		if x.extension not in {'h'}
+		if x.extension not in {'h'} and not x.identifier.startswith('.')
 	]
 
 	yield ('execute', link_editor(context, output, objects), locs['logs'] / 'reduction')
