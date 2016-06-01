@@ -48,14 +48,50 @@ import typing
 from . import libconstruct
 from ..routes import library as libroutes
 
-def executables(
+def fs_routes(i:typing.Iterator[str]) -> typing.Sequence[libroutes.File]:
+	"""
+	Construct a &list of &libroutes.File instances from the given
+	iterator of strings.
+	"""
+	global libroutes
+	return list(map(libroutes.File.from_absolute, i))
+
+def environ_paths(env='PATH', sep=os.pathsep):
+	"""
+	Construct a sequence of &libroutes.File instances to the paths stored
+	in an environment variable. &os.environ is referred to upon
+	each invocation, no caching is performed so each call represents
+	the latest version.
+
+	Defaults to `PATH`, &environ_paths can select an arbitrary environment variable
+	to structure using the &env keyword parameter.
+
+	This function exists to support &search as `search(environ_paths(), {...})` is
+	the most common use case.
+
+	[ Parameters ]
+	/env
+		The environment variable containing absolute paths.
+	/sep
+		The path separator to split the environment variable on.
+	"""
+	global os
+	global fs_routes
+
+	s = os.environ[env].split(sep)
+	seq = fs_routes(s)
+
+	return seq
+
+def search(
 		search_paths, xset:typing.Set[str]
 	) -> typing.Tuple[typing.Mapping[str, libroutes.File], typing.Set[str]]:
 	"""
-	Query the environment's paths for the given set of executables.
+	Query the sequence of search paths for the given set of files.
 
-	This returns all possibilities. All paths will be scanned for each requested
-	name in &xset.
+	All paths will be scanned for each requested identifier in &xset. When an identifier
+	is found to exist, it is removed from the set that is being scanned for causing
+	the first path match to be the one returned.
 	"""
 
 	ws = set(xset)
@@ -78,8 +114,17 @@ def executables(
 
 	return rob, ws
 
+def executables(xset:typing.Set[str]):
+	"""
+	Query the (env)`PATH` for executables with the exact name.
+	Returns a pair whose first item is the matches that currently exist,
+	and the second is the set of executables that were not found in the path.
+	"""
+	global search, environ_paths
+	return search(environ_paths(), xset)
+
 def libraries(
-		interface,
+		context,
 		libraries:typing.Sequence[str],
 		symbols:typing.Sequence[str],
 	):
@@ -87,8 +132,9 @@ def libraries(
 	Validate that the given libraries can be linked against an executable target.
 
 	[ Parameters ]
-	/matrix
-		The matrix to probe.
+
+	/context
+		The construction context.
 	/libraries
 		A sequence of strings identifying the shared libraries to link.
 	/symbols
@@ -97,7 +143,7 @@ def libraries(
 	pass
 
 def runtime(
-		interface,
+		context,
 		language:collections.abc.Hashable,
 		source:str,
 		libraries:typing.Sequence[str],
@@ -117,8 +163,6 @@ def runtime(
 	"""
 
 	output = None
-	ccmd = matrix.commands[compiler]
-	lcmd = matrix.commands[linker]
 
 	with libroutes.File.temporary() as tr:
 		src = tr/'source'
@@ -190,8 +234,8 @@ def includes(
 	perform the check.
 
 	[ Parameters ]
-	/interface
-		The interface to the execution.
+	/context
+		The construction context managing compilation.
 	/language
 		The identifier of the language that is to be compiled.
 	/includes
