@@ -399,7 +399,7 @@ def macosx_link_editor(context, output, inputs,
 	command.append('-lSystem')
 	return command
 
-def legacy_link_editor(context, output, inputs,
+def unix_link_editor(context, output, inputs,
 		verbose=True,
 		filepath=str,
 		verbose_flag='-v',
@@ -437,7 +437,8 @@ def legacy_link_editor(context, output, inputs,
 	(system:command[posix])`lorder` was apparently built long ago to alleviate this while
 	leaving the interface to (system:command[posix])`ld` to be continually unforgiving.
 
-	[ Parameters ]
+	[Parameters]
+
 	/filepath
 		Override to adjust the selected path. File paths passed are &libroutes.File
 		instances that are absolute paths. In cases where scripts are being generated,
@@ -466,30 +467,26 @@ def legacy_link_editor(context, output, inputs,
 
 	return command + [output_flag, output] + list(map(filepath, inputs)) + libs
 
-def llvm_link_editor(context):
-	"""
-	Abstraction for a sane link editor. Order of libraries, static or dynamic is
-	irrelevant.
-	"""
-	pass
-
 if sys.platform == 'darwin':
 	link_editor = macosx_link_editor
 else:
-	link_editor = legacy_link_editor
+	link_editor = unix_link_editor
 
-def updated(obj, src, depfile):
+def updated(outputs, inputs, depfile):
 	"""
-	Return whether or not the &obj needs to be updated.
+	Return whether or not the &outputs need to be updated.
 	"""
-	if not obj.exists():
-		# No such object, not updated.
-		return False
+	for x in outputs:
+		if not x.exists():
+			# No such object, not updated.
+			return False
+		lm = x.last_modified()
+		olm = min(x)
 
-	olm = obj.last_modified()
-	if olm < src.last_modified():
-		# rebuild if object is older than source.
-		return False
+	for x in inputs:
+		if olm < x.last_modified():
+			# rebuild if any output is older than any source.
+			return False
 
 	if depfile is not None and depfile.exists():
 		# Alter to only pay attention to project and context files.
