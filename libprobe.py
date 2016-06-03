@@ -185,7 +185,7 @@ def runtime(
 
 		return output
 
-def sysctl(route, names):
+def sysctl(names, route=None):
 	"""
 	Retrieve the system control variables using (system:executable)`sysctl`.
 
@@ -195,7 +195,14 @@ def sysctl(route, names):
 	/names
 		The settings to get.
 	"""
-	pass
+	if route is None:
+		found, missing = executables({'sysctl'})
+		if missing:
+			raise RuntimeError("no sysctl command found")
+		route = found.pop('sysctl')
+
+	command = [route]
+	command += names
 
 def includes(
 		context,
