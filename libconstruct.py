@@ -511,7 +511,7 @@ def unix_link_editor(context, output, inputs,
 	sls = get('system.library.set', ())
 	libs = [link_flag + filepath(x) for x in sls]
 
-	return command + [output_flag, output] + list(map(filepath, inputs)) + libs
+	return command + [output_flag, output] + list(map(filepath, inputs)) + libdirs + libs
 
 if sys.platform == 'darwin':
 	link_editor = macosx_link_editor
