@@ -8,12 +8,6 @@ from ...routes import library as libroutes
 from ...xml import library as libxml
 from .. import libprobe
 
-system_linkers = {
-	'ld': None,
-	'lld': None,
-	'cl.exe': None,
-}
-
 compiler_collections = {
 	'clang': (
 		'c', 'c++', 'objective-c', 'objective-c++',
@@ -34,6 +28,17 @@ compiler_collections = {
 }
 
 compiler_collection_preference = ('clang', 'gcc', 'cl.exe')
+
+linkers = {
+	'lld': (
+		'objects',
+	),
+	'ld': (
+		'objects',
+	),
+}
+
+linker_preference = ('lld', 'ld')
 
 haskell_compilers = {
 	'ghc': ('haskell',),
@@ -74,23 +79,86 @@ def debug_isolate(self, target):
 		(objcopy, '--add-gnu-debuglink', target, debug),
 	]
 
+# libconstruct directory ->
+	# context ->
+		# role ->
+			# purpose ->
+				# default language handler
+				# role file
+				# language -> parameters
+
+def select(paths, possibilities, preferences):
+	global libprobe
+
+	found, missing = libprobe.search(paths, tuple(possibilities))
+	if not found:
+		return None
+	else:
+		for x in preferences:
+			if x in found:
+				path = found[x]
+				name = x
+				break
+		else:
+			# select one randomly
+			name = tuple(found)[0]
+			path = found[name]
+
+	return name, path
+
 def main(name, args, paths=None):
 	global libroutes
 	import os
 
+	if args:
+		libconstruct_dir, = args
+	else:
+		user = libroutes.File.home()
+		libconstruct_dir = user / '.fault' / 'libconstruct'
+
+	ctx = libconstruct_dir / 'host'
+
 	if paths is None:
 		paths = libprobe.environ_paths()
 
-	user = libroutes.File.home()
+	# default command
+	ccname, cc = select(paths, compiler_collections, compiler_collection_preference)
+	ldname, ld = select(paths, linkers, linker_preference)
+
+	print('default:', cc)
+	print('linker:', ld)
+	core = {
+		'system': {
+			None: {
+				'interface': 'fault.development.libconstruct.link_editor',
+				'type': 'linker',
+				'name': ldname,
+				'command': str(ld),
+			},
+			'compiler': {
+				'interface': 'fault.development.libconstruct.compiler_collection',
+				'type': 'collection',
+				'name': ccname,
+				'command': str(cc),
+			},
+		}
+	}
+
 	S = libxml.Serialization()
+	D = S.switch('data:')
+	xml = b''.join(
+		S.root('libconstruct',
+			S.element('context',
+				libxml.Data.serialize(D, core),
+			),
+			('xmlns', 'https://fault.io/xml/libconstruct'),
+			('xmlns:data', 'https://fault.io/xml/data'),
+		)
+	)
+	rolefile = ctx / 'core.xml'
 
-	for x in roles:
-		contextfile = user / '.fault' / 'context' / (x + '.xml')
-		contextfile.init('file')
-
-		xml = b''.join(libxml.Data.serialize(S, None))
-		with contextfile.open('wb') as f:
-			f.write(xml)
+	with rolefile.open('wb') as f:
+		f.write(xml)
 
 if __name__ == '__main__':
 	import sys

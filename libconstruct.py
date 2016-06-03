@@ -2,6 +2,10 @@
 Management of target construction jobs for creating system [context] executable,
 libraries, and extensions.
 
+The effects that &.libconstruct causes are heavily influenced by the Construction Context.
+The Construction Context is defined as a set of roles which ultimately determine the
+necessary procedures for constructing a target.
+
 [ Properties ]
 
 /roles
@@ -38,6 +42,9 @@ from ..io import library as libio
 from ..system import library as libsys
 from ..routes import library as libroutes
 
+from ..xml import library as libxml
+from ..xml import lxml
+
 roles = {
 	'optimal': 'Maximum optimizations with debugging symbols separated or stripped',
 
@@ -48,7 +55,9 @@ roles = {
 
 	'survey': 'Test role with profiling and coverage collection enabled',
 
-	'introspection': 'Role for structuring coefficients (sources) into XML',
+	'introspection':
+		'Role for structuring coefficients (sources) into a form used by documentation tools',
+	'core': 'The role used to represent the conceptual base of other roles.',
 }
 
 library_extensions = {
@@ -103,6 +112,26 @@ def merge(parameters, source, operations = merge_operations):
 				parameters[key] = r
 		else:
 			parameters[key] = source[key]
+
+xml_namespaces = {
+	'lc': 'https://fault.io/xml/libconstruct',
+	'd': 'https://fault.io/xml/data',
+}
+
+def libconstruct_data():
+	return libroutes.File.home() / '.fault' / 'libconstruct'
+
+def libconstruct_transforms(selection, role):
+	xf = libconstruct_data() / (selection or 'host') / (role + '.xml')
+	if not xf.exists():
+		return None, {}
+
+	with xf.open() as f:
+		xml = lxml.etree.parse(f)
+
+	d = xml.xpath('/lc:libconstruct/lc:context/d:*', namespaces=xml_namespaces)[0]
+	data = libxml.Data.structure(d)
+	return xml, data
 
 def compile_bytecode(target, source):
 	global importlib
@@ -380,7 +409,7 @@ def unix_compiler_collection(context, output, inputs,
 compiler_collection = unix_compiler_collection
 
 def windows_link_editor(context, output, inputs):
-	pass
+	raise libdev.PendingImplementation("cl.exe linker not implemented")
 
 def macosx_link_editor(context, output, inputs,
 		filepath=str,
@@ -486,6 +515,8 @@ def unix_link_editor(context, output, inputs,
 
 if sys.platform == 'darwin':
 	link_editor = macosx_link_editor
+elif sys.platform in ('win32', 'win64'):
+	link_editor = windows_link_editor
 else:
 	link_editor = unix_link_editor
 
@@ -542,7 +573,7 @@ def execution_context_extension_defines(module_fullname, target_fullname):
 		('MODULE_PACKAGE', target_fullname[:tp]),
 	]
 
-def initialize(context:str, role:str, module:libdev.Sources):
+def initialize(selection:str, context:str, role:str, module:libdev.Sources):
 	"""
 	Initialize a context for use by &transform and &reduce.
 
@@ -570,17 +601,25 @@ def initialize(context:str, role:str, module:libdev.Sources):
 			refs.append(x)
 
 	work = libfactor.cache_directory(module, context, role, 'x').container
+
+	# context: context -> role -> purpose -> format
+	doc, core_data = libconstruct_transforms(selection, 'core')
+	doc, role_data = libconstruct_transforms(selection, role)
+	merge(core_data, role_data)
+
 	parameters = {
 		'module': module,
 		'role': role,
 		'name': context,
 		'system.type': getattr(module, 'system_object_type', None),
+		'reduction': module.output(context, role),
 
 		'probes': probes,
 		'libraries': libs,
 		'references': refs,
 
-		'transform': compiler_collection,
+		'mechanisms': core_data,
+
 		'system.include.directories': incdirs,
 		'system.library.directories': [],
 		'system.library.set': set(),
@@ -590,7 +629,6 @@ def initialize(context:str, role:str, module:libdev.Sources):
 			('F_ROLE_ID', 'F_ROLE_' + role.upper() + '_ID'),
 		],
 
-		'reduction': module.output(context, role),
 		'locations': {
 			'sources': module.sources,
 			'work': work,
@@ -610,7 +648,7 @@ def initialize(context:str, role:str, module:libdev.Sources):
 	parameters['system.library.directories'] = [parameters['locations']['libraries']]
 
 	for probe in probes:
-		report = probe.report(probe, 'inherit', role, module)
+		report = probe.report(probe, 'host', role, module)
 		merge(parameters, report) # probe parameter merge
 
 	for lib in libs:
@@ -628,6 +666,18 @@ def initialize(context:str, role:str, module:libdev.Sources):
 	parameters['compiler.preprocessor.defines'].extend(idefines)
 
 	return parameters
+
+@functools.lru_cache(6)
+def context_interface(path):
+	"""
+	Resolves the construction interface for processing a source or performing
+	the final reduction (link-stage).
+	"""
+	mod, apath = libroutes.Import.from_attributes(path)
+	obj = importlib.import_module(str(mod))
+	for x in apath:
+		obj = getattr(obj, x)
+	return obj
 
 def transform(context, type, filtered=(lambda x,y,z: False)):
 	"""
@@ -653,7 +703,8 @@ def transform(context, type, filtered=(lambda x,y,z: False)):
 
 	yield ('directory', loc['logs'])
 	yield ('directory', loc['objects'])
-	xf = context.get('transform')
+	mech = context['mechanisms']
+	mech = mech['system']
 
 	commands = []
 	for src in context['sources']:
@@ -663,6 +714,11 @@ def transform(context, type, filtered=(lambda x,y,z: False)):
 			continue
 
 		lang = languages.get(src.extension)
+		if lang in mech:
+			lmech = mech[lang]
+		else:
+			lmech = mech['compiler']
+
 		obj = libroutes.File(loc['objects'], src.points)
 		depfile = libroutes.File(loc['dependencies'], src.points)
 
@@ -677,11 +733,14 @@ def transform(context, type, filtered=(lambda x,y,z: False)):
 				emitted.add(d)
 				yield ('directory', d)
 
+		ifpath = lmech['interface'] # python
+		xf = context_interface(ifpath)
 		genobj = functools.partial(xf, language=lang)
 
 		# compilation
 		go = {}
 		compilation = genobj(context, obj, (src,))
+		compilation[0] = lmech['command']
 
 		yield ('execute', compilation, logfile)
 
@@ -701,6 +760,8 @@ def reduce(context):
 	locs = context['locations']
 	libdir = locs['libraries']
 	output = context['reduction']
+	mech = context['mechanisms']['system'][None]
+	transform = context_interface(mech['interface'])
 
 	if 'sources' not in context:
 		# Nothing to reduce.
@@ -730,7 +791,10 @@ def reduce(context):
 		if x.extension not in {'h'} and not x.identifier.startswith('.')
 	]
 
-	yield ('execute', link_editor(context, output, objects), locs['logs'] / 'reduction')
+	cmd = transform(context, output, objects)
+	cmd[0] = mech['command']
+
+	yield ('execute', cmd, locs['logs'] / 'reduction')
 
 def parse_make_dependencies(make_rule_str):
 	"""
@@ -796,11 +860,13 @@ class Construction(libio.Processor):
 		tracks = self.tracking[module]
 
 		if context is None:
+			# context was not selected, so default to the host
+			# context. In cases of Python extension, this is the triplet.
 			if getattr(module, 'execution_context_extension', False):
 				context = python_triplet
 			else:
 				# Default 'host' context.
-				context = 'inherit'
+				context = 'host'
 		else:
 			# context was explicitly stated meaning
 			# extension modules are built for mounting.
@@ -812,7 +878,7 @@ class Construction(libio.Processor):
 			probe_set = [('probe', module, x) for x in dependencies]
 			tracks.append(probe_set)
 		else:
-			ctx = initialize(context, self.cx_role, module)
+			ctx = initialize(self.cx_context, context, self.cx_role, module)
 			xf = list(transform(ctx, None))
 			rd = list(reduce(ctx))
 			tracks.extend((xf, rd))
@@ -834,18 +900,18 @@ class Construction(libio.Processor):
 		sector = self.sector
 		dep = instruction[2]
 
-		key = module.key(module, self.cx_context or 'inherit', self.cx_role, dep)
-		reports = module.retrieve(self.cx_context or 'inherit', self.cx_role)
+		key = module.key(module, self.cx_context or 'host', self.cx_role, dep)
+		reports = module.retrieve(self.cx_context or 'host', self.cx_role)
 
 		if key in reports:
 			# Needed report is cached.
 			self.progress[module] += 1
 		else:
-			xreport = module.deploy(module, self.cx_context or 'inherit', self.cx_role, dep)
+			xreport = module.deploy(module, self.cx_context or 'host', self.cx_role, dep)
 			reports[key] = xreport
 			if xreport is not None:
 				# &None indicates constant probe; &report will build on demand.
-				module.record(reports, self.cx_context or 'inherit', self.cx_role)
+				module.record(reports, self.cx_context or 'host', self.cx_role)
 
 			self.progress[module] += 1
 
