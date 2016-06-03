@@ -123,25 +123,6 @@ def executables(xset:typing.Set[str]):
 	global search, environ_paths
 	return search(environ_paths(), xset)
 
-def libraries(
-		context,
-		libraries:typing.Sequence[str],
-		symbols:typing.Sequence[str],
-	):
-	"""
-	Validate that the given libraries can be linked against an executable target.
-
-	[ Parameters ]
-
-	/context
-		The construction context.
-	/libraries
-		A sequence of strings identifying the shared libraries to link.
-	/symbols
-		A sequence of symbols to refer to in the program.
-	"""
-	pass
-
 def runtime(
 		context,
 		language:collections.abc.Hashable,
