@@ -83,7 +83,7 @@ def main(sector, role='optimal', mount_extensions=True):
 				# libdev.Sources and is identified as being constructed.
 				root_system_modules.append((target, tm))
 
-		if mount_extensions:
+		if mount_extensions and role not in {'test', 'survey'}:
 			# Construct a separate list of Python extensions for subsequent mounting.
 			exe_ctx_extensions = []
 
