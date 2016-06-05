@@ -97,7 +97,17 @@ def main(sector, role='optimal', mount_extensions=True):
 		for target, tm in exe_ctx_extensions:
 			libconstruct.mount(role, target, tm)
 
-		cxn = libconstruct.Construction(context_name, role, root_system_modules)
+		# Controls process execution queue.
+		try:
+			import psutil
+			ncpu = psutil.cpu_count(logical=False)
+		except ImportError:
+			ncpu = 2
+
+		cxn = libconstruct.Construction(
+			context_name, role, root_system_modules,
+			processors=ncpu
+		)
 		sector.dispatch(cxn)
 		cxn.atexit(functools.partial(set_exit_code, unit=sector.unit))
 
