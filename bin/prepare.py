@@ -98,15 +98,17 @@ def main(sector, role='optimal', mount_extensions=True):
 			libconstruct.mount(role, target, tm)
 
 		# Controls process execution queue.
+		ncpu = 2
 		try:
 			import psutil
 			ncpu = psutil.cpu_count(logical=False)
+			ncpu = max(2, ncpu)
 		except ImportError:
-			ncpu = 2
+			pass
 
 		cxn = libconstruct.Construction(
 			context_name, role, root_system_modules,
-			processors=ncpu
+			processors=max(2, ncpu)
 		)
 		sector.dispatch(cxn)
 		cxn.atexit(functools.partial(set_exit_code, unit=sector.unit))
