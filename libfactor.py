@@ -193,7 +193,7 @@ class SystemModule(libdev.Sources):
 		"""
 		The target file of the construction.
 		The file is relative to the Python cache directory of the package module
-		identifying itself as a system module: (fs-path)`factor/{platform}/{role}`.
+		identifying itself as a system module: (fs-path)`{context}/{role}/factor`.
 		"""
 		return cache_directory(self, context, role, 'factor')
 
