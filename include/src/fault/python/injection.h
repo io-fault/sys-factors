@@ -25,8 +25,10 @@ do { \
 	} \
 	else \
 	{ \
+		char _er_name[256]; \
+		snprintf(_er_name, 256, "%s.%s", __func__, #SYSCALL); \
 		_er_gs = PyGILState_Ensure(); /* need it to get the item */ \
-		_er_entry = PyDict_GetItemString(__ERRNO_RECEPTACLE__, (char *) (__func__ "." #SYSCALL)); \
+		_er_entry = PyDict_GetItemString(__ERRNO_RECEPTACLE__, (char *) _er_name); \
 		\
 		if (_er_entry == NULL) \
 		{ \
@@ -76,7 +78,9 @@ do { \
 	} \
 	else \
 	{ \
-		_pr_entry = PyDict_GetItemString(__PYTHON_RECEPTACLE__, (char *) __func__ "." ID); \
+		char _er_name[256]; \
+		snprintf(_er_name, 256, "%s.%s", __func__, #ID); \
+		_pr_entry = PyDict_GetItemString(__PYTHON_RECEPTACLE__, (char *) _er_name); \
 		if (_pr_entry == NULL) \
 		{ \
 			*((PyObj *) RETURN) = (PyObj) CALL(__VA_ARGS__); \
