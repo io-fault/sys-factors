@@ -7,6 +7,7 @@ import functools
 from ...routes import library as libroutes
 from ...xml import library as libxml
 from .. import libprobe
+from .. import libconstruct
 
 compiler_collections = {
 	'clang': (
@@ -113,8 +114,7 @@ def main(name, args, paths=None):
 	if args:
 		libconstruct_dir, = args
 	else:
-		user = libroutes.File.home()
-		libconstruct_dir = user / '.fault' / 'libconstruct'
+		libconstruct_dir = libconstruct.root_context_directory()
 
 	ctx = libconstruct_dir / 'host'
 
@@ -125,21 +125,21 @@ def main(name, args, paths=None):
 	ccname, cc = select(paths, compiler_collections, compiler_collection_preference)
 	ldname, ld = select(paths, linkers, linker_preference)
 
-	print('default:', cc)
-	print('linker:', ld)
 	core = {
 		'system': {
 			None: {
-				'interface': 'fault.development.libconstruct.link_editor',
+				'interface': libconstruct.__name__ + '.link_editor',
 				'type': 'linker',
 				'name': ldname,
 				'command': str(ld),
+				'defaults': {},
 			},
 			'compiler': {
-				'interface': 'fault.development.libconstruct.compiler_collection',
+				'interface': libconstruct.__name__ + '.compiler_collection',
 				'type': 'collection',
 				'name': ccname,
 				'command': str(cc),
+				'defaults': {},
 			},
 		}
 	}
@@ -159,6 +159,10 @@ def main(name, args, paths=None):
 
 	with rolefile.open('wb') as f:
 		f.write(xml)
+
+	# Initialize lib directory for context libraries.
+	ctxlib = ctx / 'lib'
+	ctxlib.init('directory')
 
 if __name__ == '__main__':
 	import sys
