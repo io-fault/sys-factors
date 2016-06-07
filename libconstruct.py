@@ -487,19 +487,6 @@ def unix_link_editor(context, output, inputs,
 
 		use_static='-Bstatic',
 		use_shared='-Bdynamic',
-
-		# System specific.
-		exe='crt1.o',
-		pie='Scrt1.o',
-
-		staticlib_start='crtbeginT.o',
-		static_end='crtend.o',
-
-		sharedlib_start='crtbeginS.o',
-		sharedlib_stop='crtendS.o',
-
-		libstart='crti.o',
-		libstop='crtn.o',
 	):
 	"""
 	Command constructor for the unix link editors.
@@ -541,7 +528,7 @@ def unix_link_editor(context, output, inputs,
 	libs = [link_flag + filepath(x) for x in sls]
 
 	rt = context['mechanisms']['system']['runtime'][typ]
-	if 'pdc' in rt:
+	if 'pic' in rt:
 		prefix, suffix = rt['pdc']
 	else:
 		prefix = suffix = ()
