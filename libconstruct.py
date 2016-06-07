@@ -524,6 +524,7 @@ def unix_link_editor(context, output, inputs,
 	command = [None]
 	add = command.append
 	iadd = command.extend
+	typ = get('system.type')
 
 	if verbose:
 		add(verbose_flag)
