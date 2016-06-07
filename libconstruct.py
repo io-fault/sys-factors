@@ -529,7 +529,7 @@ def unix_link_editor(context, output, inputs,
 
 	rt = context['mechanisms']['system']['runtime'][typ]
 	if 'pic' in rt:
-		prefix, suffix = rt['pdc']
+		prefix, suffix = rt['pic']
 	else:
 		prefix = suffix = ()
 
