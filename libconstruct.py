@@ -369,8 +369,7 @@ def unix_compiler_collection(context, output, inputs,
 
 	# -fPIC or not.
 	link_type = get('type', 'dynamic')
-	if link_type == 'dynamic':
-		command.append(pic_flag)
+	command.append(pic_flag)
 
 	# Compiler optimization target: -O0, -O1, ..., -Ofast, -Os, -Oz
 	co = optimizations[role]
