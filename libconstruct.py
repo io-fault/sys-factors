@@ -445,7 +445,7 @@ def macosx_link_editor(context, output, inputs,
 	Command constructor for Mach-O link editor provided on Apple MacOS X systems.
 	"""
 	get = context.get
-	command = [None]
+	command = [None, '-t']
 
 	typ = get('system.type')
 	loutput_type = type_map[typ]
@@ -455,12 +455,18 @@ def macosx_link_editor(context, output, inputs,
 
 	command.extend((output_flag, filepath(output)))
 	if typ == 'executable':
-		command.append('/usr/lib/crt1.o')
+		rt = context['mechanisms']['system']['runtime'][typ]
+		prefix, suffix = rt['pdc']
+	else:
+		prefix = suffix = ()
 
+	command.extend(prefix)
 	command.extend(inputs)
 
 	command.extend([link_flag+filepath(x) for x in context.get('system.library.set', ())])
 	command.append('-lSystem')
+
+	command.extend(suffix)
 
 	return command
 
@@ -480,8 +486,8 @@ def unix_link_editor(context, output, inputs,
 			'fragment': '-r',
 		},
 
-		static='-Bstatic',
-		shared='-Bshareable',
+		use_static='-Bstatic',
+		use_shared='-Bdynamic',
 
 		# System specific.
 		exe='crt1.o',
@@ -522,7 +528,9 @@ def unix_link_editor(context, output, inputs,
 	if verbose:
 		add(verbose_flag)
 
-	loutput_type = type_map[get('system.type')]
+	systype = get('system.type')
+
+	loutput_type = type_map[systype] # failure indicates bad type parameter to libfactor.load()
 	if loutput_type:
 		add(loutput_type)
 
@@ -532,7 +540,21 @@ def unix_link_editor(context, output, inputs,
 	sls = get('system.library.set', ())
 	libs = [link_flag + filepath(x) for x in sls]
 
-	return command + [output_flag, output] + list(map(filepath, inputs)) + libdirs + libs
+	rt = context['mechanisms']['system']['runtime'][typ]
+	if 'pdc' in rt:
+		prefix, suffix = rt['pdc']
+	else:
+		prefix = suffix = ()
+
+	command.extend((output_flag, output))
+
+	command.extend(prefix)
+	command.extend(map(filepath, inputs))
+	command.extend(libdirs)
+	command.extend(libs)
+	command.extend(suffix)
+
+	return command
 
 if sys.platform == 'darwin':
 	link_editor = macosx_link_editor
@@ -672,9 +694,9 @@ def initialize(selection:str, context:str, role:str, module:libdev.Sources, lcd=
 		'system.type': getattr(module, 'system_object_type', None),
 		'reduction': module.output(context, role),
 
-		'probes': probes,
-		'libraries': libs,
-		'references': refs,
+		'probes': probes, # libfactor.ProbeModule
+		'libraries': libs, # system.library modules
+		'references': refs, # libdev.Sources instances
 
 		'mechanisms': core_data,
 
@@ -706,7 +728,7 @@ def initialize(selection:str, context:str, role:str, module:libdev.Sources, lcd=
 	parameters['system.library.directories'] = [parameters['locations']['libraries']]
 
 	for probe in probes:
-		report = probe.report(probe, 'host', role, module)
+		report = probe.report(probe, selection, role, module)
 		merge(parameters, report) # probe parameter merge
 
 	for lib in libs:
@@ -714,6 +736,7 @@ def initialize(selection:str, context:str, role:str, module:libdev.Sources, lcd=
 		parameters['system.library.set'].add(libname)
 
 	if libpython in probes:
+		# Note as building a Python extension.
 		parameters['execution_context_extension'] = True
 		men = parameters['mount_point'] = module.extension_name()
 		idefines = execution_context_extension_defines(module.__name__, men)
@@ -762,7 +785,7 @@ def transform(context, type, filtered=(lambda x,y,z: False)):
 	yield ('directory', loc['logs'])
 	yield ('directory', loc['objects'])
 	mech = context['mechanisms']
-	mech = mech['system']
+	mech = mech['system']['transformations']
 	mech_cache = {}
 
 	commands = []
@@ -781,7 +804,7 @@ def transform(context, type, filtered=(lambda x,y,z: False)):
 			if lang in mech:
 				lmech = mech[lang]
 			else:
-				lmech = mech['compiler']
+				lmech = mech[None]
 
 			layers = [lmech]
 			while 'inherit' in lmech:
@@ -837,7 +860,7 @@ def reduce(context):
 	locs = context['locations']
 	libdir = locs['libraries']
 	output = context['reduction']
-	mech = context['mechanisms']['system'][None]
+	mech = context['mechanisms']['system']['reductions'][None]
 	xf = context_interface(mech['interface'])
 
 	if 'sources' not in context:

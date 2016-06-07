@@ -3,6 +3,7 @@ Configure the initialization of the construction context.
 """
 import sys
 import functools
+import shell_command
 
 from ...routes import library as libroutes
 from ...xml import library as libxml
@@ -28,7 +29,7 @@ compiler_collections = {
 	),
 }
 
-compiler_collection_preference = ('clang', 'gcc', 'cl.exe')
+compiler_collection_preference = ('clang', 'gcc', 'icc', 'cl.exe')
 
 linkers = {
 	'lld': (
@@ -40,10 +41,6 @@ linkers = {
 }
 
 linker_preference = ('lld', 'ld')
-
-haskell_compilers = {
-	'ghc': ('haskell',),
-}
 
 assemblers = {
 	'yasm': (),
@@ -60,6 +57,10 @@ environment = {
 
 pyrex_compilers = {
 	'cython',
+}
+
+haskell_compilers = {
+	'ghc': ('haskell',),
 }
 
 def debug_isolate(self, target):
@@ -107,6 +108,23 @@ def select(paths, possibilities, preferences):
 
 	return name, path
 
+runtime_objects = set([
+	'crt0.o',
+	'crt1.o',
+	'Scrt1.o',
+	'gcrt1.o',
+	'gcrt1.o',
+
+	'crtbeginT.o',
+	'crtend.o',
+
+	'crtbeginS.o',
+	'crtendS.o',
+
+	'crti.o',
+	'crtn.o',
+])
+
 def main(name, args, paths=None):
 	global libroutes
 	import os
@@ -122,27 +140,125 @@ def main(name, args, paths=None):
 		paths = libprobe.environ_paths()
 
 	# default command
-	ccname, cc = select(paths, compiler_collections, compiler_collection_preference)
+	if 'CC' in os.environ:
+		cc = libroutes.File.from_absolute(os.environ['CC'])
+		ccname = cc.identifier
+	else:
+		ccname, cc = select(paths, compiler_collections, compiler_collection_preference)
 	ldname, ld = select(paths, linkers, linker_preference)
+
+	bindir = cc.container
+	ccprefix = bindir.container
+
+	# gather compiler information.
+	data = shell_command.shell_output(str(cc) + ' --version').split('\n')
+	version_line = data[0]
+	cctype, version_spec = version_line.split(' version ')
+	version_info, release = version_spec.split('(', 1)
+	release = release.strip('()')
+	version_info = version_info.strip().split('.', 3)
+
+	if cctype == 'Apple LLVM':
+		# rename to clang.
+		ccname = 'clang'
+
+	target = None
+	for line in data:
+		if line.startswith('Target:'):
+			target = line
+			break
+	else:
+		target = None
+		print('no target in compiler collection version')
+	if target:
+		target = target.split(':', 1)
+		target = target[1].strip()
+
+	data = shell_command.shell_output(str(cc) + ' -print-search-dirs').split('\n')
+	data = [x.split('=', 1) for x in data]
+	data = dict([(k.strip(' =:'), v.split(':')) for k, v in data])
+	root = libroutes.File.from_absolute('/')
+
+	libdirs = [libroutes.File.from_relative(root, str(x).strip('/')) for x in data['libraries']]
+	libdirs.extend(map(libroutes.File.from_absolute,
+		('/lib', '/usr/lib',)))
+
+	# scan for runtime objects
+	found, missing = libprobe.search(libdirs, runtime_objects)
+	prepare = lambda x: tuple(map(str, [y for y in x if y]))
+	print(found, missing)
 
 	core = {
 		'system': {
-			None: {
-				'interface': libconstruct.__name__ + '.link_editor',
-				'type': 'linker',
-				'name': ldname,
-				'command': str(ld),
-				'defaults': {},
+			# subject data
+			'platform': target,
+
+			# Variants applies to the compilation of code.
+			'variants': {
+				'executable': set(('pie','pdc')),
+				'library': set(('pdc', 'pic')),
+				'extension': set(('pic',)),
+				'fragment': set(('pic', 'pdc', 'pie')),
 			},
-			'compiler': {
-				'interface': libconstruct.__name__ + '.compiler_collection',
-				'type': 'collection',
-				'name': ccname,
-				'command': str(cc),
-				'defaults': {},
+
+			'runtime': {
+				'executable': {
+					'pdc': [
+						prepare((found.get('crt1.o'),),),
+						()
+					],
+					'pie': [
+						prepare((found.get('Scrt1.o'),),),
+						()
+					],
+				},
+				'library': {
+					'pdc': [
+						prepare((found.get('crti.o'), found.get('crtbegin.o')),),
+						prepare((found.get('crtend.o'), found.get('crtn.o')),),
+					],
+					'pic': [
+						prepare((found.get('crti.o'), found.get('crtbeginS.o')),),
+						prepare((found.get('crtendS.o'), found.get('crtn.o')),),
+					],
+				},
+				'extension': {
+					'pic': [
+						prepare((found.get('crti.o'), found.get('crtbeginS.o')),),
+						prepare((found.get('crtendS.o'), found.get('crtn.o')),),
+					],
+				},
+				# fragment has no runtime requirements.
+				'fragment': {},
+			},
+
+			# subject interfaces.
+			'reductions': {
+				None: {
+					'interface': libconstruct.__name__ + '.link_editor',
+					'type': 'linker',
+					'name': ldname,
+					'command': str(ld),
+					'defaults': {},
+				}
+			},
+
+			'transformations': {
+				None: {
+					'interface': libconstruct.__name__ + '.compiler_collection',
+					'type': 'collection',
+					'name': ccname,
+					'implementation': cctype,
+					'version': version_info,
+					'release': release,
+					'command': str(cc),
+					'defaults': {},
+				},
 			},
 		}
 	}
+	import pprint
+	pprint.pprint(core)
 
 	S = libxml.Serialization()
 	D = S.switch('data:')
