@@ -301,6 +301,13 @@ def identity(module):
 
 	return basename
 
+def disabled(*args, **kw):
+	"""
+	A transformation that can be assigned to a subject's mechanism
+	in order to describe it as being disabled.
+	"""
+	return ()
+
 def unix_compiler_collection(context, output, inputs,
 		mechanism=None,
 		language=None, # The selected language.
