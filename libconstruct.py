@@ -497,6 +497,7 @@ def macosx_link_editor(context, output, inputs,
 	return command
 
 def unix_link_editor(context, output, inputs,
+		format=None,
 		mechanism=None,
 		verbose=True,
 		filepath=str,
