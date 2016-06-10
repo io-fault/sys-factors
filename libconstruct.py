@@ -497,8 +497,8 @@ def macosx_link_editor(context, output, inputs,
 	return command
 
 def unix_link_editor(context, output, inputs,
-		format=None,
 		mechanism=None,
+		format=None,
 		verbose=True,
 		filepath=str,
 		pie_flag='-pie',
@@ -557,17 +557,16 @@ def unix_link_editor(context, output, inputs,
 		sls = sys.get('library.set', ())
 		libs = [link_flag + filepath(x) for x in sls]
 
-		rt = context['mechanisms']['system']['objects'][typ]
-		if 'pic' in rt:
-			prefix, suffix = rt['pic']
-		else:
-			prefix = suffix = ()
+		rt = context['mechanisms']['system']['objects'][typ][format]
+		prefix, suffix = rt
 
 		command.extend(prefix)
 		command.extend(map(filepath, inputs))
 		command.extend(libdirs)
 		command.extend(libs)
 		command.extend(suffix)
+	else:
+		command.extend(map(filepath, inputs))
 
 	command.extend((output_flag, output))
 	return command
