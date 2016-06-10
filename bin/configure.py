@@ -109,13 +109,13 @@ def select(paths, possibilities, preferences):
 	return name, path
 
 runtime_objects = set([
-	'crt0.o',
-	'crt1.o',
-	'Scrt1.o',
+	'crt0.o', # No constructor support.
+	'crt1.o', # Constructor Support.
+	'Scrt1.o', # PIE.
 	'gcrt1.o',
-	'gcrt1.o',
+	'crt1S.o', # Not sure how this is used.
 
-	'crtbeginT.o',
+	'crtbeginT.o', # Apparently used for statically linked executables.
 	'crtend.o',
 
 	'crtbeginS.o',
@@ -162,6 +162,7 @@ def main(name, args, paths=None):
 		# rename to clang.
 		ccname = 'clang'
 
+	# Extract the default target from the compiler.
 	target = None
 	for line in data:
 		if line.startswith('Target:'):
@@ -170,10 +171,13 @@ def main(name, args, paths=None):
 	else:
 		target = None
 		print('no target in compiler collection version')
+
 	if target:
 		target = target.split(':', 1)
 		target = target[1].strip()
 
+	# Analyze the library search directories.
+	# Primarily interested in finding the crt*.o files for linkage.
 	data = shell_command.shell_output(str(cc) + ' -print-search-dirs').split('\n')
 	data = [x.split('=', 1) for x in data]
 	data = dict([(k.strip(' =:'), v.split(':')) for k, v in data])
@@ -181,37 +185,31 @@ def main(name, args, paths=None):
 
 	libdirs = [libroutes.File.from_relative(root, str(x).strip('/')) for x in data['libraries']]
 	libdirs.extend(map(libroutes.File.from_absolute,
-		('/lib', '/usr/lib',)))
+		('/lib', '/usr/lib',))) # Make sure likely directories are included.
 
 	# scan for runtime objects
 	found, missing = libprobe.search(libdirs, runtime_objects)
 	prepare = lambda x: tuple(map(str, [y for y in x if y]))
-	print(found, missing)
 
 	core = {
 		'system': {
 			# subject data
 			'platform': target,
 
-			# Variants applies to the compilation of code.
-			'variants': {
-				'executable': set(('pie','pdc')),
-				'library': set(('pdc', 'pic')),
-				'extension': set(('pic',)),
-				'fragment': set(('pic', 'pdc', 'pie')),
+			'reference-types': {'weak', 'lazy', 'upward', 'default'},
+
+			# Formats to build for targets.
+			# Fragments inherit the code type.
+			'formats': {
+				'executable': 'pie',
+				'library': 'pic',
+				'extension': 'pic',
 			},
 
-			'runtime': {
-				'executable': {
-					'pdc': [
-						prepare((found.get('crt1.o'),),),
-						()
-					],
-					'pie': [
-						prepare((found.get('Scrt1.o'),),),
-						()
-					],
-				},
+			# objects used to support the construction of system targets
+			# The split (prefix objects and suffix objects) is used to support
+			# linkers where the positioning of the parameters is significant.
+			'objects': {
 				'library': {
 					'pdc': [
 						prepare((found.get('crti.o'), found.get('crtbegin.o')),),
@@ -228,8 +226,8 @@ def main(name, args, paths=None):
 						prepare((found.get('crtendS.o'), found.get('crtn.o')),),
 					],
 				},
-				# fragment has no runtime requirements.
-				'fragment': {},
+				# fragments do not have requirements.
+				'fragment': None,
 			},
 
 			# subject interfaces.
@@ -257,6 +255,29 @@ def main(name, args, paths=None):
 			},
 		}
 	}
+
+	if sys.platform == 'darwin':
+		core['system']['objects']['executable'] = {
+			'pie': [
+				prepare((found.get('crt1.o'), found.get('crti.o'), found.get('crtbeginS.o')),),
+				prepare((found.get('crtendS.o'), found.get('crtn.o')),),
+			],
+		}
+	else:
+		# FreeBSD and many Linux systems.
+		core['system']['objects']['executable'] = {
+			# PDC or PIE based executables. PIC is, essentially, PIE.
+			# PDC does not mean that the library is a (completely) statically link binary.
+			'pdc': [
+				prepare((found.get('crt1.o'), found.get('crti.o'), found.get('crtbegin.o')),),
+				prepare((found.get('crtend.o'), found.get('crtn.o')),),
+			],
+			'pie': [
+				prepare((found.get('Scrt1.o'), found.get('crti.o'), found.get('crtbeginS.o')),),
+				prepare((found.get('crtendS.o'), found.get('crtn.o')),),
+			],
+		}
+
 	import pprint
 	pprint.pprint(core)
 

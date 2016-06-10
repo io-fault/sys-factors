@@ -28,9 +28,11 @@ python_include_directory = sysconfig.get_config_var('INCLUDEPY')
 python_library_directory = sysconfig.get_config_var('LIBDIR')
 
 report_dictionary = {
-	'system.library.set': (python_library,),
-	'system.library.directories': (python_library_directory,),
-	'system.include.directories': (python_include_directory,),
+	'system': {
+		'library.set': (python_library,),
+		'library.directories': (python_library_directory,),
+		'include.directories': (python_include_directory,),
+	}
 }
 
 def report(probe, context, role, module):

@@ -146,10 +146,10 @@ class ProbeModule(libdev.Sources):
 		"""
 		key = probe.key(probe, context, role, module)
 		reports = probe.retrieve(context, role)
-		return reports[key]
+		return reports.get(key, {})
 
 	@staticmethod
-	def deploy(probe, role, module):
+	def deploy(probe, context, role, module):
 		"""
 		Cause the probe to activate its sensors to collect information
 		from the system that will be later fetched with &report.
@@ -197,13 +197,6 @@ class SystemModule(libdev.Sources):
 		"""
 		return cache_directory(self, context, role, 'factor')
 
-	def libraries(self, context=None, role=None):
-		"""
-		The route to the libraries that this target depends upon.
-		Only used for linking against other targets.
-		"""
-		return cache_directory(self, context, role, 'lib')
-
 	@property
 	def includes(self):
 		"""
@@ -211,16 +204,22 @@ class SystemModule(libdev.Sources):
 		"""
 		return self.sources.container / 'include'
 
-	def objects(self, context=None, role=None):
-		"""
-		The route to the objects directory inside the cache.
-		"""
-		return cache_directory(self, context, role, 'objects')
-
 	def compilation_parameters(self, role, language):
 		return {}
 
-def load(typ):
+	def link(self, link_operation, *roles):
+		"""
+		Return the &load parameter for recommending a type of link.
+		"""
+		if self.system_object_type == 'fragment':
+			raise RuntimeError("link specification is always 'union' for fragments")
+
+		if link_operation not in {'include', 'reference'}:
+			raise ValueError("ltype must be 'intersection' or 'union'")
+
+		return (self, (link_operation, roles))
+
+def load(typ, *parameters, **keywords):
 	"""
 	Load a development factor performing a build when needed.
 	"""
@@ -252,4 +251,6 @@ def load(typ):
 				module.execution_context_extension = False
 		module.system_object_type = typ[typ.find('.')+1:]
 
+	module.parameters = dict(x for x in parameters if x is not None)
+	module.configuration = keywords
 	module._init()

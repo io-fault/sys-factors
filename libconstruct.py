@@ -23,8 +23,6 @@ necessary procedures for constructing a target.
 import os
 import sys
 import copy
-import builtins
-import subprocess
 import functools
 import itertools
 import collections
@@ -221,8 +219,7 @@ def collect(module, types=(libfactor.SystemModule, libfactor.ProbeModule)):
 
 def traverse(working, tree, inverse, module):
 	"""
-	Construct an inverted directed graph of dependencies from the
-	module's dependencies.
+	Invert the directed graph of dependencies from the target modules.
 
 	System object factor modules import their dependencies into their global
 	dictionary forming a directed graph. The imported system object factor
@@ -309,7 +306,8 @@ def identity(module):
 
 def unix_compiler_collection(context, output, inputs,
 		mechanism=None,
-		format=None, # The selected language.
+		language=None, # The selected language.
+		format=None, # PIC vs PIE vs PDC
 		verbose=True, # Enable verbose output.
 		emit_dependencies=False,
 
@@ -324,7 +322,13 @@ def unix_compiler_collection(context, output, inputs,
 		sid_flag='-isystem',
 		id_flag='-I', si_flag='-include',
 		debug_flag='-g',
-		pic_flag='-fPIC',
+		format_map = {
+			'pic': '-fPIC',
+			'pie': '-fPIE',
+			'pdc': ({
+				'darwin': '-mdynamic-no-pic',
+			}).get(sys.platform)
+		},
 		co_flag='-O', define_flag='-D',
 		overflow_map = {
 			'wrap': '-fwrapv',
@@ -350,14 +354,17 @@ def unix_compiler_collection(context, output, inputs,
 	commands for a compiler collection.
 	"""
 	get = context.get
+	sys = get('system')
+	typ = sys.get('type')
 	role = get('role')
 	command = [None, compile_flag]
 	if verbose:
 		command.append(verbose_flag)
 
+	# Add language flag if it's a compiler collection.
 	if mechanism['type'] == 'collection':
-		if format is not None:
-			command.extend((language_flag, format))
+		if language is not None:
+			command.extend((language_flag, language))
 
 	if 'standards' in context:
 		standard = get('standards', None).get(format, None)
@@ -367,9 +374,10 @@ def unix_compiler_collection(context, output, inputs,
 	command.append(visibility) # Encourage use of SYMBOL() define.
 	command.append(color)
 
-	# -fPIC or not.
-	link_type = get('type', 'dynamic')
-	command.append(pic_flag)
+	# -fPIC, -fPIE or nothing. -mdynamic-no-pic for MacOS X.
+	format_flags = format_map.get(format)
+	if format_flags is not None:
+		command.append(format_flags)
 
 	# Compiler optimization target: -O0, -O1, ..., -Ofast, -Os, -Oz
 	co = optimizations[role]
@@ -388,24 +396,24 @@ def unix_compiler_collection(context, output, inputs,
 		command.extend(('-fprofile-instr-generate', '-fcoverage-mapping'))
 
 	# Include Directories; -I option.
-	sid = list(get('system.include.directories', ()))
+	sid = list(sys.get('include.directories', ()))
 	command.extend([id_flag + str(x) for x in sid])
 
 	# -include files. Forced inclusion.
-	sis = get('include.set') or ()
+	sis = sys.get('include.set') or ()
 	for x in sis:
 		command.extend((si_flag, x))
 
 	module = get('module')
 
 	# -D defines.
-	sp = [define_flag + '='.join(x) for x in get('compiler.preprocessor.defines', ())]
+	sp = [define_flag + '='.join(x) for x in sys.get('source.parameters', ())]
 	command.extend(sp)
 
-	command.append(define_flag + 'FAULT_TYPE=' + get('type', 'unspecified'))
+	command.append(define_flag + 'FAULT_TYPE=' + (typ or 'unspecified'))
 
 	# -U undefines.
-	spo = ['-U' + x for x in get('compiler.preprocessor.undefines', ())]
+	spo = ['-U' + x for x in sys.get('compiler.preprocessor.undefines', ())]
 	command.extend(spo)
 
 	if emit_dependencies:
@@ -429,43 +437,62 @@ def windows_link_editor(context, output, inputs):
 
 def macosx_link_editor(context, output, inputs,
 		mechanism=None,
+		format=None,
 		filepath=str,
-		link_flag='-l', libdir_flag='-L',
+		pie_flag='-pie',
+		libdir_flag='-L',
 		rpath_flag='-rpath',
 		output_flag='-o',
+		link_flag='-l',
+		ref_flags = {
+			'weak': '-weak-l',
+			'lazy': '-lazy-l',
+			'default': '-l',
+		},
 		type_map = {
 			'executable': '-execute',
 			'library': '-dylib',
 			'extension': '-bundle',
-			'collection': '-r',
+			'fragment': '-r',
 		},
+		lto_preserve_exports='-export_dynamic',
+		platform_version_flag='-macosx_version_min',
 	):
 	"""
 	Command constructor for Mach-O link editor provided on Apple MacOS X systems.
 	"""
 	get = context.get
-	command = [None, '-t']
+	command = [None, '-t', lto_preserve_exports, platform_version_flag, '10.11.0',]
 
-	typ = get('system.type')
+	sys = get('system')
+	typ = sys.get('type')
+
 	loutput_type = type_map[typ]
 	command.append(loutput_type)
+	if typ == 'executable':
+		if format == 'pie':
+			command.append(pie_flag)
 
-	command.extend([libdir_flag+filepath(x) for x in context['system.library.directories']])
+	if typ != 'fragment':
+		command.extend([libdir_flag+filepath(x) for x in sys['library.directories']])
+
+		support = context['mechanisms']['system']['objects'][typ].get(format)
+		if support is not None:
+			prefix, suffix = support
+		else:
+			prefix = suffix = ()
+
+		command.extend(prefix)
+		command.extend(inputs)
+
+		command.extend([link_flag+filepath(x) for x in sys.get('library.set', ())])
+		command.append(link_flag+'System')
+
+		command.extend(suffix)
+	else:
+		command.extend(inputs)
 
 	command.extend((output_flag, filepath(output)))
-	if typ == 'executable':
-		rt = context['mechanisms']['system']['runtime'][typ]
-		prefix, suffix = rt['pdc']
-	else:
-		prefix = suffix = ()
-
-	command.extend(prefix)
-	command.extend(inputs)
-
-	command.extend([link_flag+filepath(x) for x in context.get('system.library.set', ())])
-	command.append('-lSystem')
-
-	command.extend(suffix)
 
 	return command
 
@@ -473,6 +500,7 @@ def unix_link_editor(context, output, inputs,
 		mechanism=None,
 		verbose=True,
 		filepath=str,
+		pie_flag='-pie',
 		verbose_flag='-v',
 		link_flag='-l', libdir_flag='-L',
 		rpath_flag='-rpath',
@@ -507,40 +535,40 @@ def unix_link_editor(context, output, inputs,
 		Enable or disable the verbosity of the command. Defaults to &True.
 	"""
 	get = context.get
+	sys = get('system')
+	typ = sys.get('type')
+
 	command = [None]
 	add = command.append
 	iadd = command.extend
-	typ = get('system.type')
 
 	if verbose:
 		add(verbose_flag)
 
-	systype = get('system.type')
-
-	loutput_type = type_map[systype] # failure indicates bad type parameter to libfactor.load()
+	loutput_type = type_map[typ] # failure indicates bad type parameter to libfactor.load()
 	if loutput_type:
 		add(loutput_type)
 
-	sld = get('system.library.directories', ())
-	libdirs = [libdir_flag + filepath(x) for x in sld]
+	if typ != 'fragment':
+		sld = sys.get('library.directories', ())
+		libdirs = [libdir_flag + filepath(x) for x in sld]
 
-	sls = get('system.library.set', ())
-	libs = [link_flag + filepath(x) for x in sls]
+		sls = sys.get('library.set', ())
+		libs = [link_flag + filepath(x) for x in sls]
 
-	rt = context['mechanisms']['system']['runtime'][typ]
-	if 'pic' in rt:
-		prefix, suffix = rt['pic']
-	else:
-		prefix = suffix = ()
+		rt = context['mechanisms']['system']['objects'][typ]
+		if 'pic' in rt:
+			prefix, suffix = rt['pic']
+		else:
+			prefix = suffix = ()
+
+		command.extend(prefix)
+		command.extend(map(filepath, inputs))
+		command.extend(libdirs)
+		command.extend(libs)
+		command.extend(suffix)
 
 	command.extend((output_flag, output))
-
-	command.extend(prefix)
-	command.extend(map(filepath, inputs))
-	command.extend(libdirs)
-	command.extend(libs)
-	command.extend(suffix)
-
 	return command
 
 if sys.platform == 'darwin':
@@ -635,7 +663,11 @@ def mechanism(directory, context, role):
 
 	return core_data
 
-def initialize(selection:str, context:str, role:str, module:libdev.Sources, lcd=None):
+def initialize(
+		selection:str, context:str, role:str,
+		module:libdev.Sources, dependents,
+		lcd=None
+	):
 	"""
 	Initialize a construction context for use by &transform and &reduce.
 
@@ -656,71 +688,116 @@ def initialize(selection:str, context:str, role:str, module:libdev.Sources, lcd=
 	incdirs = [include.directory]
 	probes = []
 	libs = []
+	fragments = []
 	refs = []
 	for x in td:
 		if isinstance(x, libfactor.IncludesModule):
 			incdirs.append(x.sources)
 		elif isinstance(x, libfactor.ProbeModule):
 			probes.append(x)
-		elif isinstance(x, libfactor.SystemModule) and x.system_object_type == 'library':
-			libs.append(x)
+		elif isinstance(x, libfactor.SystemModule):
+			if x.system_object_type == 'library':
+				libs.append(x)
+			elif x.system_object_type == 'fragment':
+				fragments.append(x)
 		else:
 			refs.append(x)
 
 	work = libfactor.cache_directory(module, context, role, 'x').container
 
 	# context: context -> role -> purpose -> format
-	core_data = mechanism(lcd or root_context_directory(), selection, role)
+	mechanisms = mechanism(lcd or root_context_directory(), selection, role)
 
+	# the full context dictionary.
 	parameters = {
+		'name': context, # context name
 		'module': module,
 		'role': role,
-		'name': context,
-		# Target type being built.
-		'type': getattr(module, 'system_object_type', None),
-		'system.type': getattr(module, 'system_object_type', None),
-		'reduction': module.output(context, role),
 
 		'probes': probes, # libfactor.ProbeModule
-		'libraries': libs, # system.library modules
 		'references': refs, # libdev.Sources instances
-
-		'mechanisms': core_data,
-
-		'system.include.directories': incdirs,
-		'system.library.directories': [],
-		'system.library.set': set(),
-
-		'compiler.preprocessor.defines': [
-			('F_ROLE', role),
-			('F_ROLE_ID', 'F_ROLE_' + role.upper() + '_ID'),
-		],
 
 		'locations': {
 			'sources': module.sources,
 			'work': work,
-			'objects': libfactor.cache_directory(module, context, role, 'objects'),
-			'libraries': libfactor.cache_directory(module, context, role, 'lib'),
+			'output': libfactor.cache_directory(module, context, role, 'out'),
 			'logs': libfactor.cache_directory(module, context, role, 'log'),
+			'libraries': libfactor.cache_directory(module, context, role, 'lib'),
 			'dependencies': libfactor.cache_directory(module, context, role, 'dl'),
+		},
+
+		# Mechanisms (compiler/linker) for the context+role combination.
+		'mechanisms': mechanisms,
+
+		# Context data for system subject.
+		'system': {
+			'type': getattr(module, 'system_object_type', None), # Conceptual
+			'formats': set(),
+			'libraries': libs, # dependencies that are system libraries.
+			'fragments': fragments,
+			'include.directories': incdirs,
+
+			'library.directories': [],
+			'library.set': set(),
+
+			'source.parameters': [
+				('F_ROLE', role),
+				('F_ROLE_ID', 'F_ROLE_' + role.upper() + '_ID'),
+			],
 		}
 	}
-	libdir = parameters['locations']['libraries']
+
+	# The code formats and necessary reductions need to be identified.
+	# Dependents ultimately determine what this means by designating
+	# the type of link that should be used for a given role.
+
+	sys = parameters['system']
+	typ = sys['type']
+	sysformats = mechanisms['system']['formats'] # code types used by the object types
+
+	if typ in {'executable', 'extension', 'library'}:
+		# system/user is the dependent.
+		# Usually, PIC for extensions, PDF for executables.
+		sys['formats'].add(sysformats[typ])
+	else:
+		# For fragments, the dependents decide
+		# the format set to build. If no format is designated,
+		# the default code type and link is configured.
+
+		links = set()
+		for x in dependents:
+			sys['formats'].add(sysformats[x.system_object_type])
+
+			dparams = getattr(x, 'parameters', None)
+			if dparams is None or not dparams:
+				# no configuration to analyze
+				links.add(link_operations[(x.system_object_type, typ)])
+				continue
+
+			# get any dependency parameters for this target.
+			links.add(dparams.get(module))
 
 	# Full set of regular files in the sources location.
 	if parameters['locations']['sources'].exists():
 		parameters['sources'] = parameters['locations']['sources'].tree()[1]
 
 	# Local dependency set comes first.
-	parameters['system.library.directories'] = [parameters['locations']['libraries']]
+	parameters['system']['library.directories'] = [parameters['locations']['libraries']]
 
-	for probe in probes:
-		report = probe.report(probe, selection, role, module)
-		merge(parameters, report) # probe parameter merge
-
+	libdir = parameters['locations']['libraries']
 	for lib in libs:
 		libname = identity(lib)
-		parameters['system.library.set'].add(libname)
+		parameters['system']['library.set'].add(libname)
+
+	# Add include directories from libraries and fragments.
+	for inc in itertools.chain(libs, fragments):
+		incdir = inc.sources.container / 'include'
+		if incdir.exists():
+			sys['include.directories'].append(incdir)
+
+	for probe in probes:
+		report = probe.report(probe, selection or 'host', role, module)
+		merge(parameters, report) # probe parameter merge
 
 	if libpython in probes:
 		# Note as building a Python extension.
@@ -731,7 +808,7 @@ def initialize(selection:str, context:str, role:str, module:libdev.Sources, lcd=
 		parameters['execution_context_extension'] = False
 		idefines = factor_defines(module.__name__)
 
-	parameters['compiler.preprocessor.defines'].extend(idefines)
+	parameters['system']['source.parameters'].extend(idefines)
 
 	return parameters
 
@@ -749,11 +826,7 @@ def context_interface(path):
 
 def transform(context, type, filtered=(lambda x,y,z: False)):
 	"""
-	Using the given set of &processors, prepare the parameters to be given to the
-	processor from the probes referenced &module.
-
-	The &context and &role parameters define the perspective that the target is to
-	be built for; cache directories are referenced and created using these parameters.
+	Transform the sources using the mechanisms defined in &context.
 
 	[ Parameters ]
 	/context
@@ -766,11 +839,18 @@ def transform(context, type, filtered=(lambda x,y,z: False)):
 	if 'sources' not in context:
 		return
 
+	sys = context['system']
 	loc = context['locations']
-	emitted = set([loc['logs'], loc['objects']])
+	formats = sys['formats']
 
-	yield ('directory', loc['logs'])
-	yield ('directory', loc['objects'])
+	emitted = set([loc['output']])
+	emitted.add(loc['logs'])
+	emitted.add(loc['output'])
+	emitted.update([loc['output'] / typ for typ in formats])
+
+	for x in emitted:
+		yield ('directory', x)
+
 	mech = context['mechanisms']
 	mech = mech['system']['transformations']
 	mech_cache = {}
@@ -806,32 +886,35 @@ def transform(context, type, filtered=(lambda x,y,z: False)):
 			mech_cache[lang] = cmech
 			lmech = cmech
 
-		obj = libroutes.File(loc['objects'], src.points)
-		depfile = libroutes.File(loc['dependencies'], src.points)
-
-		if filtered(obj, src, depfile):
-			continue
-
-		logfile = libroutes.File(loc['logs'], src.points)
-
-		for x in (obj, depfile, logfile):
-			d = x.container
-			if d not in emitted:
-				emitted.add(d)
-				yield ('directory', d)
-
 		ifpath = lmech['interface'] # python
 		xf = context_interface(ifpath)
-		genobj = functools.partial(xf, mechanism=lmech, format=lang)
 
-		# compilation
-		go = {}
-		compilation = genobj(context, obj, (src,))
-		compilation[0] = lmech['command']
+		depfile = libroutes.File(loc['dependencies'], src.points)
+		for fmt in formats:
+			# Iterate over formats (pic, pdc, pie).
+			obj = libroutes.File(loc['output'] / fmt, src.points)
 
-		yield ('execute', compilation, logfile)
+			if filtered(obj, src, depfile):
+				continue
 
-def reduce(context):
+			logfile = libroutes.File(loc['logs'] / fmt, src.points)
+
+			for x in (obj, depfile, logfile):
+				d = x.container
+				if d not in emitted:
+					emitted.add(d)
+					yield ('directory', d)
+
+			genobj = functools.partial(xf, mechanism=lmech, language=lang, format=fmt)
+
+			# compilation
+			go = {}
+			compilation = genobj(context, obj, (src,))
+			compilation[0] = lmech['command']
+
+			yield ('execute', compilation, logfile)
+
+def reduce(context, sys_platform=sys.platform):
 	"""
 	Construct the operations for reducing the object files created by &transform
 	instructions into a set of targets that can satisfy
@@ -842,46 +925,70 @@ def reduce(context):
 		The construction context created by &initialize.
 	"""
 
+	ctx = context['name']
 	role = context['role']
 	# target library directory containing links to dependencies
 	locs = context['locations']
 	libdir = locs['libraries']
-	output = context['reduction']
-	mech = context['mechanisms']['system']['reductions'][None]
+
+	subject = context.get('subject', 'system')
+	mech = context['mechanisms'][subject]['reductions'][None]
 	xf = context_interface(mech['interface'])
+
+	sys = context['system']
+	formats = tuple(sys['formats'])
 
 	if 'sources' not in context:
 		# Nothing to reduce.
 		return
 
-	yield ('directory', output.container)
 	yield ('directory', libdir)
 
 	libs = []
 
-	for x in context['libraries']:
+	for x in context['system']['libraries']:
 		# Create symbolic links inside the target's local library directory.
 		# This is done to avoid a large number of -L options in targets
 		# with a large number of dependencies.
 
 		# Explicit link of factor.
-		libdep = x.output(context['name'], role)
+		libdep = x.output(ctx, role)
 		li = identity(x)
-		lib = libdir / library_filename(sys.platform, li)
+		lib = libdir / library_filename(sys_platform, li)
 		yield ('link', libdep, lib)
 		libs.append(li)
 
+	fragments = [x.output(ctx, role) for x in context['system']['fragments']]
+
 	# Discover the known sources in order to identify which objects should be selected.
-	objdir = locs['objects']
-	objects = [
-		libroutes.File(objdir, x.points) for x in context['sources']
-		if x.extension not in {'h'} and not x.identifier.startswith('.')
-	]
+	output_base = context['module'].output(ctx, role)
+	typ = sys['type']
+	if typ == 'fragment':
+		# Fragments may have multiple builds.
+		# A library may want PIC and an executable, PIE.
+		# The additional compilation allows the fragment to offer
+		# library or executable specific code as well.
+		outputs = [
+			output_base / fmt for fmt in formats
+		]
+		yield ('directory', output_base)
+	else:
+		assert len(formats) == 1
+		outputs = (output_base,)
 
-	cmd = xf(context, output, objects, mechanism=mech)
-	cmd[0] = mech['command']
+	for fmt, output in zip(formats, outputs):
+		objdir = locs['output'] / fmt
+		objects = [
+			libroutes.File(objdir, x.points) for x in context['sources']
+			if x.extension not in {'h'} and not x.identifier.startswith('.')
+		]
+		if fragments:
+			objects.extend([x / fmt for x in fragments])
 
-	yield ('execute', cmd, locs['logs'] / 'reduction')
+		cmd = xf(context, output, objects, mechanism=mech, format=fmt)
+		cmd[0] = mech['command']
+
+		yield ('execute', cmd, locs['logs'] / fmt / 'reduction')
 
 def parse_make_dependencies(make_rule_str):
 	"""
@@ -899,12 +1006,11 @@ def parse_make_dependencies(make_rule_str):
 class Construction(libio.Processor):
 	"""
 	Construction process manager. Maintains the set of target modules to construct and
-	dispatches the work to be performed for completion.
+	dispatches the work to be performed for completion in the appropriate order.
 
 	! DEVELOPER:
 		Primarily, this class traverses the directed graph constructed by imports
-		performed by the target modules being built. It works specifically with
-		&.libfactor.load modules, and should be generalized.
+		performed by the target modules being built.
 	"""
 
 	def __init__(self, context, role, modules, processors=4):
@@ -939,7 +1045,7 @@ class Construction(libio.Processor):
 		self.drain_process_queue()
 		return super().actuate()
 
-	def collect(self, module, dependencies=()):
+	def collect(self, module, dependents=()):
 		"""
 		Collect all the work to be done for building the desired targets.
 		"""
@@ -956,16 +1062,18 @@ class Construction(libio.Processor):
 				context = 'host'
 		else:
 			# context was explicitly stated meaning
-			# extension modules are built for mounting.
+			# extension modules are not built for mounting.
 			pass
 
 		if isinstance(module, libfactor.ProbeModule):
 			# Needs to be transformed into a job.
 			# Probes are deployed per dependency.
-			probe_set = [('probe', module, x) for x in dependencies]
+			probe_set = [('probe', module, x) for x in dependents]
 			tracks.append(probe_set)
 		else:
-			ctx = initialize(self.cx_context, context, self.cx_role, module)
+			ctx = initialize(
+				self.cx_context, context, self.cx_role, module, dependents
+			)
 			xf = list(transform(ctx, None))
 			rd = list(reduce(ctx))
 			tracks.extend((xf, rd))
@@ -1007,6 +1115,7 @@ class Construction(libio.Processor):
 		assert typ == 'execute'
 		strcmd = tuple(map(str, cmd))
 
+		pid = None
 		with log.open('wb') as f:
 			f.write(b'[Command]\n')
 			f.write(' '.join(strcmd).encode('utf-8'))
@@ -1017,6 +1126,7 @@ class Construction(libio.Processor):
 				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(),1), (f.fileno(),2)))
 				sp = libio.Subprocess(pid)
 
+		#print(' '.join(strcmd) + ' #' + str(pid))
 		self.sector.dispatch(sp)
 		sp.atexit(functools.partial(self.process_exit, start=libtime.now(), descriptor=(typ, cmd, log), module=module))
 
