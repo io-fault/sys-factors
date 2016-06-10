@@ -553,6 +553,8 @@ def unix_link_editor(context, output, inputs,
 
 		sls = sys.get('library.set', ())
 		libs = [link_flag + filepath(x) for x in sls]
+		if 'abi' in sys:
+			command.extend((soname_flag, sys['abi']))
 
 		rt = context['mechanisms']['system']['objects'][typ][format]
 		prefix, suffix = rt
@@ -729,6 +731,7 @@ def initialize(
 		# Context data for system subject.
 		'system': {
 			'type': getattr(module, 'system_object_type', None), # Conceptual
+			'abi': getattr(module, 'abi', None), # -soname for unix/elf.
 			'formats': set(),
 			'libraries': libs, # dependencies that are system libraries.
 			'fragments': fragments,
