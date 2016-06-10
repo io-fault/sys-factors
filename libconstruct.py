@@ -79,7 +79,6 @@ python_triplet = libdev.python_context(
 
 merge_operations = {
 	set: set.update,
-	dict: dict.update,
 	list: list.extend,
 	int: int.__add__,
 	tuple: (lambda x, y: x + tuple(y)),
@@ -95,18 +94,16 @@ def merge(parameters, source, operations = merge_operations):
 	"""
 	for key in source:
 		if key in parameters:
-			if key in operations:
-				# merge operation overloaded by key
-				mokey = key
+			# merge parameters by class
+			cls = parameters[key].__class__
+			if cls is dict:
+				merge_op = merge
 			else:
-				# merge parameters by class
-				mokey = parameters[key].__class__
-
-			merge_op = operations[mokey]
+				merge_op = operations[cls]
 
 			# DEFECT: The manipulation methods often return None.
 			r = merge_op(parameters[key], source[key])
-			if r is not parameters[key] and r is not None:
+			if r is not None and r is not parameters[key]:
 				parameters[key] = r
 		else:
 			parameters[key] = source[key]
