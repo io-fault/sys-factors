@@ -1007,6 +1007,9 @@ class Construction(libio.Processor):
 	! DEVELOPER:
 		Primarily, this class traverses the directed graph constructed by imports
 		performed by the target modules being built.
+
+		Refactoring could yield improvements; notably moving the work through a Flow
+		in order to leverage obstruction signalling.
 	"""
 
 	def __init__(self, context, role, modules, processors=4):
