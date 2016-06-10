@@ -771,7 +771,6 @@ def initialize(
 			dparams = getattr(x, 'parameters', None)
 			if dparams is None or not dparams:
 				# no configuration to analyze
-				links.add(link_operations[(x.system_object_type, typ)])
 				continue
 
 			# get any dependency parameters for this target.
