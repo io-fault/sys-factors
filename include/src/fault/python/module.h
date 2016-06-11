@@ -14,14 +14,35 @@ do { \
 	__dict__ = NULL; \
 } while(0)
 
-#if TEST()
+#if TEST() || METRICS()
 	#define DEFINE_MODULE_GLOBALS \
 		PyObj __ERRNO_RECEPTACLE__; \
 		PyObj __PYTHON_RECEPTACLE__; \
 		PyObj __dict__ = NULL;
+
+	#define DROP_MODULE_GLOBALS() do { \
+			Py_XDECREF(__ERRNO_RECEPTACLE__); \
+			Py_XDECREF(__PYTHON_RECEPTACLE__); \
+			__ERRNO_RECEPTACLE__ = NULL; \
+			__PYTHON_RECEPTACLE__ = NULL; \
+		} while(0)
+
+	#define INIT_MODULE_GLOBALS() \
+		__ERRNO_RECEPTACLE__ = PyDict_New(); \
+		__PYTHON_RECEPTACLE__ = PyDict_New(); \
+		if (PyErr_Occurred()) { \
+			DROP_MODULE_GLOBALS(); \
+		} else { \
+			PyDict_SetItemString(__dict__, "__ERRNO_RECEPTACLE__", __ERRNO_RECEPTACLE__); \
+			PyDict_SetItemString(__dict__, "__PYTHON_RECEPTACLE__", __ERRNO_RECEPTACLE__); \
+		}
 #else
 	#define DEFINE_MODULE_GLOBALS \
 		PyObj __dict__ = NULL;
+
+	/* Nothing without TEST || METRICS */
+	#define INIT_MODULE_GLOBALS() ;
+	#define DROP_MODULE_GLOBALS() ;
 #endif
 
 #define _py_INIT_FUNC_X(BN) CONCAT_IDENTIFIER(PyInit_, BN)
@@ -60,7 +81,18 @@ do { \
 			*MOD = NULL; \
 		} \
 		else \
-			*MOD = _MOD; \
+		{ \
+			INIT_MODULE_GLOBALS(); \
+			if (PyErr_Occurred()) \
+			{ \
+				Py_DECREF(_MOD); \
+				*MOD = NULL; \
+			} \
+			else \
+			{ \
+				*MOD = _MOD; \
+			} \
+		} \
 	} \
 } while(0)
 #else
