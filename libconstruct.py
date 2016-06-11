@@ -585,6 +585,12 @@ elif sys.platform in ('win32', 'win64'):
 else:
 	link_editor = unix_link_editor
 
+def reconstruct(outputs, inputs, depfile):
+	"""
+	Unconditionally report the &outputs as outdated.
+	"""
+	return False
+
 def updated(outputs, inputs, depfile):
 	"""
 	Return whether or not the &outputs need to be updated.
@@ -1025,7 +1031,8 @@ class Construction(libio.Processor):
 		in order to leverage obstruction signalling.
 	"""
 
-	def __init__(self, context, role, modules, processors=4):
+	def __init__(self, context, role, modules, reconstruct=False, processors=4):
+		self.reconstruct = reconstruct
 		self.failures = 0
 		self.cx_context = context
 		self.cx_role = role
@@ -1045,6 +1052,11 @@ class Construction(libio.Processor):
 		super().__init__()
 
 	def actuate(self):
+		if self.reconstruct:
+			self._filter = reconstruct
+		else:
+			self._filter = updated
+
 		try:
 			modules, deps = next(self.sequence) # WorkingSet
 		except StopIteration:
@@ -1086,8 +1098,8 @@ class Construction(libio.Processor):
 			ctx = initialize(
 				self.cx_context, context, self.cx_role, module, dependents
 			)
-			xf = list(transform(ctx, filtered=updated))
-			rd = list(reduce(ctx, filtered=updated))
+			xf = list(transform(ctx, filtered=self._filter))
+			rd = list(reduce(ctx, filtered=self._filter))
 			tracks.extend((xf, rd))
 
 		if tracks:

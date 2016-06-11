@@ -139,7 +139,8 @@ def main(role='optimal', mount_extensions=True):
 		cxn = libconstruct.Construction(
 			context_name, role,
 			root_system_modules,
-			processors=max(2, ncpu)
+			processors=max(2, ncpu),
+			reconstruct=reconstruct,
 		)
 		sector.dispatch(cxn)
 		cxn.atexit(functools.partial(set_exit_code, unit=sector.unit))
