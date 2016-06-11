@@ -103,7 +103,7 @@ def main(role='optimal', mount_extensions=True):
 				# libdev.Sources and is identified as being constructed.
 				root_system_modules.append((target, tm))
 
-		if mount_extensions and role not in {'test', 'survey'}:
+		if mount_extensions and role not in {'test', 'metrics'}:
 			# Construct a separate list of Python extensions for subsequent mounting.
 			exe_ctx_extensions = []
 
@@ -127,7 +127,8 @@ def main(role='optimal', mount_extensions=True):
 			pass
 
 		cxn = libconstruct.Construction(
-			context_name, role, root_system_modules,
+			context_name, role,
+			root_system_modules,
 			processors=max(2, ncpu)
 		)
 		sector.dispatch(cxn)

@@ -589,12 +589,13 @@ def updated(outputs, inputs, depfile):
 	"""
 	Return whether or not the &outputs need to be updated.
 	"""
+	olm = None
 	for x in outputs:
 		if not x.exists():
 			# No such object, not updated.
 			return False
 		lm = x.last_modified()
-		olm = min(x)
+		olm = min(lm, olm or lm)
 
 	for x in inputs:
 		if olm < x.last_modified():
@@ -831,7 +832,7 @@ def context_interface(path):
 		obj = getattr(obj, x)
 	return obj
 
-def transform(context, type, filtered=(lambda x,y,z: False)):
+def transform(context, filtered=(lambda x,y,z: False)):
 	"""
 	Transform the sources using the mechanisms defined in &context.
 
@@ -901,7 +902,7 @@ def transform(context, type, filtered=(lambda x,y,z: False)):
 			# Iterate over formats (pic, pdc, pie).
 			obj = libroutes.File(loc['output'] / fmt, src.points)
 
-			if filtered(obj, src, depfile):
+			if filtered((obj,), (src,), depfile):
 				continue
 
 			logfile = libroutes.File(loc['logs'] / fmt, src.points)
@@ -921,7 +922,7 @@ def transform(context, type, filtered=(lambda x,y,z: False)):
 
 			yield ('execute', compilation, logfile)
 
-def reduce(context, sys_platform=sys.platform):
+def reduce(context, filtered=(lambda x,y,z: False), sys_platform=sys.platform):
 	"""
 	Construct the operations for reducing the object files created by &transform
 	instructions into a set of targets that can satisfy
@@ -992,10 +993,11 @@ def reduce(context, sys_platform=sys.platform):
 		if fragments:
 			objects.extend([x / fmt for x in fragments])
 
-		cmd = xf(context, output, objects, mechanism=mech, format=fmt)
-		cmd[0] = mech['command']
+		if not filtered((output,), objects, None):
+			cmd = xf(context, output, objects, mechanism=mech, format=fmt)
+			cmd[0] = mech['command']
 
-		yield ('execute', cmd, locs['logs'] / fmt / 'reduction')
+			yield ('execute', cmd, locs['logs'] / fmt / 'reduction')
 
 def parse_make_dependencies(make_rule_str):
 	"""
@@ -1084,8 +1086,8 @@ class Construction(libio.Processor):
 			ctx = initialize(
 				self.cx_context, context, self.cx_role, module, dependents
 			)
-			xf = list(transform(ctx, None))
-			rd = list(reduce(ctx))
+			xf = list(transform(ctx, filtered=updated))
+			rd = list(reduce(ctx, filtered=updated))
 			tracks.extend((xf, rd))
 
 		if tracks:
