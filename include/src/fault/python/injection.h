@@ -1,7 +1,7 @@
 /*
  * Support for failure injection.
  */
-#if TEST() || SURVEY()
+#if TEST() || METRICS()
 extern PyObj __ERRNO_RECEPTACLE__;
 extern PyObj __PYTHON_RECEPTACLE__;
 

@@ -1,7 +1,7 @@
 """
 Test coverage data aggregation and serialization.
 
-Used in conjunction with &.bin.survey and &..factors to report the collected trace data.
+Used in conjunction with &.bin.measure and &..factors to report the collected trace data.
 
 [ Development Tasks ]
 
@@ -27,7 +27,7 @@ from ..xml import library as libxml
 
 # xml schemas and serialization.
 from .xml import libtest
-from .xml import libsurvey
+from .xml import libmetrics
 
 from . import libpython
 from . import libtrace
@@ -196,10 +196,10 @@ def isolate(measures) -> dict:
 
 def merge(perspective, sfm, project_entry, measures):
 	"""
-	Merge the re-oriented survey data into the given perspective and return
+	Merge the re-oriented metrics into the given perspective and return
 	the test results in a dictionary..
 
-	This loads the stored survey data from disk for the given test specified in &project_entry.
+	This loads the stored metrics from disk for the given test specified in &project_entry.
 	"""
 	import pickle
 	# recollect stored coverage data and orient them relative to the project
@@ -233,7 +233,7 @@ def group(times, counts):
 	[ Parameters ]
 
 	/measures
-		A mapping of test results produced by &.bin.survey.
+		A mapping of test results produced by &.bin.measure.
 	"""
 
 	# recollect stored coverage data and orient them relative to the project
@@ -262,8 +262,8 @@ def coverage(module, counts, RangeSet=librange.RangeSet):
 
 		For gcov, the diagnostic files produced during tests runs were processed
 		and the traversed-traversable information was available at the end of the test.
-		Currently, survey does not collect this information as the structure of extension
-		modules have changed to a multi-file configuration.
+		Currently, the measurements do not collect this information as the structure of
+		extension modules have changed to a multi-file configuration.
 
 		Potentially, traversable information should be made available
 		prior to this point.
@@ -331,41 +331,41 @@ def process(measures, item,
 
 	return (project, (test_results, permodule_times, permodule_counts))
 
-def prepare(survey:libfs.Dictionary, store=pickle.dump):
+def prepare(metrics:libfs.Dictionary, store=pickle.dump):
 	"""
-	Prepare the survey data for formatting by &.factors.
+	Prepare the metrics for formatting by &.factors.
 
-	Given a &libfs.Dictionary of collected survey data(&Harness), process
+	Given a &libfs.Dictionary of collected metrics(&Harness), process
 	it into a form that is more suitable for consumption by reporting tools.
 	"""
 
-	i = isolate(survey)
+	i = isolate(metrics)
 
 	# Process on a per-project basis so old perspectives can be thrown away.
 	for project, data in i.items():
 		print(project)
 		project_key = str(project).encode('utf-8')
-		data = process(survey, (project, data))[1]
+		data = process(metrics, (project, data))[1]
 
 		# project test results
 		# per-module times and counts.
 		test_results, pm_times, pm_counts = data
 		for module, times in pm_times.items():
 			m = str(module).encode('utf-8')
-			with survey.route(b'profile:'+m).open('wb') as f:
+			with metrics.route(b'profile:'+m).open('wb') as f:
 				store(times, f)
 
 		for module, counts in pm_counts.items():
 			m = str(module).encode('utf-8')
-			with survey.route(b'coverage:'+m).open('wb') as f:
+			with metrics.route(b'coverage:'+m).open('wb') as f:
 				store(dict(counts), f)
 
-		with survey.route(b'tests:'+project_key).open('wb') as f:
+		with metrics.route(b'tests:'+project_key).open('wb') as f:
 			store(test_results, f)
 
 class Harness(libharness.Harness):
 	"""
-	Test harness for surveying a project using its tests.
+	Test harness for measuring a project using its tests.
 	"""
 	from ..chronometry import library as libtime
 
@@ -425,7 +425,7 @@ class Harness(libharness.Harness):
 	def seal(self, test):
 		"""
 		Perform the test and store its report and measurements into
-		the configured survey data directory.
+		the configured metrics directory.
 		"""
 		trace, events = libtrace.prepare()
 		subscribe = trace.subscribe

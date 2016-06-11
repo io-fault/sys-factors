@@ -57,7 +57,7 @@ arbitrarily enabled allowing production to be profiled.
 [ Coverage ]
 
 &.libtrace also provides support for collecting line coverage of Python modules.
-Primarily, coverage is a feature of &.bin.survey which will associate coverage
+Primarily, coverage is a feature of &.bin.measure which will associate coverage
 and profile data with the tests that cause them.
 
 [ Debugging ]
@@ -72,5 +72,5 @@ provides an abstraction for Python and the debugger included in &/sw/llvm.
 -----------------
 
 API documentation and narratives are extracted into an XML format with help from &..factors.
-Used in conjunction with &.bin.survey, coverage and test results are joined into the XML for reporting into
+Used in conjunction with &.bin.measure, coverage, profile, and test results are joined into the XML for reporting into
 the HTML for human readable publication.

@@ -33,7 +33,7 @@ def select(module, role):
 	Designate that the given role should be used for the identified &package and its content.
 
 	&select should only be used during development or development related operations. Notably,
-	selecting the role for a given package during the testing or surveyence of a project.
+	selecting the role for a given package during the testing of a project.
 
 	It can also be used for one-off debugging purposes where a particular target is of interest.
 	"""

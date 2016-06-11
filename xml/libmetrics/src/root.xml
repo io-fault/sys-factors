@@ -2,17 +2,17 @@
 <!-- XML description of a language agnostic Traceback; a stack of frames !-->
 <grammar
 	xmlns="http://relaxng.org/ns/structure/1.0"
-	ns="https://fault.io/xml/survey#profile"
+	ns="https://fault.io/xml/metrics#profile"
 	datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes"
 	xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0">
 
 	<a:documentation>
-		Grammar for representing survey data.
+		Grammar for representing development metrics.
 	</a:documentation>
 
 	<!-- Used to represent tracebacks for test failures. -->
 
-	<define name="libsurvey.xml.id">
+	<define name="libmetrics.xml.id">
 		<a:documentation>Name attribute used on most elements.</a:documentation>
 		<optional>
 			<attribute name="xml:id">
@@ -24,7 +24,7 @@
 		</optional>
 	</define>
 
-	<define name="libsurvey.xml.space">
+	<define name="libmetrics.xml.space">
 		<attribute name="xml:space">
 			<choice>
 				<value>default</value>
@@ -33,13 +33,13 @@
 		</attribute>
 	</define>
 
-	<define name="libsurvey.identifier">
+	<define name="libmetrics.identifier">
 		<attribute name="identifier">
 			<data type="normalizedString"/>
 		</attribute>
 	</define>
 
-	<define name="libsurvey.report">
+	<define name="libmetrics.report">
 		<a:documentation>Set of data describing a factor or a part of a factor.</a:documentation>
 		<element name="report">
 			<attribute name="timestamp">
@@ -47,15 +47,15 @@
 			</attribute>
 
 			<zeroOrMore>
-				<ref name="libsurvey.measurements"/>
+				<ref name="libmetrics.measurements"/>
 			</zeroOrMore>
 		</element>
 	</define>
 
-	<define name="libsurvey.measurements">
+	<define name="libmetrics.measurements">
 		<a:documentation>Data frames container.</a:documentation>
 		<element name="measurements">
-			<ref name="libsurvey.xml.id"/>
+			<ref name="libmetrics.xml.id"/>
 
 			<optional>
 				<attribute name="dimensions">
@@ -78,27 +78,27 @@
 			</optional>
 
 			<zeroOrMore>
-				<ref name="libsurvey.frame"/>
+				<ref name="libmetrics.frame"/>
 			</zeroOrMore>
 		</element>
 	</define>
 
-	<define name="libsurvey.key">
+	<define name="libmetrics.key">
 		<element>
 			<anyName/>
 			<optional>
-				<ref name="libsurvey.identifier"/>
+				<ref name="libmetrics.identifier"/>
 			</optional>
 
 			<text/>
 		</element>
 	</define>
 
-	<define name="libsurvey.frame">
+	<define name="libmetrics.frame">
 		<element name="frame">
 			<zeroOrMore>
 				<choice>
-					<ref name="libsurvey.xml.id"/>
+					<ref name="libmetrics.xml.id"/>
 					<attribute>
 						<anyName ns="https://fault.io/xml/key"/>
 						<text/>
@@ -120,12 +120,12 @@
 
 			<!-- Keys are isolated so measurements can processed independently -->
 			<zeroOrMore>
-				<ref name="libsurvey.key"/>
+				<ref name="libmetrics.key"/>
 			</zeroOrMore>
 		</element>
 	</define>
 
 	<start>
-		<ref name="libsurvey.report"/>
+		<ref name="libmetrics.report"/>
 	</start>
 </grammar>

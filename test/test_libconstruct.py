@@ -19,16 +19,16 @@ def test_unix_compiler_collection(test):
 	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',))
 	test/cmd == [cc, '-c', '-v', '-fPIC', '-O3', '-g', '-DTEST=VALUE', '-o', 'out.o', 'input.c']
 
-	# coverage flags from survey role.
+	# coverage flags from metrics role.
 	context = {
-		'role': 'survey',
+		'role': 'metrics',
 		'compiler.preprocessor.defines': [
 			('TEST', 'VALUE'),
 		],
 	}
 	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',))
-	survey_head = [cc, '-c', '-v', '-fPIC', '-O1', '-g']
-	test/cmd == survey_head + ['-fprofile-instr-generate', '-fcoverage-mapping', '-DTEST=VALUE', '-o', 'out.o', 'input.c']
+	metrics_head = [cc, '-c', '-v', '-fPIC', '-O1', '-g']
+	test/cmd == metrics_head + ['-fprofile-instr-generate', '-fcoverage-mapping', '-DTEST=VALUE', '-o', 'out.o', 'input.c']
 
 	# include directories
 	context = {

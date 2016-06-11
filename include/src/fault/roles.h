@@ -21,16 +21,16 @@
 
 #define F_ROLE_STR STRING_FROM_IDENTIFIER(F_ROLE)
 #define F_ROLE_TEST_ID 5
-#define F_ROLE_SURVEY_ID 10
+#define F_ROLE_METRICS_ID 10
 #define F_ROLE_FACTOR_ID 1
 #define F_ROLE_INSPECT_ID -1
 #define F_ROLE_DEBUG_ID 2
 
-#define TEST(y) (F_ROLE_ID == F_ROLE_TEST_ID || F_ROLE_ID == F_ROLE_SURVEY_ID)
+#define TEST(y) (F_ROLE_ID == F_ROLE_TEST_ID || F_ROLE_ID == F_ROLE_METRICS_ID)
 #define DEBUG(y) (F_ROLE_ID == F_ROLE_DEBUG_ID)
 #define FACTOR(y) (F_ROLE_ID == F_ROLE_FACTOR_ID)
 #define INSPECT(y) (F_ROLE_ID == F_ROLE_INSPECT_ID)
-#define SURVEY(y) (F_ROLE_ID == F_ROLE_SURVEY_ID)
+#define METRICS(y) (F_ROLE_ID == F_ROLE_METRICS_ID)
 
 #ifndef F_ROLE_ID
 	#error compilation driver was not given a F_ROLE_ID preprocessor definition

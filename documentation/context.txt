@@ -1,8 +1,7 @@
 [ Glossary ]
 
-/Survey
-	The collection of coverage and profile information from the tests provided by a
-	project.
+/Metrics
+	The measurements collected described the effects of the tests provided by a project.
 
 /Harness
 	In the context of &.libtest and &.libharness, a harness is an

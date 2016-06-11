@@ -12,7 +12,7 @@ import itertools
 from ....chronometry import library as libtime
 from ....xml import library as libxml
 
-namespace = 'https://fault.io/xml/survey'
+namespace = 'https://fault.io/xml/metrics'
 
 def profile(serialization, report,
 		timestamp=None, keys=None, prefix='',
