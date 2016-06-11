@@ -38,11 +38,16 @@ def set_exit_code(cxn, unit=None):
 	# Restrict revealed count to 201. The exit code is rather small.
 	unit.result = min(cxn.failures, 201)
 
-def main(sector, role='optimal', mount_extensions=True):
+def main(role='optimal', mount_extensions=True):
 	"""
 	Prepare the entire package building factor targets and writing bytecode.
 	"""
+	from ...io import library as libio
+
+	call = libio.context()
+	sector = call.sector
 	proc = sector.context.process
+
 	args = proc.invocation.parameters['system']['arguments']
 	env = proc.invocation.parameters['system'].get('environment')
 	if not env:
