@@ -60,6 +60,15 @@ def main(role='optimal', mount_extensions=True):
 	role = env.get('FAULT_ROLE', role) or role
 	stack = contextlib.ExitStack()
 
+	if role == 'optimal':
+		opt = 2
+	elif role in {'debug', 'test', 'metrics'}:
+		# run asserts
+		opt = 0
+	else:
+		# keep docstrings, but lose asserts
+		opt = 1
+
 	# collect packages to prepare from positional parameters
 	roots = [
 		libroutes.Import.from_fullname(x)
@@ -77,7 +86,7 @@ def main(role='optimal', mount_extensions=True):
 				with status(str(x)):
 					fp = str(x.file())
 					if fp.endswith('.py'):
-						py_compile.compile(fp)
+						py_compile.compile(fp, optimize=opt)
 
 		# Identify all system modules in project/context package.
 		root_system_modules = []
