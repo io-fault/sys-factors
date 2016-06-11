@@ -234,7 +234,10 @@ collector_call(PyObj self, PyObj args, PyObj kw)
 	event = PyTuple_GET_ITEM(args, EVENT_INDEX);
 	arg = PyTuple_GET_ITEM(args, ARG_INDEX);
 
-	return(trace(self, f, 0, arg));
+	if (trace(self, f, 0, arg))
+		return(NULL);
+
+	Py_RETURN_NONE;
 }
 
 const char collector_doc[] = "A callable object that manages the collection of trace events for later aggregation";
