@@ -96,7 +96,7 @@ class Harness(libharness.Harness):
 			report['fate'] = 'core'
 			test.fate = self.libtest.Core(None)
 			self._report_core(test)
-			self._handle_core(libcore.corelocation(pid))
+			self._handle_core(libcore.location(pid))
 		elif not os.WIFEXITED(status):
 			# redrum
 			import signal
