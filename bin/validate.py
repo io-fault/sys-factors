@@ -13,13 +13,13 @@ from .. import library as libdev
 
 # The escapes are used directly to avoid dependencies.
 exits = {
-	'return': '\x1b[38;5;235m' '+' '\x1b[0m',
-	'pass': '\x1b[38;5;235m' '+' '\x1b[0m',
-	'fail': '\x1b[38;5;196m' '-' '\x1b[0m',
-	'core': '\x1b[38;5;202m' '-' '\x1b[0m',
-	'skip': '\x1b[38;5;237m' '.' '\x1b[0m',
 	'explicit': '\x1b[38;5;237m' 'x' '\x1b[0m',
+	'skip': '\x1b[38;5;237m' 's' '\x1b[0m',
+	'return': '\x1b[38;5;235m' '.' '\x1b[0m',
+	'pass': '\x1b[38;5;235m' '.' '\x1b[0m',
 	'divide': '\x1b[38;5;237m' '/' '\x1b[0m',
+	'fail': '\x1b[38;5;196m' '!' '\x1b[0m',
+	'core': '\x1b[38;5;202m' '!' '\x1b[0m',
 }
 
 class Harness(libharness.Harness):
@@ -39,7 +39,7 @@ class Harness(libharness.Harness):
 		self.tests = []
 
 	def dispatch(self, test):
-		# seal fate in a child process
+		# Run self.seal() in a fork
 		seal = self.concurrently(functools.partial(self.seal, test))
 		self.tests.append(seal)
 
@@ -67,15 +67,20 @@ class Harness(libharness.Harness):
 
 	def seal(self, test):
 		self.status.write('\x1b[38;5;234m' '>' '\x1b[0m')
+		self.status.flush() # Clear local buffers before fork.
 		test.seal()
 
 		if isinstance(test.fate, self.libtest.Divide):
-			# Descend.
+			# Descend. Clear in case of subdivide.
 			self.metrics.clear()
 			del self.tests[:]
+
+			# Divide returned the gathered tests,
+			# dispatch all of them and wait for completion.
 			self.execute(test.fate.content, ())
 			for x in self.tests:
 				self.complete(x)
+
 			self.status.write(exits['divide'])
 			return dict(self.metrics)
 		else:
@@ -84,10 +89,13 @@ class Harness(libharness.Harness):
 			return {test.fate.impact: 1}
 
 def main(package, modules, role='optimal'):
+	sys.dont_write_bytecode = True
+
 	p = Harness(package, sys.stderr, role=role)
 	p.execute(p.root(libdev.Factor.from_fullname(package)), modules)
 	for x in p.tests:
 		p.complete(x)
+
 	sys.stderr.write(';\n')
 	sys.stderr.flush()
 
