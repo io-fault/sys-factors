@@ -86,7 +86,13 @@ def main(role='optimal', mount_extensions=True):
 				with status(str(x)):
 					fp = str(x.file())
 					if fp.endswith('.py'):
-						py_compile.compile(fp, optimize=opt)
+						try:
+							py_compile.compile(fp, optimize=opt, doraise=True)
+							continue
+						except py_compile.PyCompileError as err:
+							exc = err.__context__
+							exc.__traceback__ = None
+						raise exc
 
 		# Identify all system modules in project/context package.
 		root_system_modules = []
