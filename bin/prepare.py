@@ -75,7 +75,20 @@ def main(role='optimal', mount_extensions=True):
 		for x in args
 	]
 
-	for route in roots:
+	for route, ref in zip(roots, args):
+		package_file = route.file()
+
+		if package_file is None:
+			# Initialize the context package module if not available.
+
+			# Resolve from Python's identified location?
+			package_file = libroutes.File.from_path(ref)
+			ctxroot = package_file / 'context' / 'root.py'
+			if ctxroot.exists():
+				# context project package.
+				package_file = (package_file / '__init__.py')
+				package_file.link(ctxroot)
+
 		packages, modules = route.tree()
 
 		if not dont_write_bytecode:
