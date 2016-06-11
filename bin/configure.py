@@ -187,7 +187,7 @@ def main(name, args, paths=None):
 	libdirs.extend(map(libroutes.File.from_absolute,
 		('/lib', '/usr/lib',))) # Make sure likely directories are included.
 
-	# scan for runtime objects
+	# scan for system objects (crt1.o, crt0.o, etc)
 	found, missing = libprobe.search(libdirs, runtime_objects)
 	prepare = lambda x: tuple(map(str, [y for y in x if y]))
 
@@ -300,6 +300,8 @@ def main(name, args, paths=None):
 	# Initialize lib directory for context libraries.
 	ctxlib = ctx / 'lib'
 	ctxlib.init('directory')
+	ctxinc = ctx / 'include'
+	ctxinc.init('directory')
 
 if __name__ == '__main__':
 	import sys
