@@ -92,9 +92,6 @@ def main(role='optimal', mount_extensions=True):
 		packages, modules = route.tree()
 
 		if not dont_write_bytecode:
-			del os.environ['PYTHONDONTWRITEBYTECODE']
-			sys.dont_write_bytecode = False
-
 			for x in itertools.chain(roots, packages, modules):
 				with status(str(x)):
 					fp = str(x.file())
