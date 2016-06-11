@@ -29,11 +29,12 @@ import collections
 import contextlib
 import importlib
 import importlib.machinery
+import types
 
 from . import libfactor
 from . import include
 from . import library as libdev
-from .probes import libpython
+from .probes import libpython # Used to detect Python Extensions.
 
 from ..chronometry import library as libtime
 from ..io import library as libio
@@ -51,7 +52,7 @@ roles = {
 	'profile': 'Raw profiling for custom collections',
 	'coverage': 'Raw coverage for custom collections',
 
-	'survey': 'Test role with profiling and coverage collection enabled',
+	'metrics': 'Test role with profiling and coverage collection enabled',
 
 	'introspection':
 		'Role for structuring coefficients (sources) into a form used by documentation tools',
@@ -344,7 +345,7 @@ def unix_compiler_collection(context, output, inputs,
 		),
 		optimizations = {
 			'optimal': '3',
-			'survey': '1',
+			'metrics': '1',
 			'debug': '0',
 			'test': '0',
 			'profile': '3',
@@ -394,9 +395,9 @@ def unix_compiler_collection(context, output, inputs,
 	if overflow_spec is not None:
 		command.append(overflow_map[overflow_spec])
 
-	# coverage options for survey and profile roles.
+	# coverage options for metrics and profile roles.
 	coverage = get('coverage', False)
-	if role in {'survey', 'profile'}:
+	if role in {'metrics', 'profile'}:
 		command.extend(('-fprofile-instr-generate', '-fcoverage-mapping'))
 
 	# Include Directories; -I option.
@@ -1103,21 +1104,51 @@ class Construction(libio.Processor):
 
 		sector = self.sector
 		dep = instruction[2]
+		ctx = self.cx_context or 'host'
+		role = self.cx_role
 
-		key = module.key(module, self.cx_context or 'host', self.cx_role, dep)
-		reports = module.retrieve(self.cx_context or 'host', self.cx_role)
+		key = module.key(module, ctx, role, dep)
+		reports = module.retrieve(ctx, role)
 
 		if key in reports:
 			# Needed report is cached.
 			self.progress[module] += 1
 		else:
-			xreport = module.deploy(module, self.cx_context or 'host', self.cx_role, dep)
-			reports[key] = xreport
-			if xreport is not None:
-				# &None indicates constant probe; &report will build on demand.
-				module.record(reports, self.cx_context or 'host', self.cx_role)
+			deploy = module.deploy
+			xreport = module.deploy(module, ctx, role, dep)
+			if isinstance(xreport, types.CoroutineType):
+				# wait for completion
+				cop = libio.Coroutine(xreport)
+				self.sector.dispatch(cop)
+				cop.atexit(functools.partial(self.probe_complete,
+						module=module,
+						reports=reports,
+						key=key
+					),
+				)
+			else:
+				reports[key] = xreport
+				if xreport is not None:
+					# &None indicates constant probe; &report will build on demand.
+					module.record(reports, ctx, role)
 
-			self.progress[module] += 1
+				self.progress[module] += 1
+
+	def probe_exit(self, processor, module=None, reports=None, key=None):
+		self.progress[module] += 1
+		self.activity.add(module)
+
+		try:
+			report = processor.product
+			reports[key] = report
+			module.record(reports, ctx, role)
+		finally:
+			pass
+
+		if self.continued is False:
+			# Consolidate loading of the next set of processors.
+			self.continued = True
+			self.fio_enqueue(self.continuation)
 
 	def process_execute(self, instruction):
 		module, (typ, cmd, log) = instruction
