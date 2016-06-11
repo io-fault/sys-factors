@@ -64,7 +64,8 @@ class Harness(libharness.Harness):
 
 		if os.path.exists(corefile):
 			self.status.write("CORE: Identified, {0!r}, loading debugger.\n".format(corefile))
-			libcore.debug(corefile)
+			from .. import libcore as devcore
+			devcore.debug(corefile)
 			self.status.write("CORE: Removed file.\n".format(corefile))
 			os.remove(corefile)
 		else:
