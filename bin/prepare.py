@@ -93,6 +93,9 @@ def main(role='optimal', mount_extensions=True):
 
 		if not dont_write_bytecode:
 			for x in itertools.chain(roots, packages, modules):
+				if not x.exists():
+					continue
+
 				with status(str(x)):
 					fp = str(x.file())
 					if fp.endswith('.py'):
