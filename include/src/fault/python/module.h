@@ -34,7 +34,7 @@ do { \
 			DROP_MODULE_GLOBALS(); \
 		} else { \
 			PyDict_SetItemString(__dict__, "__ERRNO_RECEPTACLE__", __ERRNO_RECEPTACLE__); \
-			PyDict_SetItemString(__dict__, "__PYTHON_RECEPTACLE__", __ERRNO_RECEPTACLE__); \
+			PyDict_SetItemString(__dict__, "__PYTHON_RECEPTACLE__", __PYTHON_RECEPTACLE__); \
 		}
 #else
 	#define DEFINE_MODULE_GLOBALS \

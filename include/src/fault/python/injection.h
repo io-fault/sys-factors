@@ -26,7 +26,7 @@ do { \
 	else \
 	{ \
 		char _er_name[256]; \
-		snprintf(_er_name, 256, "%s.%s", __func__, #SYSCALL); \
+		snprintf(_er_name, 256, "%s", __func__, #SYSCALL); \
 		_er_gs = PyGILState_Ensure(); /* need it to get the item */ \
 		_er_entry = PyDict_GetItemString(__ERRNO_RECEPTACLE__, (char *) _er_name); \
 		\
@@ -36,7 +36,7 @@ do { \
 		} \
 		else \
 		{ \
-			PyObj _er_override = PyObject_CallFunction(_er_entry, "ss", (char *) __func__, #SYSCALL); \
+			PyObj _er_override = PyObject_CallFunction(_er_entry, "((ss))", (char *) __func__, #SYSCALL); \
 			\
 			if (_er_override == Py_False) \
 			{ \
@@ -50,7 +50,6 @@ do { \
 				if (_er_override == NULL || !PyArg_ParseTuple(_er_override, "i", &seterrno)) \
 				{ \
 					/* convert to python warning */ \
-					PyErr_Clear(); \
 					fprintf(stderr, \
 						"errno injections must return tuples of '%s' OR False: %s.%s\n", \
 						"i", (char *) __func__, #SYSCALL); \
@@ -79,7 +78,10 @@ do { \
 	else \
 	{ \
 		char _er_name[256]; \
-		snprintf(_er_name, 256, "%s.%s", __func__, #ID); \
+		if (ID == NULL) \
+			snprintf(_er_name, 256, "%s", __func__); \
+		else \
+			snprintf(_er_name, 256, "%s.%s", __func__, ID); \
 		_pr_entry = PyDict_GetItemString(__PYTHON_RECEPTACLE__, (char *) _er_name); \
 		if (_pr_entry == NULL) \
 		{ \
@@ -103,7 +105,7 @@ do { \
 			} \
 			else \
 			{ \
-				*(RETURN) = NULL; \
+				*(RETURN) = NULL; /* Python Error Raised */ \
 			} \
 		} \
 	} \
