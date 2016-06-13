@@ -1,5 +1,5 @@
 """
-Python eXtension Environment probe module.
+Python extension environment probe module.
 
 libpython provides the necessary compile time and link time parameters for building a Python
 extension module. Enables special cases for Python extension modules for relocatable targets.
