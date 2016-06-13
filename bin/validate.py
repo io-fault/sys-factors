@@ -90,6 +90,8 @@ class Harness(libharness.Harness):
 
 def main(package, modules, role='optimal'):
 	sys.dont_write_bytecode = True
+	sys.stderr.write('^')
+	sys.stderr.flush()
 
 	p = Harness(package, sys.stderr, role=role)
 	p.execute(p.root(libdev.Factor.from_fullname(package)), modules)
