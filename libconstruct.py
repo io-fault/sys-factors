@@ -496,7 +496,9 @@ def macosx_link_editor(context, output, inputs,
 
 		command.extend(suffix)
 		if role in {'metrics', 'profile'}:
-			command.append(context['mechanisms']['system']['resources']['profile'])
+			command.append(context['mechanisms']['system']['transformations'][None]['resources']['profile'])
+
+		command.append(context['mechanisms']['system']['transformations'][None]['resources']['builtins'])
 	else:
 		command.extend(inputs)
 
@@ -574,6 +576,12 @@ def unix_link_editor(context, output, inputs,
 		command.extend(map(filepath, inputs))
 		command.extend(libdirs)
 		command.extend(libs)
+
+		if role in {'metrics', 'profile'}:
+			command.append(context['mechanisms']['system']['transformations'][None]['resources']['profile'])
+
+		command.append(context['mechanisms']['system']['transformations'][None]['resources']['builtins'])
+
 		command.extend(suffix)
 	else:
 		command.extend(map(filepath, inputs))

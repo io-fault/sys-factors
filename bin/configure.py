@@ -125,6 +125,21 @@ runtime_objects = set([
 	'crtn.o',
 ])
 
+def compiler_libraries(compiler, prefix, version, executable, target):
+	"""
+	Attempt to select the compiler libraries directory containing compiler support
+	libraries for profiling, sanity, and runtime.
+	"""
+	if compiler == 'clang':
+		lib = prefix / 'lib' / 'clang' / version / 'lib'
+		syslib = lib / sys.platform # Naturally, not always consistent.
+		if syslib.exists():
+			return syslib
+	elif compiler == 'gcc':
+		return prefix / 'lib' / 'gcc' / target / version
+	else:
+		pass
+
 def main(name, args, paths=None):
 	global libroutes
 	import os
@@ -156,7 +171,8 @@ def main(name, args, paths=None):
 	cctype, version_spec = version_line.split(' version ')
 	version_info, release = version_spec.split('(', 1)
 	release = release.strip('()')
-	version_info = version_info.strip().split('.', 3)
+	version = version_info.strip()
+	version_info = version.split('.', 3)
 
 	if cctype == 'Apple LLVM':
 		# rename to clang.
@@ -175,6 +191,50 @@ def main(name, args, paths=None):
 	if target:
 		target = target.split(':', 1)
 		target = target[1].strip()
+
+	# First field of the target string.
+	arch = target[:target.find('-')]
+	arch_alt = arch.replace('_', '-')
+
+	cclib = compiler_libraries(ccname, ccprefix, '.'.join(version_info), cc, target)
+
+	if ccname == 'gcc':
+		profile_lib = cclib / 'libgcov.a'
+		builtins = cclib / 'libgcc.a'
+	elif ccname == 'clang':
+		files = cclib.subnodes()[1]
+		profile_libs = [x for x in files if 'profile' in x.identifier]
+
+		if len(profile_libs) == 1:
+			profile_lib = profile_libs[0]
+		else:
+			# Scan for library with matching architecture.
+			for x in profile_libs:
+				x = str(x)
+				if arch in x or arch_alt in x:
+					profile_lib = x
+					break
+			else:
+				profile_lib = None
+
+		if sys.platform == 'darwin':
+			builtins = str(cclib / 'libclang_rt.osx.a')
+		else:
+			# Similar to profile, scan for matching arch.
+			cclibs = [x for x in files if 'builtins' in x.identifier]
+
+			if len(cclibs) == 1:
+				builtins = str(cclibs[0])
+			else:
+				# Scan for library with matching architecture.
+				for x in cclibs:
+					x = str(x)
+					if arch in x or arch_alt in x:
+						builtins = x
+						break
+				else:
+					# clang, but no libclang_rt.
+					builtins = '-lcompiler_rt.a'
 
 	# Analyze the library search directories.
 	# Primarily interested in finding the crt*.o files for linkage.
@@ -247,10 +307,15 @@ def main(name, args, paths=None):
 					'type': 'collection',
 					'name': ccname,
 					'implementation': cctype,
-					'version': version_info,
+					'libraries': str(cclib),
+					'version': tuple(map(int, version_info)),
 					'release': release,
 					'command': str(cc),
 					'defaults': {},
+					'resources': {
+						'profile': str(profile_lib),
+						'builtins': str(builtins),
+					},
 				},
 			},
 		}
