@@ -63,6 +63,8 @@ haskell_compilers = {
 	'ghc': ('haskell',),
 }
 
+platform = sys.platform.strip('0123456789')
+
 def debug_isolate(self, target):
 	dtarget = target + '.dSYM'
 	return dtarget, [
@@ -132,7 +134,7 @@ def compiler_libraries(compiler, prefix, version, executable, target):
 	"""
 	if compiler == 'clang':
 		lib = prefix / 'lib' / 'clang' / version / 'lib'
-		syslib = lib / sys.platform # Naturally, not always consistent.
+		syslib = lib / platform # Naturally, not always consistent.
 		if syslib.exists():
 			return syslib
 	elif compiler == 'gcc':
@@ -217,7 +219,7 @@ def main(name, args, paths=None):
 			else:
 				profile_lib = None
 
-		if sys.platform == 'darwin':
+		if platform == 'darwin':
 			builtins = str(cclib / 'libclang_rt.osx.a')
 		else:
 			# Similar to profile, scan for matching arch.
@@ -321,7 +323,7 @@ def main(name, args, paths=None):
 		}
 	}
 
-	if sys.platform == 'darwin':
+	if platform == 'darwin':
 		core['system']['objects']['executable'] = {
 			'pie': [
 				prepare((found.get('crt1.o'), found.get('crti.o'), found.get('crtbeginS.o')),),
