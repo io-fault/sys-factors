@@ -409,8 +409,6 @@ def unix_compiler_collection(context, output, inputs,
 	for x in sis:
 		command.extend((si_flag, x))
 
-	module = get('module')
-
 	# -D defines.
 	sp = [define_flag + '='.join(x) for x in sys.get('source.parameters', ())]
 	command.extend(sp)
@@ -523,7 +521,7 @@ def unix_link_editor(context, output, inputs,
 			'extension': '-shared',
 			'fragment': '-r',
 		},
-
+		allow_runpath='--enable-new-dtags',
 		use_static='-Bstatic',
 		use_shared='-Bdynamic',
 	):
@@ -570,8 +568,13 @@ def unix_link_editor(context, output, inputs,
 		if 'abi' in sys:
 			command.extend((soname_flag, sys['abi']))
 
-		rt = context['mechanisms']['system']['objects'][typ][format]
-		prefix, suffix = rt
+		sysmech = context['mechanisms']['system']
+
+		if allow_runpath:
+			# Enable by default, but allow
+			add(allow_runpath)
+
+		prefix, suffix = sysmech['objects'][typ][format]
 
 		command.extend(prefix)
 		command.extend(map(filepath, inputs))
@@ -579,12 +582,13 @@ def unix_link_editor(context, output, inputs,
 		command.extend(libs)
 
 		if role in {'metrics', 'profile'}:
-			command.append(context['mechanisms']['system']['transformations'][None]['resources']['profile'])
+			command.append(sysmech['transformations'][None]['resources']['profile'])
 
-		command.append(context['mechanisms']['system']['transformations'][None]['resources']['builtins'])
+		command.append(sysmech['transformations'][None]['resources']['builtins'])
 
 		command.extend(suffix)
 	else:
+		# fragment is an incremental link. Most options are irrelevant.
 		command.extend(map(filepath, inputs))
 
 	command.extend((output_flag, output))
@@ -745,7 +749,7 @@ def initialize(
 
 		'locations': {
 			'sources': module.sources,
-			'work': work,
+			'work': work, # normally, __pycache__ subdirectory.
 			'output': libfactor.cache_directory(module, context, role, 'out'),
 			'logs': libfactor.cache_directory(module, context, role, 'log'),
 			'libraries': libfactor.cache_directory(module, context, role, 'lib'),
