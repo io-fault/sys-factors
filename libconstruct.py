@@ -607,7 +607,7 @@ def reconstruct(outputs, inputs, depfile):
 	"""
 	return False
 
-def updated(outputs, inputs, depfile):
+def updated(outputs, inputs, depfile, requirement=None):
 	"""
 	Return whether or not the &outputs need to be updated.
 	"""
@@ -618,6 +618,10 @@ def updated(outputs, inputs, depfile):
 			return False
 		lm = x.last_modified()
 		olm = min(lm, olm or lm)
+
+	if requirement is not None and olm < requirement:
+		# Age requirement not meant, reconstruct.
+		return False
 
 	for x in inputs:
 		if olm < x.last_modified():
@@ -1047,7 +1051,7 @@ class Construction(libio.Processor):
 		in order to leverage obstruction signalling.
 	"""
 
-	def __init__(self, context, role, modules, reconstruct=False, processors=4):
+	def __init__(self, context, role, modules, requirement=None, reconstruct=False, processors=4):
 		self.reconstruct = reconstruct
 		self.failures = 0
 		self.cx_context = context
@@ -1065,13 +1069,15 @@ class Construction(libio.Processor):
 
 		self.continued = False
 		self.activity = set()
+		self.requirement = requirement # outputs must be newer.
+
 		super().__init__()
 
 	def actuate(self):
 		if self.reconstruct:
 			self._filter = reconstruct
 		else:
-			self._filter = updated
+			self._filter = functools.partial(updated, requirement=self.requirement)
 
 		try:
 			modules, deps = next(self.sequence) # WorkingSet

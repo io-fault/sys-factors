@@ -11,6 +11,7 @@ import importlib.machinery
 import functools
 import collections
 
+from .. import include
 from .. import libconstruct
 from .. import library as libdev
 
@@ -139,11 +140,14 @@ def main(role='optimal', mount_extensions=True):
 		except ImportError:
 			pass
 
+		dirs, files = libroutes.File.from_absolute(include.directory).tree()
 		cxn = libconstruct.Construction(
 			context_name, role,
 			root_system_modules,
 			processors=max(2, ncpu),
 			reconstruct=reconstruct,
+			# Age requirement based on global includes.
+			requirement=max(x.last_modified() for x in files),
 		)
 		sector.dispatch(cxn)
 		cxn.atexit(functools.partial(set_exit_code, unit=sector.unit))
