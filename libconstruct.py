@@ -345,7 +345,7 @@ def unix_compiler_collection(context, output, inputs,
 		),
 		optimizations = {
 			'optimal': '3',
-			'metrics': '1',
+			'metrics': '0',
 			'debug': '0',
 			'test': '0',
 			'profile': '3',
@@ -469,6 +469,7 @@ def macosx_link_editor(context, output, inputs,
 	get = context.get
 	command = [None, '-t', lto_preserve_exports, platform_version_flag, '10.11.0',]
 
+	role = get('role')
 	sys = get('system')
 	typ = sys.get('type')
 
@@ -494,6 +495,8 @@ def macosx_link_editor(context, output, inputs,
 		command.append(link_flag+'System')
 
 		command.extend(suffix)
+		if role in {'metrics', 'profile'}:
+			command.append(context['mechanisms']['system']['resources']['profile'])
 	else:
 		command.extend(inputs)
 
