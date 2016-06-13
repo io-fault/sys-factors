@@ -10,11 +10,16 @@ csource = r"""
 #define APPEND(STR) \
 	PyObject_CallMethod(ob, "append", "s", STR);
 
+#if PY_VERSION_HEX < 0x03050000
+	/* Renamed in 3.5+ */
+	#define Py_DecodeLocale _Py_char2wchar
+#endif
+
 static wchar_t xname[] = PYTHON_EXEC_CHARS;
 int
 main(int argc, char *argv[])
 {
-	int r;
+	int r, nbytes;
 	wchar_t **wargv;
 	PyObject *ob, *mod;
 
@@ -32,26 +37,39 @@ main(int argc, char *argv[])
 		fprintf(stderr, "could not initialize python\n");
 		return(200);
 	}
+	_PyRandom_Init();
 
-	/* XXX: This is... not entirely consistent with python.c, so... */
-	wargv = PyMem_Malloc(sizeof(wchar_t *) * argc);
+	nbytes = sizeof(wchar_t *) * (argc+1);
+	wargv = PyMem_RawMalloc(nbytes);
+	if (wargv == NULL)
+	{
+		fprintf(stderr, "failed to allocate %d bytes of memory for system arguments\n", nbytes);
+		return(210);
+	}
+
 	for (r = 0; r < argc; ++r)
 	{
-		wargv[r] = _Py_char2wchar(argv[r], NULL);
+		wargv[r] = Py_DecodeLocale(argv[r], NULL);
+		if (wargv[r] == NULL)
+		{
+			fprintf(stderr, "failed to decode system arguments\n");
+			return(210);
+		}
 	}
+
 	PySys_SetArgvEx(argc, wargv, 0);
 
 	PyEval_InitThreads();
 	if (!PyEval_ThreadsInitialized())
 	{
-		fprintf(stderr, "could not initialize python threading\n");
+		fprintf(stderr, "failed to initialize threading\n");
 		return(199);
 	}
 
 	ob = PySys_GetObject("path");
 	if (ob == NULL)
 	{
-		fprintf(stderr, "could not get sys.path\n");
+		fprintf(stderr, "failed to initialize execution context\n");
 		return(198);
 	}
 
@@ -61,7 +79,7 @@ main(int argc, char *argv[])
 	mod = PyImport_ImportModule(MODULE_NAME);
 	if (mod == NULL)
 	{
-		fprintf(stderr, "could not import bound module: " MODULE_NAME "\n");
+		fprintf(stderr, "failed to import implementation module: " MODULE_NAME "\n");
 		return(197);
 	}
 	else
@@ -80,24 +98,55 @@ main(int argc, char *argv[])
 		}
 		else
 		{
-			fprintf(stderr,
-				"bound module's, "
-				MODULE_NAME
-				", callable, "
-				CALL_NAME
-				", did not return a long\n");
+			fprintf(stderr, "implementation, "
+				MODULE_NAME "." CALL_NAME
+				", did not return an integer\n");
 			r = 190;
 		}
 
-		Py_DECREF(ob); ob = NULL;
+		Py_DECREF(ob);
+		ob = NULL;
 	}
 	else
 	{
-		printf("bound module did not trap exceptions\n");
-		r = 1; /* generic failure */
+		if (PyErr_ExceptionMatches(PyExc_SystemExit))
+		{
+			PyObject *exc, *val, *tb;
+			PyErr_Fetch(&exc, &val, &tb);
+			PyObject *pi;
+
+			if ((PyObject *) val->ob_type == PyExc_SystemExit)
+			{
+				pi = PyObject_GetAttrString(val, "code");
+				if (pi)
+				{
+					r = (int) PyLong_AsLong(pi);
+					Py_DECREF(pi);
+				}
+			}
+			else
+			{
+				pi = val;
+				r = (int) PyLong_AsLong(pi);
+			}
+
+			Py_DECREF(exc);
+			Py_XDECREF(val);
+			Py_XDECREF(tb);
+		}
+		else
+		{
+			fprintf(stderr, "[implementation module raised exception]\n");
+			PyErr_Print();
+			fflush(stderr);
+			r = 1;
+		}
 	}
 
 	Py_Finalize();
+	#if 0
+		_Py_ReleaseInternedUnicodeStrings();
+	#endif
 	return(r);
 }
 """
@@ -107,17 +156,17 @@ def buildcall(target, filename):
 	Construct the parameters to be used to compile and link the new executable.
 	"""
 	import sysconfig
-	libs = tuple(sysconfig.get_config_var('SHLIBS').split())
-	syslibs = tuple(sysconfig.get_config_var('SYSLIBS').split())
+
 	ldflags = tuple(sysconfig.get_config_var('LDFLAGS').split())
 	pyversion = sysconfig.get_config_var('VERSION')
 	pyabi = sysconfig.get_config_var('ABIFLAGS') or ''
 	pyspec = 'python' + pyversion + pyabi
+
 	return (
 		'clang' or sysconfig.get_config_var('CC'), '-v',
 		'-ferror-limit=3', '-Wno-array-bounds',
 		'-o', target,
-	) + libs + syslibs + ldflags + (
+	) + ldflags + (
 		'-I' + sysconfig.get_config_var('INCLUDEPY'),
 		'-L' + sysconfig.get_config_var('LIBDIR'),
 		'-l' + pyspec,
