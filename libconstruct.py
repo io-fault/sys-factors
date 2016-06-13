@@ -548,6 +548,7 @@ def unix_link_editor(context, output, inputs,
 	get = context.get
 	sys = get('system')
 	typ = sys.get('type')
+	role = get('role')
 
 	command = [None]
 	add = command.append
