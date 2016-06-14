@@ -6,7 +6,6 @@
 
 #include <fault/roles.h>
 #include <fault/python/environ.h>
-#include <fault/python/module.h>
 #include <frameobject.h>
 
 struct Collector {
@@ -285,11 +284,7 @@ CollectorType = {
 	collector_new,                        /* tp_new */
 };
 
-/* METH_O, METH_VARARGS, METH_VARKEYWORDS, METH_NOARGS */
-METHODS() = {
-	{NULL}
-};
-
+#include <fault/python/module.h>
 INIT("C-Level trace support")
 {
 	PyObj mod;

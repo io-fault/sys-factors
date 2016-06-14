@@ -4,11 +4,6 @@
 
 #include <fault/roles.h>
 #include <fault/python/environ.h>
-#include <fault/python/module.h>
-
-METHODS() = {
-	{NULL}
-};
 
 typedef long long long_long;
 
@@ -48,6 +43,7 @@ INT_TYPES()
 	X(struct tm, tm) \
 	X(time_t, time_t) \
 
+#include <fault/python/module.h>
 INIT("Sizes of the standard C types.")
 {
 	PyObj mod;

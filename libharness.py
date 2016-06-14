@@ -138,6 +138,8 @@ class Harness(object):
 		parent = importlib.import_module(str(route.container))
 		setattr(parent, route.identifier, mod)
 
+		return mod
+
 	@staticmethod
 	def _collect_targets(route):
 		for pkg in route.tree()[0]:

@@ -3,9 +3,22 @@
  */
 #include "../symbols.h"
 
-/* Appropriate way to define the method table for the module */
-#define METHODS() \
-	static PyMethodDef methods[]
+#ifndef MODULE_FUNCTIONS
+	#define MODULE_FUNCTIONS() /* Should be defined by importer. */
+#endif
+
+#if METRICS()
+	void __llvm_profile_write_file(void);
+	void __llvm_profile_reset_counters(void);
+	static PyObj _instr_flush(PyObj self) { __llvm_profile_write_file(); Py_RETURN_NONE; }
+	static PyObj _instr_clear(PyObj self) { __llvm_profile_reset_counters(); Py_RETURN_NONE; }
+
+	#define FAULT_MODULE_FUNCTIONS() \
+		PYMETHOD(_instrumentation_write, _instr_flush, METH_NOARGS, "save counters to disk" ) \
+		PYMETHOD(_instrumentation_reset, _instr_clear, METH_NOARGS, "clear in memory counters" )
+#else
+	#define FAULT_MODULE_FUNCTIONS()
+#endif
 
 /* Used to destroy the module in error cases. */
 #define DROP_MODULE(MOD) \
@@ -54,6 +67,11 @@ do { \
  */
 #define INIT(DOCUMENTATION) \
 	DEFINE_MODULE_GLOBALS \
+	static PyMethodDef methods[] = { \
+		FAULT_MODULE_FUNCTIONS() \
+		MODULE_FUNCTIONS() \
+		{NULL,} \
+	} ; \
 	\
 	static struct PyModuleDef \
 	module = { \
@@ -107,6 +125,11 @@ do { \
  */
 #define INIT(DOCUMENTATION) \
 	DEFINE_MODULE_GLOBALS \
+	static PyMethodDef methods[] = { \
+		FAULT_MODULE_FUNCTIONS() \
+		MODULE_FUNCTIONS() \
+		{NULL,} \
+	} \
 	static PyObject * _py_INIT_FUNC(void); /* prototype */ \
 	_fault_reveal_symbol PyMODINIT_FUNC _py_INIT_COMPAT(void) \
 	{ PyObj mod; mod = _py_INIT_FUNC(); /* for consistent return() signature */ } \

@@ -8,6 +8,11 @@
 
 typedef PyObject * PyObj;
 
+#if TEST() || METRICS()
+	extern PyObj __ERRNO_RECEPTACLE__;
+	extern PyObj __PYTHON_RECEPTACLE__;
+#endif
+
 /*
  * Cover in case of absence
  */
@@ -16,6 +21,8 @@ typedef PyObject * PyObj;
 #endif
 
 #define PyAllocate(TYP) (((PyTypeObject *) TYP)->tp_alloc((PyTypeObject *) TYP, 0))
+
+#define PYMETHOD(name, func, args, doc) {#name, (PyCFunction) func, args, PyDoc_STR(doc)},
 
 static inline PyObj
 _PyLoop_DictionaryItems(PyObj d)

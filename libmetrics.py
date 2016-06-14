@@ -380,6 +380,11 @@ class Harness(libharness.Harness):
 		self.status.write(test.identity+'\n')
 		self.status.flush() # need to see the test being ran right now
 
+	def preload_extension(self, *args):
+		mod = super().preload_extension(*args)
+		mod._instrumentation_write()
+		mod._instrumentation_reset()
+
 	def dispatch(self, test):
 		faten = None
 		self._status_test_sealing(test)
