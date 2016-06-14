@@ -565,7 +565,9 @@ def unix_link_editor(context, output, inputs,
 
 		sls = sys.get('library.set', ())
 		libs = [link_flag + filepath(x) for x in sls]
-		if 'abi' in sys:
+
+		abi = sys.get('abi')
+		if abi is not None:
 			command.extend((soname_flag, sys['abi']))
 
 		sysmech = context['mechanisms']['system']
