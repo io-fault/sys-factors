@@ -106,5 +106,11 @@ def main(package, modules, role='optimal'):
 
 if __name__ == '__main__':
 	command, package, *modules = sys.argv
+	try:
+		os.nice(10)
+	except:
+		# Ignore nice() failures.
+		pass
+
 	with libcore.constraint():
 		libsys.control(main, package, modules)
