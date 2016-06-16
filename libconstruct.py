@@ -371,8 +371,8 @@ def unix_compiler_collection(context, output, inputs,
 		if language is not None:
 			command.extend((language_flag, language))
 
-	if 'standards' in context:
-		standard = get('standards', None).get(format, None)
+	if 'standards' in sys:
+		standard = sys['standards'].get(language, None)
 		if standard is not None and standard_flag is not None:
 			command.append(standard_flag + '=' + standard)
 
@@ -396,7 +396,6 @@ def unix_compiler_collection(context, output, inputs,
 		command.append(overflow_map[overflow_spec])
 
 	# coverage options for metrics and profile roles.
-	coverage = get('coverage', False)
 	if role in {'metrics', 'profile'}:
 		command.extend(('-fprofile-instr-generate', '-fcoverage-mapping'))
 
@@ -404,20 +403,20 @@ def unix_compiler_collection(context, output, inputs,
 	sid = list(sys.get('include.directories', ()))
 	command.extend([id_flag + str(x) for x in sid])
 
-	# -include files. Forced inclusion.
-	sis = sys.get('include.set') or ()
-	for x in sis:
-		command.extend((si_flag, x))
+	command.append(define_flag + 'FAULT_TYPE=' + (typ or 'unspecified'))
 
 	# -D defines.
 	sp = [define_flag + '='.join(x) for x in sys.get('source.parameters', ())]
 	command.extend(sp)
 
-	command.append(define_flag + 'FAULT_TYPE=' + (typ or 'unspecified'))
-
 	# -U undefines.
 	spo = ['-U' + x for x in sys.get('compiler.preprocessor.undefines', ())]
 	command.extend(spo)
+
+	# -include files. Forced inclusion.
+	sis = sys.get('include.set') or ()
+	for x in sis:
+		command.extend((si_flag, x))
 
 	if emit_dependencies:
 		command.append(emit_dependencies_flag)
@@ -426,7 +425,7 @@ def unix_compiler_collection(context, output, inputs,
 			if setting or setting is None and default:
 				command.append(v)
 
-	command.extend(get('command.option.injection', ()))
+	command.extend(sys.get('command.option.injection', ()))
 
 	# finally, the output file and the inputs as the remainder.
 	command.extend((output_flag, output))
