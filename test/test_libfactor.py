@@ -151,8 +151,8 @@ trace_module = \
 
 def test_roles_management(test):
 	# defaults to factor
-	test/library.role('void') == 'factor'
-	test/library.role('void.module') == 'factor'
+	test/library.role('void') == 'optimal'
+	test/library.role('void.module') == 'optimal'
 
 	# override default for everything in void.
 	library.select('void.', 'debug')

@@ -2,88 +2,125 @@ from .. import libconstruct as library
 from ...routes import library as libroutes
 
 def test_unix_compiler_collection(test):
-	cc = '/x/realm/bin/clang'
-	stdhead = [cc, '-c', '-v', '-fPIC', '-O3', '-g']
+	m = {
+		'type': 'collection',
+	}
+	stdhead = [None, '-c', '-v', '-fvisibility=hidden', '-fcolor-diagnostics', '-O3', '-g', '-DFAULT_TYPE=unspecified']
 	context = {
 		'role': 'optimal',
+		'name': 'host',
+		'system': {
+			'type': None,
+		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',))
-	test/cmd == [cc, '-c', '-v', '-fPIC', '-O3', '-g', '-o', 'out.o', 'input.c']
+
+	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), mechanism=m)
+	test/cmd == stdhead + ['-o', 'out.o', 'input.c']
 
 	context = {
 		'role': 'optimal',
-		'compiler.preprocessor.defines': [
-			('TEST', 'VALUE'),
-		],
+		'name': 'host',
+		'system': {
+			'source.parameters': [
+				('TEST', 'VALUE'),
+			],
+		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',))
-	test/cmd == [cc, '-c', '-v', '-fPIC', '-O3', '-g', '-DTEST=VALUE', '-o', 'out.o', 'input.c']
+	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), mechanism=m)
+	test/cmd == stdhead + ['-DTEST=VALUE', '-o', 'out.o', 'input.c']
 
 	# coverage flags from metrics role.
 	context = {
 		'role': 'metrics',
-		'compiler.preprocessor.defines': [
-			('TEST', 'VALUE'),
-		],
+		'name': 'host',
+		'system': {
+			'source.parameters': [
+				('TEST', 'VALUE'),
+			],
+		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',))
-	metrics_head = [cc, '-c', '-v', '-fPIC', '-O1', '-g']
-	test/cmd == metrics_head + ['-fprofile-instr-generate', '-fcoverage-mapping', '-DTEST=VALUE', '-o', 'out.o', 'input.c']
+	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), mechanism=m)
+	metrics_head = list(stdhead)
+	metrics_head = [None, '-c', '-v', '-fvisibility=hidden', '-fcolor-diagnostics', '-O0', '-g',
+		'-fprofile-instr-generate', '-fcoverage-mapping', '-DFAULT_TYPE=unspecified']
+	test/cmd == metrics_head + ['-DTEST=VALUE', '-o', 'out.o', 'input.c']
 
 	# include directories
 	context = {
 		'role': 'optimal',
-		'system.include.directories': [
-			'incdir1', 'incdir2',
-		],
-		'compiler.preprocessor.defines': [
-			('TEST', 'VALUE'),
-		],
+		'name': 'host',
+		'system': {
+			'include.directories': [
+				'incdir1', 'incdir2',
+			],
+			'source.parameters': [
+				('TEST', 'VALUE'),
+			],
+		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',))
-	test/cmd == stdhead + ['-Iincdir1', '-Iincdir2', '-DTEST=VALUE', '-o', 'out.o', 'input.c']
+	expect = [None, '-c', '-v', '-fvisibility=hidden', '-fcolor-diagnostics', '-O3', '-g',
+		'-Iincdir1', '-Iincdir2', '-DFAULT_TYPE=unspecified', '-DTEST=VALUE', '-o', 'out.o', 'input.c']
+	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), mechanism=m)
+	test/cmd == expect
 
 	# include set
 	context = {
 		'role': 'optimal',
-		'include.set': [
-			'inc1.h', 'inc2.h',
-		],
+		'name': 'host',
+		'system': {
+			'include.set': [
+				'inc1.h', 'inc2.h',
+			],
+		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',))
-	test/cmd == stdhead + ['-include', 'inc1.h', '-include', 'inc2.h', '-o', 'out.o', 'input.c']
+	expect = [None, '-c', '-v', '-fvisibility=hidden', '-fcolor-diagnostics', '-O3', '-g',
+		'-DFAULT_TYPE=unspecified',
+		'-include', 'inc1.h', '-include', 'inc2.h', '-o', 'out.o', 'input.c']
+	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), mechanism=m)
+	test/cmd == expect
 
 	# injection
 	context = {
 		'role': 'optimal',
-		'command.option.injection': ['-custom-op'],
+		'name': 'host',
+		'system': {
+			'command.option.injection': ['-custom-op'],
+		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',))
+	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), mechanism=m)
 	test/cmd == stdhead + ['-custom-op', '-o', 'out.o', 'input.c']
 
 	# undefines
 	context = {
 		'role': 'optimal',
-		'compiler.preprocessor.undefines': [
-			'TEST1', 'TEST2',
-		],
+		'name': 'host',
+		'system': {
+			'compiler.preprocessor.undefines': [
+				'TEST1', 'TEST2',
+			],
+		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',))
+	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), mechanism=m)
 	test/cmd == stdhead + ['-UTEST1', '-UTEST2', '-o', 'out.o', 'input.c']
 
 	# language
 	context = {
 		'role': 'optimal',
+		'name': 'host',
+		'system': {
+		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), language='c')
+	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), language='c', mechanism=m)
 	test/cmd == stdhead[0:3] + ['-x', 'c'] + stdhead[3:] + ['-o', 'out.o', 'input.c']
 
 	# language and standard
 	context = {
 		'role': 'optimal',
-		'standards': {'c': 'c99'},
+		'system': {
+			'standards': {'c': 'c99'},
+		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), language='c')
+	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), language='c', mechanism=m)
 	test/cmd == stdhead[0:3] + ['-x', 'c', '-std=c99'] + stdhead[3:] + ['-o', 'out.o', 'input.c']
 
 def test_updated(test):
@@ -91,17 +128,17 @@ def test_updated(test):
 	with libroutes.File.temporary() as tr:
 		of = tr / 'obj'
 		sf = tr / 'src'
-		test/library.updated(of, sf, None) == False
+		test/library.updated([of], [sf], None) == False
 
 		# object older than source
 		of.init('file')
 		sf.init('file')
 		of.set_last_modified(sf.last_modified().rollback(second=10))
-		test/library.updated(of, sf, None) == False
+		test/library.updated([of], [sf], None) == False
 
 		of.void()
 		of.init('file')
-		test/library.updated(of, sf, None) == True
+		test/library.updated([of], [sf], None) == True
 
 def test_sequence(test):
 	"""
@@ -122,10 +159,10 @@ def test_sequence(test):
 	# M1 -> M2
 	m[0].m2 = m[1]
 	ms = library.sequence(m)
-	proc = next(ms)
+	proc = next(ms)[0]
 	test/set(proc) == set((m[1], m[2]))
 
-	proc = ms.send(proc)
+	proc = ms.send(proc)[0]
 	test/set(proc) == set((m[0],))
 
 	# M3 -> N1 -> N2 -> N3
@@ -133,11 +170,11 @@ def test_sequence(test):
 	n[1].n3 = n[2]
 	m[2].n1 = n[0]
 	ms = library.sequence(m+n)
-	proc = next(ms)
+	proc = next(ms)[0]
 	test/set(proc) == set([n[2], m[1]])
-	test/set(ms.send(())) == set() # no op
-	test/set(ms.send([n[2]])) == set((n[1],)) # triggers n[1]
-	test/set(ms.send([m[1]])) == set((m[0],)) # triggers m[0]
+	test/set(ms.send(())[0]) == set() # no op
+	test/set(ms.send([n[2]])[0]) == set((n[1],)) # triggers n[1]
+	test/set(ms.send([m[1]])[0]) == set((m[0],)) # triggers m[0]
 
 def test_identity(test):
 	import types
@@ -189,8 +226,8 @@ def test_construction_sequence(test):
 		mt.__package__ = 'pkg.exe'
 		mt._init()
 
-		ctx = library.initialize('inherit', 'optimal', mt)
-		xf = list(library.transform(ctx, 'dynamic'))
+		ctx = library.initialize('host', 'host', 'optimal', mt, ())
+		xf = list(library.transform(ctx))
 		rd = list(library.reduce(ctx))
 
 if __name__ == '__main__':
