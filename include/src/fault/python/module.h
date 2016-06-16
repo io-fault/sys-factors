@@ -62,16 +62,14 @@ do { \
 #define _py_INIT_FUNC _py_INIT_FUNC_X(FACTOR_BASENAME)
 
 #if PY_MAJOR_VERSION > 2
-/*
- * Python 3.x
- */
+/* Python 3.x */
 #define INIT(DOCUMENTATION) \
 	DEFINE_MODULE_GLOBALS \
 	static PyMethodDef methods[] = { \
 		FAULT_MODULE_FUNCTIONS() \
 		MODULE_FUNCTIONS() \
 		{NULL,} \
-	} ; \
+	}; \
 	\
 	static struct PyModuleDef \
 	module = { \
@@ -129,7 +127,7 @@ do { \
 		FAULT_MODULE_FUNCTIONS() \
 		MODULE_FUNCTIONS() \
 		{NULL,} \
-	} \
+	}; \
 	static PyObject * _py_INIT_FUNC(void); /* prototype */ \
 	_fault_reveal_symbol PyMODINIT_FUNC _py_INIT_COMPAT(void) \
 	{ PyObj mod; mod = _py_INIT_FUNC(); /* for consistent return() signature */ } \
