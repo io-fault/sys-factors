@@ -65,7 +65,7 @@ class Harness(object):
 		test/module.__name__ == test.identity
 
 		for x in self.extensions.get(test.identity, ()):
-			self.preload_extension(x)
+			mod = self.preload_extension(test.identity, x)
 
 		module.__tests__ = self.gather(module)
 		if '__test__' in dir(module):
@@ -82,11 +82,12 @@ class Harness(object):
 		module = importlib.import_module(test.identity)
 		test/module.__name__ == test.identity
 		ir = libroutes.Import.from_fullname(module.__name__)
+		tid = str(ir.bottom())
 
 		# Preload all extensions inside the package.
 		# Empty when .role is None
-		for x in self.extensions.get(str(ir.bottom()), ()):
-			self.preload_extension(x)
+		for x in self.extensions.get(tid, ()):
+			mod = self.preload_extension(tid, x)
 
 		if 'context' in dir(module):
 			module.context()
@@ -102,6 +103,9 @@ class Harness(object):
 		raise self.libtest.Divide(module)
 
 	def dispatch(self, test):
+		"""
+		Execute the test directly using &test.seal.
+		"""
 		test.seal()
 
 	def execute(self, container, modules):
@@ -112,7 +116,7 @@ class Harness(object):
 			test = self.libtest.Test(tid, tcall)
 			self.dispatch(test)
 
-	def preload_extension(self, import_object:libroutes.Import):
+	def preload_extension(self, test_id, import_object:libroutes.Import):
 		"""
 		Given an extension route, &import_object, import the module using
 		the configured &role. 

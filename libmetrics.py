@@ -344,7 +344,6 @@ def prepare(metrics:libfs.Dictionary, store=pickle.dump):
 
 	# Process on a per-project basis so old perspectives can be thrown away.
 	for project, data in i.items():
-		print(project)
 		project_key = str(project).encode('utf-8')
 		data = process(metrics, (project, data))[1]
 
@@ -372,19 +371,29 @@ class Harness(libharness.Harness):
 
 	concurrently = staticmethod(libsys.concurrently)
 
-	def __init__(self, measurements, package, status):
+	def __init__(self, work, measurements, package, status):
 		super().__init__(package, role='metrics')
+		self.work = work
 		self.measurements = measurements
 		self.status = status
+		self.instrumentation_set = set()
 
 	def _status_test_sealing(self, test):
 		self.status.write(test.identity+'\n')
 		self.status.flush() # need to see the test being ran right now
 
-	def preload_extension(self, *args):
-		mod = super().preload_extension(*args)
+	def preload_extension(self, test_id, *args):
+		mod = super().preload_extension(test_id, *args)
+
+		m = self.work / 'llvm' / test_id
+		if not m.exists():
+			m.init('directory')
+
+		mod._instrumentation_set_path(str(m / mod.__name__))
 		mod._instrumentation_write()
 		mod._instrumentation_reset()
+		self.instrumentation_set.add(mod)
+		return mod
 
 	def dispatch(self, test):
 		faten = None
@@ -428,6 +437,13 @@ class Harness(libharness.Harness):
 		report['exitstatus'] = os.WEXITSTATUS(status)
 		return report
 
+	def prepare_extensions(self, test_id):
+		prefix = self.work / 'llvm' / test_id
+		prefix.init('directory')
+		for mod in self.instrumentation_set:
+			mod._instrumentation_set_path(str(prefix / mod.__name__))
+			mod._instrumentation_reset()
+
 	def seal(self, test):
 		"""
 		Perform the test and store its report and measurements into
@@ -439,6 +455,7 @@ class Harness(libharness.Harness):
 
 		with self.libtime.clock.stopwatch() as view:
 			try:
+				self.prepare_extensions(test.identity)
 				subscribe()
 				test.seal()
 			finally:

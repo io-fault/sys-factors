@@ -7,15 +7,41 @@
 	#define MODULE_FUNCTIONS() /* Should be defined by importer. */
 #endif
 
-#if METRICS()
+#if METRICS() && __clang__
 	void __llvm_profile_write_file(void);
 	void __llvm_profile_reset_counters(void);
+	void __llvm_profile_set_filename(const char *);
+
 	static PyObj _instr_flush(PyObj self) { __llvm_profile_write_file(); Py_RETURN_NONE; }
 	static PyObj _instr_clear(PyObj self) { __llvm_profile_reset_counters(); Py_RETURN_NONE; }
 
+	static PyObj _instr_file(PyObj self, PyObj filepath)
+	{
+		static char ifbuf[2048] = {0,}; /* buf must be valid after exit */
+
+		PyObj bytes;
+		bytes = PyUnicode_EncodeFSDefault(filepath);
+		if (bytes == NULL)
+			return(NULL);
+
+		if (PyBytes_GET_SIZE(bytes) < 2048)
+		{
+			memcpy(ifbuf, PyBytes_AS_STRING(bytes), PyBytes_GET_SIZE(bytes));
+			ifbuf[PyBytes_GET_SIZE(bytes)] = 0;
+			__llvm_profile_set_filename(ifbuf);
+		}
+
+		Py_DECREF(bytes);
+		Py_RETURN_NONE;
+	}
+
 	#define FAULT_MODULE_FUNCTIONS() \
+		PYMETHOD(_instrumentation_set_path, _instr_file, METH_O, "set file path to write to" ) \
 		PYMETHOD(_instrumentation_write, _instr_flush, METH_NOARGS, "save counters to disk" ) \
 		PYMETHOD(_instrumentation_reset, _instr_clear, METH_NOARGS, "clear in memory counters" )
+#elif METRICS()
+	#warning (metrics): No suitable instrumentation for coverage and profiling.
+	#define FAULT_MODULE_FUNCTIONS()
 #else
 	#define FAULT_MODULE_FUNCTIONS()
 #endif
@@ -112,14 +138,12 @@ do { \
 	} \
 } while(0)
 #else
+/* Python 2.x */
 #define _py_INIT_COMPAT CONCAT_IDENTIFIER(init, FACTOR_BASENAME)
-/*
- * Python 2.x
- */
 
 /*
- * Just invoke the new signature. Allows the user to return(NULL) regardless of Python
- * version.
+ * Invoke the new signature.
+ * Allows the user to return(NULL) regardless of Python version.
  */
 #define INIT(DOCUMENTATION) \
 	DEFINE_MODULE_GLOBALS \
