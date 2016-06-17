@@ -28,7 +28,7 @@ selections = None
 _factor_role_patterns = None
 _factor_roles = None # exact matches
 
-def select(module, role):
+def select(module, role, context=None):
 	"""
 	Designate that the given role should be used for the identified &package and its content.
 
@@ -56,7 +56,7 @@ def select(module, role):
 		# exact
 		_factor_roles[module] = role
 
-def role(module, default_role='factor'):
+def role(module, role='optimal', context=None):
 	"""
 	Get the configured role for the given module path.
 	"""
@@ -65,7 +65,7 @@ def role(module, default_role='factor'):
 	path = str(module)
 
 	if _factor_roles is None:
-		return default_role
+		return role
 
 	if path in _factor_roles:
 		return _factor_roles[path]
@@ -84,6 +84,35 @@ def cache_directory(module, context, role, subject):
 	"""
 	# Get a route to a directory in __pycache__.
 	return module.sources.container / '__pycache__' / context / role / subject
+
+def extension_access_name(name:str):
+	"""
+	The name, Python module path, that the extension module will be available at.
+
+	Python extension module targets that are to be mounted to canonical full names
+	are placed in packages named (python:identifier)`extensions`. In order to resolve
+	the full name, the first `'.extensions.'` substring is replaced with a single `'.'`.
+
+	For instance, `'project.extensions.capi_module'` will become `'project.capi_module'`.
+	"""
+	return '.'.join(name.split('.extensions.', 1))
+
+def package_directory(module):
+	global libroutes
+	return module.file().container
+
+def sources(module:libroutes.Import, dirname='src'):
+	"""
+	Return the &libroutes.File instance to the set of sources.
+	"""
+	return package_directory(module) / dirname
+
+def work(module:libroutes.Import, context:str, role:str):
+	"""
+	Return the work directory of the factor &module for the given &context and &role.
+	"""
+	path = package_directory(module) / context / role
+	return libroutes.File(None, path.absolute)
 
 class ProbeModule(libdev.Sources):
 	"""
@@ -203,9 +232,6 @@ class SystemModule(libdev.Sources):
 		Public includes used by cofactors or unknown dependencies.
 		"""
 		return self.sources.container / 'include'
-
-	def compilation_parameters(self, role, language):
-		return {}
 
 	def link(self, link_operation, *roles):
 		"""
