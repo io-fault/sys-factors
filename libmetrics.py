@@ -21,6 +21,7 @@ import resource
 
 from ..routes import library as libroutes
 from ..system import library as libsys
+from ..system import libcore
 from ..filesystem import library as libfs
 from ..computation import librange
 from ..xml import library as libxml
@@ -405,11 +406,11 @@ class Harness(libharness.Harness):
 			faten = 'core'
 			report['fate'] = 'core'
 			test.fate = self.libtest.Core(None)
-			corefile = libcore.corelocation(pid)
+			corefile = libcore.location(pid)
 			if corefile is None or not os.path.exists(corefile):
 				pass
 			else:
-				report['core'] = libcore.snapshot(corefile)
+				report['core'] = corefile
 				rr = self.measurements.route(test.identity.encode('utf-8'))
 				cr = self.measurements.route(('core:'+test.identity).encode('utf-8'))
 				os.move(corefile, str(cr))
