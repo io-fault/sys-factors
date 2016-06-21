@@ -11,6 +11,7 @@ import sysconfig
 
 from .. import libfactor
 from .. import libprobe
+__factor_type__ = 'system.probe'
 
 # Marker used by libconstruct to identify that
 # it is an extension module for *this* Python.
