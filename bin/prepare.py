@@ -11,6 +11,7 @@ import importlib.machinery
 import functools
 import collections
 
+from .. import libfactor
 from .. import include
 from .. import libconstruct
 from .. import library as libdev
@@ -140,7 +141,10 @@ def main(role='optimal', mount_extensions=True):
 		except ImportError:
 			pass
 
-		dirs, files = libroutes.File.from_absolute(include.directory).tree()
+		# Get minimum (output) modification time from fault.development.include headers.
+		include_route = libroutes.Import.from_fullname(include.__name__)
+		dirs, files = libfactor.sources(include_route).tree()
+
 		cxn = libconstruct.Construction(
 			context_name, role,
 			root_system_modules,
