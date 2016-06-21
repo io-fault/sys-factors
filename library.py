@@ -25,19 +25,19 @@ class Factor(tuple):
 
 	@classmethod
 	def from_module(Class, module):
-		mt = getattr(module, '__type__', 'python-module')
+		mt = getattr(module, '__factor_type__', 'python-module')
 		return Class((mt, libroutes.Import.from_fullname(module.__name__)))
 
 	@classmethod
 	def from_fullname(Class, path, Import=libroutes.Import.from_fullname):
 		i = Import(path)
 		module = i.module()
-		mt = getattr(module, '__type__', 'python-module')
+		mt = getattr(module, '__factor_type__', 'python-module')
 		return Class((mt, i))
 
 	@property
 	def type(self):
-		"The module's `__type__` attribute."
+		"The module's `__factor_type__` attribute."
 		return self[0]
 
 	@property
@@ -54,7 +54,7 @@ class Factor(tuple):
 		x = route
 		while x.points:
 			m = x.module()
-			mt = getattr(m, '__type__', None)
+			mt = getattr(m, '__factor_type__', None)
 			if mt == 'context':
 				yield getattr(m, '__canonical__', None) or x.identifier
 			else:
@@ -95,7 +95,7 @@ class Project(object):
 	A unit containing targets to be constructed or processed.
 	Provides access to project information and common project operations.
 
-	The project's outermost package module must identify itself as the bottom
+	The project's outermost package module must identify itself as the floor
 	in order for &Project to function properly.
 
 	! WARNING:
@@ -110,7 +110,7 @@ class Project(object):
 	def from_module(Class, module, Import = libroutes.Import):
 		"Return the &Project instance for the given module path."
 		r = Import.from_module(module)
-		return Class(r.bottom())
+		return Class(r.floor())
 
 	@property
 	def information(self):
