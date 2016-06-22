@@ -83,7 +83,7 @@ def cache_directory(module, context, role, subject):
 	(fs-directory)`__pycache__` directory.
 	"""
 	# Get a route to a directory in __pycache__.
-	return module.sources.container / '__pycache__' / context / role / subject
+	return libroutes.File.from_absolute(module.__file__).container / '__pycache__' / context / role / subject
 
 def extension_access_name(name:str):
 	"""
@@ -97,15 +97,14 @@ def extension_access_name(name:str):
 	"""
 	return '.'.join(name.split('.extensions.', 1))
 
-def package_directory(module):
-	global libroutes
+def package_directory(module:libroutes.Import):
 	return module.file().container
 
-def sources(module:libroutes.Import, dirname='src'):
+def sources(factor:libroutes.Import, dirname='src'):
 	"""
 	Return the &libroutes.File instance to the set of sources.
 	"""
-	return package_directory(module) / dirname
+	return package_directory(factor) / dirname
 
 def work(module:libroutes.Import, context:str, role:str):
 	"""
@@ -114,169 +113,48 @@ def work(module:libroutes.Import, context:str, role:str):
 	path = package_directory(module) / context / role
 	return libroutes.File(None, path.absolute)
 
-class ProbeModule(libdev.Sources):
+def composite(factor:libroutes.Import):
 	"""
-	Module class representing a probe consisting of a series of sensors that provide
-	reports used to compile and link depending targets. Probe modules provide structure
-	for pre-compile time checks.
-
-	Probes are packages like most factors and the sources directory is not directly compiled,
-	but referenced by the module body itself as resources used to define or support sensors.
+	Whether the given &factor reference is a composite.
 	"""
+	global sources
+	if not factor.is_container():
+		return False
+	if factor.module().__dict__.get('__factor_type__') is None:
+		return False
+	if not sources(factor).exists():
+		return False
 
-	def cache(self, context=None, role=None):
-		"""
-		Return the route to the probe's recorded report.
-		"""
-		f = libroutes.File.from_absolute(self.__cached__)
-		last_dot = self.__name__.rfind('.')
-		path = f.container / self.__name__[last_dot+1:] / context / role
-		return path
-	output=cache
+	return True
 
-	def record(self, reports, context=None, role=None):
-		"""
-		Record the report for subsequent runs.
-		"""
-		rf = self.cache(context, role)
-		rf.init('file')
+def probe(module:types.ModuleType):
+	return module.__factor_type__ == 'system.probe'
 
-		import pickle
-		with rf.open('wb') as f:
-			pickle.dump(reports, f)
-
-	def retrieve(self, context=None, role=None):
-		"""
-		Retrieve the stored data collected by the sensor.
-		"""
-		import pickle
-		rf = self.cache(context, role)
-		with rf.open('rb') as f:
-			try:
-				return pickle.load(f) or {}
-			except (FileNotFoundError, EOFError):
-				return {}
-
-	@staticmethod
-	def key(probe, context, role, module):
-		"""
-		Construct a storage key for the report returned by &deploy.
-		"""
-		return None
-
-	@staticmethod
-	def report(probe, context, role, module):
-		"""
-		Return the report data of the probe for the given &context.
-
-		This method is called whenever a dependency accesses the report for supporting
-		the construction of a target. Probe modules can override this method in
-		order to provide parameter sets that depend on the target that is requesting them.
-		"""
-		key = probe.key(probe, context, role, module)
-		reports = probe.retrieve(context, role)
-		return reports.get(key, {})
-
-	@staticmethod
-	def deploy(probe, context, role, module):
-		"""
-		Cause the probe to activate its sensors to collect information
-		from the system that will be later fetched with &report.
-
-		Probe modules usually define this as a function in the module body.
-		"""
-		pass
-
-class IncludesModule(libdev.Sources):
+def reduction(composite:libroutes.Import, context=None, role=None):
 	"""
-	A collections of headers referenced by a system object.
+	The reduction of the &composite.
 
-	Headers factors are system object independent collections of resources
-	that are meant to be installed into (fs-directory)`include` directories.
-
-	When imported by &SystemModule packages, they are added to the preprocessor include
-	directories that the compiler will use.
+	The file is relative to the Python cache directory of the package module
+	identifying itself as a system module: (fs-path)`{context}/{role}/factor`.
 	"""
+	return composite.file().container / '__pycache__' / context / role / 'factor'
 
-	def output(self, context=None, role=None):
-		return None
-
-	def objects(self, context=None, role=None):
-		return None
-
-class SystemModule(libdev.Sources):
+def dependencies(factor:types.ModuleType):
 	"""
-	Module class representing a system object: executable, shared library, static library, and
-	archive files.
+	Collect and yield a sequence of dependencies identified by
+	the dependent's presence in the module's globals.
+
+	This works on the factor's module object as the imports performed
+	by the module body make up the analyzed data.
 	"""
-	constructed = True
+	ModuleType = types.ModuleType
 
-	def extension_name(self):
-		"""
-		The name that the extension module is bound to.
-		Only used when constructing a Python extension module.
-		"""
-		return ''.join(self.__name__.split('.extensions'))
+	for k, v in factor.__dict__.items():
+		if isinstance(v, ModuleType) and getattr(v, '__factor_type__', None) is not None:
+			yield v
 
-	def output(self, context=None, role=None):
-		"""
-		The target file of the construction.
-		The file is relative to the Python cache directory of the package module
-		identifying itself as a system module: (fs-path)`{context}/{role}/factor`.
-		"""
-		return cache_directory(self, context, role, 'factor')
-
-	@property
-	def includes(self):
-		"""
-		Public includes used by cofactors or unknown dependencies.
-		"""
-		return self.sources.container / 'include'
-
-	def link(self, link_operation, *roles):
-		"""
-		Return the &load parameter for recommending a type of link.
-		"""
-		if self.system_object_type == 'fragment':
-			raise RuntimeError("link specification is always 'union' for fragments")
-
-		if link_operation not in {'include', 'reference'}:
-			raise ValueError("ltype must be 'intersection' or 'union'")
-
-		return (self, (link_operation, roles))
-
-def load(typ, *parameters, **keywords):
-	"""
-	Load a development factor performing a build when needed.
-	"""
-	global ProbeModule, IncludesModule, SystemModule
-
-	# package modules defining a target don't have to define themselves.
-	ctx = core.outerlocals()
-	module = sys.modules[ctx['__name__']]
-
-	if typ == 'system.probe':
-		module.__class__ = ProbeModule
-		module.system_object_type = 'probe'
-	elif typ == 'system.includes':
-		module.__class__ = IncludesModule
-		module.system_object_type = 'includes'
-	else:
-		module.__class__ = SystemModule
-		if typ == 'system.extension':
-			for x in module.__dict__.values():
-				if isinstance(x, libdev.Sources):
-					# context_extension_probe is a name set in
-					# the libpython probe in order to identify a
-					# given system extension as being intended for
-					# the Python that is currently running the software.
-					if getattr(x, 'context_extension_probe', None):
-						module.execution_context_extension = True
-						break
-			else:
-				module.execution_context_extension = False
-		module.system_object_type = typ[typ.find('.')+1:]
-
-	module.parameters = dict(x for x in parameters if x is not None)
-	module.configuration = keywords
-	module._init()
+def python_extension(module, probe_id='.'.join((__package__, 'probes', 'libpython'))):
+	for x in module.__dict__.values():
+		if isinstance(x, types.ModuleType) and x.__name__ == probe_id:
+			return True
+	return False

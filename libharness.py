@@ -24,6 +24,7 @@ import imp
 import collections
 
 from ..routes import library as libroutes
+from . import libfactor
 from . import libcore
 from . import library as libdev
 
@@ -82,7 +83,7 @@ class Harness(object):
 		module = importlib.import_module(test.identity)
 		test/module.__name__ == test.identity
 		ir = libroutes.Import.from_fullname(module.__name__)
-		tid = str(ir.bottom())
+		tid = str(ir.floor())
 
 		# Preload all extensions inside the package.
 		# Empty when .role is None
@@ -116,20 +117,19 @@ class Harness(object):
 			test = self.libtest.Test(tid, tcall)
 			self.dispatch(test)
 
-	def preload_extension(self, test_id, import_object:libroutes.Import):
+	def preload_extension(self, test_id, route:libroutes.Import):
 		"""
-		Given an extension route, &import_object, import the module using
+		Given an extension route, &route, import the module using
 		the configured &role. 
 
 		Used by the harness to import extensions that are being tested in a fashion
 		that allows for coverage and profile data to be collected and for injection
 		dependent tests.
 		"""
-		global importlib, sys
+		global importlib, sys, libfactor
 
-		target_module = import_object.module()
-		dll = target_module.output(python_triplet, self.role)
-		name = target_module.extension_name()
+		dll = libfactor.reduction(route, context=python_triplet, role=self.role)
+		name = libfactor.extension_access_name(str(route))
 
 		# Get the loader for the extension file.
 		loader = importlib.machinery.ExtensionFileLoader(name, str(dll))

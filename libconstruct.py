@@ -30,6 +30,7 @@ import contextlib
 import importlib
 import importlib.machinery
 import types
+import typing
 
 from . import libfactor
 from . import include
@@ -90,8 +91,8 @@ merge_operations = {
 
 def merge(parameters, source, operations = merge_operations):
 	"""
-	Merge the given &source into &self applying merge operations
-	defined for keys or the classes of the destinations' keys.
+	Merge the given &source into &parameters applying merge functions
+	defined in &operations. Dictionaries are merged using recursion.
 	"""
 	for key in source:
 		if key in parameters:
@@ -182,7 +183,7 @@ def mount(role, route, target, ext_suffixes=importlib.machinery.EXTENSION_SUFFIX
 	# usually consistent with the triplet of the first ext suffix.
 	global python_triplet
 
-	outfile = target.output(context=python_triplet, role=role)
+	outfile = libfactor.reduction(route, context=python_triplet, role=role)
 
 	# peel until it's outside the first extensions directory.
 	pkg = route
@@ -207,12 +208,21 @@ def mount(role, route, target, ext_suffixes=importlib.machinery.EXTENSION_SUFFIX
 	print('linking', outfile, '->', link_target)
 	link_target.link(outfile, relative=True)
 
-def collect(module, types=(libfactor.SystemModule, libfactor.ProbeModule)):
+def collect(module):
 	"""
 	Return the set of dependencies that the given module has.
 	"""
+	global libfactor, libroutes, types
+	is_composite = libfactor.composite
+	is_probe = libfactor.probe
+
+	ModuleType = types.ModuleType
 	for v in module.__dict__.values():
-		if isinstance(v, types):
+		if not isinstance(v, ModuleType) or not hasattr(v, '__factor_type__'):
+			continue
+
+		i = libroutes.Import.from_fullname(v.__name__)
+		if is_composite(i) or is_probe(v):
 			yield v
 
 def traverse(working, tree, inverse, module):
@@ -294,7 +304,7 @@ def identity(module):
 
 	idx = module.__name__.rfind('.')
 	basename = module.__name__[idx+1:]
-	if module.system_object_type == 'library':
+	if module.__factor_type__.endswith('.library'):
 		if basename.startswith('lib'):
 			# strip the leading lib from module identifier.
 			# 'libNAME' returns 'NAME'
@@ -503,10 +513,14 @@ def macosx_link_editor(context, output, inputs,
 
 	return command
 
-def unix_link_editor(context, output, inputs,
+def unix_link_editor(context,
+		output:libroutes.File,
+		inputs:typing.Sequence[libroutes.File],
+
 		mechanism=None,
 		format=None,
 		verbose=True,
+
 		filepath=str,
 		pie_flag='-pie',
 		verbose_flag='-v',
@@ -525,19 +539,21 @@ def unix_link_editor(context, output, inputs,
 		use_shared='-Bdynamic',
 	):
 	"""
-	Command constructor for the unix link editors.
+	Command constructor for the unix link editor. For platforms other than &(Darwin) and
+	&(Windows), this is the default interface indirectly selected by &.development.bin.configure.
 
-	GNU ld has an insane characteristic that forces the user to decide what
+	Traditional link editors have an insane characteristic that forces the user to decide what
 	the appropriate order of archives are. The
-	(system:command[posix])`lorder` was apparently built long ago to alleviate this while
-	leaving the interface to (system:command[posix])`ld` to be continually unforgiving.
+	(system:command)`lorder` command was apparently built long ago to alleviate this while
+	leaving the interface to (system:command)`ld` to be continually unforgiving.
 
 	[Parameters]
 
-	/filepath
-		Override to adjust the selected path. File paths passed are &libroutes.File
-		instances that are absolute paths. In cases where scripts are being generated,
-		the path may need modification in order to represented in a portable fashion.
+	/output
+		The file system location to write the linker output to.
+
+	/inputs
+		The set of object files to link.
 
 	/verbose
 		Enable or disable the verbosity of the command. Defaults to &True.
@@ -610,14 +626,17 @@ def reconstruct(outputs, inputs, depfile):
 
 def updated(outputs, inputs, depfile, requirement=None):
 	"""
-	Return whether or not the &outputs need to be updated.
+	Return whether or not the &outputs are up-to-date.
+
+	&False returns means that the target should be reconstructed,
+	and &True means that the file is up-to-date and needs no processing.
 	"""
 	olm = None
-	for x in outputs:
-		if not x.exists():
+	for output in outputs:
+		if not output.exists():
 			# No such object, not updated.
 			return False
-		lm = x.last_modified()
+		lm = output.last_modified()
 		olm = min(lm, olm or lm)
 
 	if requirement is not None and olm < requirement:
@@ -625,7 +644,7 @@ def updated(outputs, inputs, depfile, requirement=None):
 		return False
 
 	for x in inputs:
-		if olm < x.last_modified():
+		if not x.exists() or olm < x.last_modified():
 			# rebuild if any output is older than any source.
 			return False
 
@@ -643,6 +662,57 @@ def updated(outputs, inputs, depfile, requirement=None):
 
 	# object has already been updated.
 	return True
+
+def probe_report(probe, context, role, module):
+	"""
+	Return the report data of the probe for the given &context.
+
+	This method is called whenever a dependency accesses the report for supporting
+	the construction of a target. Probe modules can override this method in
+	order to provide parameter sets that depend on the target that is requesting them.
+	"""
+	global probe_retrieve
+
+	probe_key = getattr(probe, 'key', None)
+	if probe_key is not None:
+		key = probe_key(probe, context, role, module)
+	else:
+		key = None
+
+	reports = probe_retrieve(probe, context, role)
+	return reports.get(key, {})
+
+def probe_retrieve(probe, context=None, role=None):
+	"""
+	Retrieve the stored data collected by the sensor.
+	"""
+	import pickle
+	rf = probe_cache(probe, context, role)
+	with rf.open('rb') as f:
+		try:
+			return pickle.load(f) or {}
+		except (FileNotFoundError, EOFError):
+			return {}
+
+def probe_record(probe, reports, context=None, role=None):
+	"""
+	Record the report for subsequent runs.
+	"""
+	rf = probe_cache(probe, context, role)
+	rf.init('file')
+
+	import pickle
+	with rf.open('wb') as f:
+		pickle.dump(reports, f)
+
+def probe_cache(probe, context=None, role=None):
+	"""
+	Return the route to the probe's recorded report.
+	"""
+	f = libroutes.File.from_absolute(probe.__cached__)
+	last_dot = probe.__name__.rfind('.')
+	path = f.container / probe.__name__[last_dot+1:] / context / role
+	return path
 
 def factor_defines(module_fullname):
 	"""
@@ -717,45 +787,55 @@ def initialize(
 	global merge
 
 	# Factor dependencies stated by imports.
-	td = list(module.dependencies())
+	td = list(libfactor.dependencies(module))
 
 	# Categorize the module's dependencies.
-	incdirs = [include.directory]
+	incdirs = [libfactor.sources(libroutes.Import.from_fullname(include.__name__))]
+	includes = []
 	probes = []
 	libs = []
 	fragments = []
 	refs = []
-	for x in td:
-		if isinstance(x, libfactor.IncludesModule):
-			incdirs.append(x.sources)
-		elif isinstance(x, libfactor.ProbeModule):
-			probes.append(x)
-		elif isinstance(x, libfactor.SystemModule):
-			if x.system_object_type == 'library':
-				libs.append(x)
-			elif x.system_object_type == 'fragment':
-				fragments.append(x)
-		else:
-			refs.append(x)
+	index = {
+		'system.probe': probes,
+		'system.library': libs,
+		'system.fragment': fragments,
+		'system.interfaces': includes,
+	}
 
+	for x in td:
+		index.get(x.__factor_type__, refs).append(x)
+
+	incdirs.extend(libfactor.sources(libroutes.Import.from_fullname(x.__name__)) for x in includes)
 	work = libfactor.cache_directory(module, context, role, 'x').container
 
 	# context: context -> role -> purpose -> format
 	mechanisms = mechanism(lcd or root_context_directory(), selection, role)
 
+	ir = libroutes.Import.from_fullname(module.__name__)
+	reduction = libfactor.reduction(ir, context=context, role=role)
+	if module.__factor_type__ == 'system.fragment':
+		# fragments can have multiple reductions.
+		# in order to accommodate for its dependents,
+		# the reduction must be a directory with entries
+		# named after the format type.
+		pass
+
 	# the full context dictionary.
 	parameters = {
 		'name': context, # context name
-		'module': module,
 		'role': role,
+		'module': module,
+		'import': ir,
 
-		'probes': probes, # libfactor.ProbeModule
-		'references': refs, # libdev.Sources instances
+		'probes': probes,
+		'references': refs,
 
 		'locations': {
-			'sources': module.sources,
+			'sources': libfactor.sources(ir),
 			'work': work, # normally, __pycache__ subdirectory.
 			'output': libfactor.cache_directory(module, context, role, 'out'),
+			'reduction': reduction,
 			'logs': libfactor.cache_directory(module, context, role, 'log'),
 			'libraries': libfactor.cache_directory(module, context, role, 'lib'),
 			'dependencies': libfactor.cache_directory(module, context, role, 'dl'),
@@ -766,7 +846,7 @@ def initialize(
 
 		# Context data for system subject.
 		'system': {
-			'type': getattr(module, 'system_object_type', None), # Conceptual
+			'type': module.__factor_type__.split('.')[1], # Conceptual
 			'abi': getattr(module, 'abi', None), # -soname for unix/elf.
 			'formats': set(),
 			'libraries': libs, # dependencies that are system libraries.
@@ -793,7 +873,7 @@ def initialize(
 
 	if typ in {'executable', 'extension', 'library'}:
 		# system/user is the dependent.
-		# Usually, PIC for extensions, PDF for executables.
+		# Usually, PIC for extensions, PDC/PIE for executables.
 		sys['formats'].add(sysformats[typ])
 	else:
 		# For fragments, the dependents decide
@@ -802,7 +882,7 @@ def initialize(
 
 		links = set()
 		for x in dependents:
-			sys['formats'].add(sysformats[x.system_object_type])
+			sys['formats'].add(sysformats[x.__factor_type__.split('.')[1]])
 
 			dparams = getattr(x, 'parameters', None)
 			if dparams is None or not dparams:
@@ -831,19 +911,22 @@ def initialize(
 			sys['include.directories'].append(incdir)
 
 	for probe in probes:
-		report = probe.report(probe, selection or 'host', role, module)
+		report = probe_report(probe, selection or 'host', role, module)
 		merge(parameters, report) # probe parameter merge
 
 	if libpython in probes:
 		# Note as building a Python extension.
 		parameters['execution_context_extension'] = True
-		men = parameters['mount_point'] = module.extension_name()
+		men = parameters['mount_point'] = libfactor.extension_access_name(module.__name__)
 		idefines = execution_context_extension_defines(module.__name__, men)
 	else:
 		parameters['execution_context_extension'] = False
 		idefines = factor_defines(module.__name__)
 
 	parameters['system']['source.parameters'].extend(idefines)
+	parameters['system']['source.parameters'].append(
+		('PRODUCT_ARCHITECTURE', mechanisms['system']['platform'])
+	)
 
 	return parameters
 
@@ -859,7 +942,7 @@ def context_interface(path):
 		obj = getattr(obj, x)
 	return obj
 
-def transform(context, filtered=(lambda x,y,z: False)):
+def transform(context, filtered=reconstruct):
 	"""
 	Transform the sources using the mechanisms defined in &context.
 
@@ -872,6 +955,8 @@ def transform(context, filtered=(lambda x,y,z: False)):
 	global languages, include
 
 	if 'sources' not in context:
+		return
+	if context['system']['type'] == 'interfaces':
 		return
 
 	sys = context['system']
@@ -949,7 +1034,7 @@ def transform(context, filtered=(lambda x,y,z: False)):
 
 			yield ('execute', compilation, logfile)
 
-def reduce(context, filtered=(lambda x,y,z: False), sys_platform=sys.platform):
+def reduce(context, filtered=reconstruct, sys_platform=sys.platform):
 	"""
 	Construct the operations for reducing the object files created by &transform
 	instructions into a set of targets that can satisfy
@@ -959,6 +1044,9 @@ def reduce(context, filtered=(lambda x,y,z: False), sys_platform=sys.platform):
 	/context
 		The construction context created by &initialize.
 	"""
+
+	if context['system']['type'] == 'interfaces':
+		return
 
 	ctx = context['name']
 	role = context['role']
@@ -987,16 +1075,19 @@ def reduce(context, filtered=(lambda x,y,z: False), sys_platform=sys.platform):
 		# with a large number of dependencies.
 
 		# Explicit link of factor.
-		libdep = x.output(ctx, role)
+		libdep = libfactor.reduction(libroutes.Import.from_fullname(x.__name__), context=ctx, role=role)
 		li = identity(x)
 		lib = libdir / library_filename(sys_platform, li)
 		yield ('link', libdep, lib)
 		libs.append(li)
 
-	fragments = [x.output(ctx, role) for x in context['system']['fragments']]
+	fragments = [
+		libfactor.reduction(libroutes.Import.from_fullname(x.__name__), context=ctx, role=role)
+		for x in context['system']['fragments']
+	]
 
 	# Discover the known sources in order to identify which objects should be selected.
-	output_base = context['module'].output(ctx, role)
+	output_base = context['locations']['reduction']
 	typ = sys['type']
 	if typ == 'fragment':
 		# Fragments may have multiple builds.
@@ -1102,7 +1193,7 @@ class Construction(libio.Processor):
 		if context is None:
 			# context was not selected, so default to the host
 			# context. In cases of Python extension, this is the triplet.
-			if getattr(module, 'execution_context_extension', False):
+			if libfactor.python_extension(module):
 				context = python_triplet
 			else:
 				# Default 'host' context.
@@ -1112,7 +1203,7 @@ class Construction(libio.Processor):
 			# extension modules are not built for mounting.
 			pass
 
-		if isinstance(module, libfactor.ProbeModule):
+		if getattr(module, '__factor_type__', None) == 'system.probe':
 			# Needs to be transformed into a job.
 			# Probes are deployed per dependency.
 			probe_set = [('probe', module, x) for x in dependents]
@@ -1144,14 +1235,17 @@ class Construction(libio.Processor):
 		ctx = self.cx_context or 'host'
 		role = self.cx_role
 
-		key = module.key(module, ctx, role, dep)
-		reports = module.retrieve(ctx, role)
+		if getattr(module, 'key', None) is not None:
+			key = module.key(module, ctx, role, dep)
+		else:
+			key = None
+
+		reports = probe_retrieve(module, ctx, role)
 
 		if key in reports:
 			# Needed report is cached.
 			self.progress[module] += 1
 		else:
-			deploy = module.deploy
 			xreport = module.deploy(module, ctx, role, dep)
 			if isinstance(xreport, types.CoroutineType):
 				# wait for completion
@@ -1167,7 +1261,7 @@ class Construction(libio.Processor):
 				reports[key] = xreport
 				if xreport is not None:
 					# &None indicates constant probe; &report will build on demand.
-					module.record(reports, ctx, role)
+					probe_record(module, reports, ctx, role)
 
 				self.progress[module] += 1
 
@@ -1178,7 +1272,7 @@ class Construction(libio.Processor):
 		try:
 			report = processor.product
 			reports[key] = report
-			module.record(reports, ctx, role)
+			probe_record(module, reports, ctx, role)
 		finally:
 			pass
 
@@ -1200,10 +1294,10 @@ class Construction(libio.Processor):
 
 			ki = libsys.KInvocation(str(cmd[0]), strcmd)
 			with open('/dev/null', 'rb') as ci, open('/dev/null', 'wb') as co:
-				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(),1), (f.fileno(),2)))
+				pid = ki(fdmap=((ci.fileno(),0), (co.fileno(),1), (f.fileno(),2)))
 				sp = libio.Subprocess(pid)
 
-		#print(' '.join(strcmd) + ' #' + str(pid))
+		print(' '.join(strcmd) + ' #' + str(pid))
 		self.sector.dispatch(sp)
 		sp.atexit(functools.partial(self.process_exit, start=libtime.now(), descriptor=(typ, cmd, log), module=module))
 

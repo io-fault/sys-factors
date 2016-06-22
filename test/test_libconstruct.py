@@ -146,15 +146,17 @@ def test_sequence(test):
 	"""
 	from .. import libfactor
 	m = [
-		libfactor.SystemModule("M1"),
-		libfactor.SystemModule("M2"),
-		libfactor.SystemModule("M3"),
+		types.ModuleType("M1"),
+		types.ModuleType("M2"),
+		types.ModuleType("M3"),
 	]
 	n = [
-		libfactor.SystemModule("N1"),
-		libfactor.SystemModule("N2"),
-		libfactor.SystemModule("N3"),
+		types.ModuleType("N1"),
+		types.ModuleType("N2"),
+		types.ModuleType("N3"),
 	]
+	for x in m+n:
+		x.__factor_type__ = 'system.library'
 
 	# M1 -> M2
 	m[0].m2 = m[1]
@@ -179,27 +181,27 @@ def test_sequence(test):
 def test_identity(test):
 	import types
 	m = types.ModuleType("some.pkg.lib.name")
-	m.system_object_type = 'library'
+	m.__factor_type__ = 'system.library'
 	test/library.identity(m) == 'name'
 
 	m = types.ModuleType("some.pkg.lib.libname")
-	m.system_object_type = 'library'
+	m.__factor_type__ = 'system.library'
 	test/library.identity(m) == 'name'
 
 	# executables are indifferent
 	m = types.ModuleType("some.pkg.lib.libname")
-	m.system_object_type = 'executable'
+	m.__factor_type__ = 'system.executable'
 	test/library.identity(m) == 'libname'
 
 	# explicit overrides are taken regardless
 	m = types.ModuleType("some.pkg.lib.libname")
-	m.system_object_type = 'library'
+	m.__factor_type__ = 'system.library'
 	m.name = 'libsomethingelse'
 	test/library.identity(m) == 'libsomethingelse'
 
 def test_construction_sequence(test):
 	"""
-	&library.initialize of a temporary &libfactor.SystemModule
+	&library.initialize of a temporary system target
 	and its subsequent &library.transform and &library.reduce.
 
 	! WARNING:
@@ -208,9 +210,8 @@ def test_construction_sequence(test):
 	import builtins
 	from .. import libfactor
 
-	mt = libfactor.SystemModule("pkg.exe", "docstring")
-	mt.system_object_type = 'executable'
-	mt.__type__ = 'system.executable'
+	mt = types.ModuleType("pkg.exe", "docstring")
+	mt.__factor_type__ = 'system.executable'
 	mt.__builtins__ = builtins
 
 	with libroutes.File.temporary() as tr:

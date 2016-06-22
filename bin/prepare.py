@@ -1,6 +1,6 @@
 """
-Prepare the project by constructing factor targets of all the &.library.Sources modules
-contained within a package.
+Prepare the project by constructing factor targets of all the composite package modules
+contained with the given set of package names.
 """
 import os
 import sys
@@ -10,6 +10,7 @@ import py_compile
 import importlib.machinery
 import functools
 import collections
+import types
 
 from .. import libfactor
 from .. import include
@@ -114,8 +115,7 @@ def main(role='optimal', mount_extensions=True):
 
 		for target in packages:
 			tm = importlib.import_module(str(target))
-			if isinstance(tm, libdev.Sources) and getattr(tm, 'constructed', None):
-				# libdev.Sources and is identified as being constructed.
+			if isinstance(tm, types.ModuleType) and libfactor.composite(target):
 				root_system_modules.append((target, tm))
 
 		if mount_extensions and role not in {'test', 'metrics'}:

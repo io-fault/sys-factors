@@ -6,18 +6,16 @@ extension module. Enables special cases for Python extension modules for relocat
 (python:string)`'system.extension'` factors that import this probe will be identified as
 Python extensions.
 """
+__factor_type__ = 'system.probe'
+
 import sys
 import sysconfig
 
-from .. import libfactor
 from .. import libprobe
-__factor_type__ = 'system.probe'
 
 # Marker used by libconstruct to identify that
 # it is an extension module for *this* Python.
 context_extension_probe = True
-
-libfactor.load('system.probe')
 
 python_version_string = '.'.join(map(str, sys.version_info[:2]))
 python_abi_flags = sys.abiflags
@@ -36,10 +34,6 @@ report_dictionary = {
 	}
 }
 
-def report(probe, context, role, module):
+def deploy(*args):
 	global report_dictionary
 	return report_dictionary
-
-def deploy(*args):
-	# No deployment necessary.
-	pass
