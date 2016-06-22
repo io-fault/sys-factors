@@ -8,7 +8,6 @@ import sys
 import os
 import functools
 
-from .. import library as libdev
 from .. import libmetrics
 
 from ...routes import library as libroutes
@@ -23,7 +22,7 @@ def main(work, target_dir, packages):
 
 	for package in packages:
 		p = libmetrics.Harness(work, target_fsdict, package, sys.stderr)
-		p.execute(p.root(libdev.Factor.from_fullname(package)), ())
+		p.execute(p.root(libroutes.Import.from_fullname(package)), ())
 		# Build measurements.
 		libmetrics.prepare(target_fsdict)
 

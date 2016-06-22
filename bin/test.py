@@ -11,8 +11,8 @@ import importlib
 
 from ...system import library as libsys
 from ...system import libcore
+from ...routes import library as libroutes
 
-from .. import library as libdev
 from .. import libtest
 from .. import libtrace
 
@@ -163,7 +163,7 @@ class Harness(libharness.Harness):
 
 def main(package, modules, role='test'):
 	p = Harness(package, sys.stderr, role=role)
-	p.execute(p.root(libdev.Factor.from_fullname(package)), modules)
+	p.execute(p.root(libroutes.Import.from_fullname(package)), modules)
 
 	raise SystemExit(0)
 

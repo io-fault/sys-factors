@@ -12,6 +12,7 @@ Factor support for Python extensions, archive files, shared objects, and executa
 import sys
 import imp
 import types
+import importlib
 
 from . import core
 from . import library as libdev
@@ -71,6 +72,22 @@ def role(module, role='optimal', context=None):
 		return _factor_roles['.'.join(path)]
 
 	return default_role
+
+def canonical_name(route:libroutes.Import):
+	"""
+	Identify the canonical name of the factor.
+	"""
+	r = []
+	add = r.append
+
+	while route:
+		mod = importlib.import_module(str(route))
+		nid = mod.__dict__.get('__canonical__', route.identifier)
+		add(nid)
+		route = route.container
+
+	r.reverse()
+	return '.'.join(r)
 
 def cache_directory(module, context, role, subject):
 	"""

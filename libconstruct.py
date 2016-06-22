@@ -172,6 +172,7 @@ languages = {}
 for k, v in extensions.items():
 	for y in v:
 		languages[y] = k
+del k, y, v
 
 def mount(role, route, target, ext_suffixes=importlib.machinery.EXTENSION_SUFFIXES):
 	"""
@@ -911,7 +912,8 @@ def initialize(
 
 	# Add include directories from libraries and fragments.
 	for inc in itertools.chain(libs, fragments):
-		incdir = inc.sources.container / 'include'
+		ir = libroutes.Import.from_fullname(inc.__name__)
+		incdir = libfactor.sources(ir).container / 'include'
 		if incdir.exists():
 			sys['include.directories'].append(incdir)
 

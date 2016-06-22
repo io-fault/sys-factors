@@ -8,8 +8,8 @@ import collections
 
 from ...system import library as libsys
 from ...system import libcore
+from ...routes import library as libroutes
 from .. import libharness
-from .. import library as libdev
 
 # The escapes are used directly to avoid dependencies.
 exits = {
@@ -94,7 +94,7 @@ def main(package, modules, role='optimal'):
 	sys.stderr.flush()
 
 	p = Harness(package, sys.stderr, role=role)
-	p.execute(p.root(libdev.Factor.from_fullname(package)), modules)
+	p.execute(p.root(libroutes.Import.from_fullname(package)), modules)
 	for x in p.tests:
 		p.complete(x)
 

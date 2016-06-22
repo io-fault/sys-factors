@@ -150,7 +150,7 @@ class Harness(object):
 			if isinstance(pkg.module(), libdev.Sources):
 				yield pkg
 
-	def root(self, factor):
+	def root(self, route):
 		"""
 		Generate the root test from the given route.
 		"""
@@ -159,17 +159,16 @@ class Harness(object):
 		# here and placed in test.root.
 		m = types.ModuleType("test.root")
 
-		f = factor
-		base_route = f.route
+		module = route.module()
 
-		if f.type == 'project':
-			extpkg = base_route / 'extensions'
+		if module.__factor_type__ == 'project':
+			extpkg = route / 'extensions'
 			if extpkg.exists() and self.role is not None:
-				self.extensions[str(base_route)].extend(self._collect_targets(extpkg))
+				self.extensions[str(route)].extend(self._collect_targets(extpkg))
 
-			m.__tests__ = [(f.route.fullname + '.test', self.package_test)]
-		elif f.type == 'context':
-			pkg, mods = base_route.subnodes()
+			m.__tests__ = [(route.fullname + '.test', self.package_test)]
+		elif module.__factor_type__ == 'context':
+			pkg, mods = route.subnodes()
 			if self.role is not None:
 				for x in pkg:
 					extpkg = x / 'extensions'
