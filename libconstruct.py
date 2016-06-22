@@ -19,6 +19,11 @@ necessary procedures for constructing a target.
 /python_triplet
 	The `-` separated strings representing the currently executing Python context.
 	Used to construct directories for Python extension builds.
+
+[ Environment ]
+
+/FAULT_ROLE
+	Role to construct targets with.
 """
 import os
 import sys

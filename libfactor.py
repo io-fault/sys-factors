@@ -8,11 +8,6 @@ Factor support for Python extensions, archive files, shared objects, and executa
 
 /import_role
 	The default role to import modules with.
-
-[ Environment ]
-
-/FAULT_CONSTRUCT_ROLE
-	Role to construct targets with.
 """
 import sys
 import imp
