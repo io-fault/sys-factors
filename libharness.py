@@ -147,7 +147,7 @@ class Harness(object):
 	@staticmethod
 	def _collect_targets(route):
 		for pkg in route.tree()[0]:
-			if isinstance(pkg.module(), libdev.Sources):
+			if libfactor.composite(pkg):
 				yield pkg
 
 	def root(self, route):
