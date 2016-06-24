@@ -18,6 +18,8 @@ import pickle
 import os
 import os.path
 import resource
+import subprocess
+import types
 
 from ..routes import library as libroutes
 from ..system import library as libsys
@@ -33,6 +35,7 @@ from .xml import libmetrics
 from . import libpython
 from . import libtrace
 from . import libharness
+from . import libfactor
 
 def statistics(
 		data,
@@ -83,18 +86,35 @@ def source_file_map(interests:typing.Sequence[libroutes.Import]):
 	"""
 	Query Python for the entire package tree of all the
 	given Import routes.
+
+	[Effects]
+	/Product
+		Mapping of file paths associated with the module path that
+		represents the file.
 	"""
 
 	# Get the full set of modules that are of interest to the perspective.
 	modules = []
+	fractions = []
 	for r in interests:
 		pkgs, mods = r.tree()
 		modules.extend(pkgs)
 		modules.extend(mods)
+		for pkg in pkgs:
+			if libfactor.composite(pkg):
+				sources = libfactor.sources(pkg)
+				prefix = str(sources)
+				prefix_length = len(prefix)
+				for s in sources.tree()[1]:
+					srcstr = str(s)
+					fractions.append((srcstr, str(pkg) + srcstr[prefix_length:]))
 
-	return {
+	sfm = {
 		r.spec().origin: r for r in modules
 	}
+	sfm.update(fractions)
+
+	return sfm
 
 def reorient(container:str, sfm:dict, input:libtrace.Measurements, output:libtrace.Measurements):
 	"""
@@ -321,10 +341,17 @@ def process(measures, item,
 				key = key[0].decode('utf-8') # The test generating the coverage.
 			else:
 				key = None
-				traversable, traversed, untraversed = coverage(m, counts)
-				permodule_counts[m]['untraversed'] = untraversed
-				permodule_counts[m]['traversed'] = traversed
-				permodule_counts[m]['traversable'] = traversable
+				if isinstance(m, libroutes.Import):
+					traversable, traversed, untraversed = coverage(m, counts)
+					permodule_counts[m]['untraversed'] = untraversed
+					permodule_counts[m]['traversed'] = traversed
+					permodule_counts[m]['traversable'] = traversable
+				else:
+					# str() is called on these fields to get the sequence of ranges.
+					module_name, srcfile = m.split('/', 1)
+					permodule_counts[m]['traversed'] = \
+					permodule_counts[m]['traversable'] = \
+					permodule_counts[m]['untraversed'] = librange.RangeSet.from_string('')
 
 			fcounts = {None:key}
 			fcounts.update(counts)
@@ -370,6 +397,18 @@ class Harness(libharness.Harness):
 	from ..chronometry import library as libtime
 
 	concurrently = staticmethod(libsys.concurrently)
+
+	metrics_postprocessor = libroutes.File.which('llvm-profdata')
+	@staticmethod
+	def llvm_merge_profile_data(output, *inputs):
+		"""
+		Return the constructed command to perform instrumentation profile data merge.
+
+		This is a requisite step in order to get the recordd coverage information.
+		"""
+		l = ['llvm-profdata', 'merge', '-instr', '-output=' + str(output)]
+		l.extend(inputs)
+		return l
 
 	def __init__(self, work, measurements, package, status):
 		super().__init__(package, role='metrics')
@@ -438,11 +477,99 @@ class Harness(libharness.Harness):
 		return report
 
 	def prepare_extensions(self, test_id):
+		"""
+		Prepare extensions with instrumentation for collection.
+
+		This sets the desintation path of the counters and resets
+		the current in memory data inside the extension.
+		"""
 		prefix = self.work / 'llvm' / test_id
 		prefix.init('directory')
 		for mod in self.instrumentation_set:
 			mod._instrumentation_set_path(str(prefix / mod.__name__))
 			mod._instrumentation_reset()
+		return prefix
+
+	@staticmethod
+	def merge_instrumentation_metrics(work, path):
+		"""
+		When collecting metrics for instrumented binaries, merge the per-test set
+		produced into a single file for each binary.
+
+		This performs a final merge giving a set of counters that represent the
+		counts across all test runs. When using &.bin.measure, this is performed
+		when the (system:environment)`FAULT_COVERAGE_TOTALS` is set.
+		"""
+		prefix = work / 'llvm'
+		totals = libroutes.File.from_path(path)
+		totals.init('directory')
+
+		for cd in prefix.subnodes()[0]:
+			# llvm/*
+			for f in cd.subnodes()[1]:
+				# llvm/*/*
+				if f.extension == 'mpd':
+					continue
+				i = f.suffix('.mpd')
+				if not i.exists():
+					continue
+
+				out = totals / f.identifier
+				if not out.exists():
+					# first entry, just copy.
+					out.replace(i)
+					continue
+				tmp = out.prefix('tmp:')
+
+				cmd = list(map(str, Harness.llvm_merge_profile_data(str(tmp), str(out), i)))
+				cmd[0] = str(Harness.metrics_postprocessor)
+				sp = subprocess.Popen(cmd)
+				sp.wait()
+				# Move tmp back
+				out.replace(out.prefix('tmp:'))
+
+		for f in totals.subnodes()[1]:
+			if f.identifier.startswith('tmp:'):
+				f.void()
+
+	def flush_extensions(self, directory):
+		"""
+		Iterate over the extensions writing any collected data to disk.
+		The data is written to a file determined by &prepare_extensions prior
+		to the execution of a test.
+
+		After the data has been written, a postprocessor is immediately ran in-place
+		to merge the data.
+		"""
+		if not self.instrumentation_set:
+			# No instrumentation extensions loaded.
+			return
+
+		for mod in self.instrumentation_set:
+			mod._instrumentation_write()
+
+		for x in directory.subnodes()[1]:
+			# Each file in this directory is the profile emitted by an extension.
+			cmd = list(map(str, self.llvm_merge_profile_data(str(x) + '.mpd', x)))
+			cmd[0] = str(self.metrics_postprocessor)
+			sp = subprocess.Popen(cmd)
+			sp.wait()
+
+	def instrumentation_metrics(self, directory):
+		"""
+		Iterate over the merged profile data in the given &directory
+		to collect the per-file measurements.
+		"""
+		from . import llvm_instr
+
+		for mod in self.instrumentation_set:
+			basename = mod.__name__
+			data = directory / (basename + '.mpd')
+			if not data.exists():
+				continue
+
+			# Each file in this directory is the profile emitted by an extension.
+			yield from llvm_instr.extract_nonzero_counters(mod.__file__, str(data))
 
 	def seal(self, test):
 		"""
@@ -455,7 +582,7 @@ class Harness(libharness.Harness):
 
 		with self.libtime.clock.stopwatch() as view:
 			try:
-				self.prepare_extensions(test.identity)
+				llmetrics = self.prepare_extensions(test.identity)
 				subscribe()
 				test.seal()
 			finally:
@@ -471,15 +598,25 @@ class Harness(libharness.Harness):
 		else:
 			error = None
 
+		self.flush_extensions(llmetrics)
+
 		faten = test.fate.__class__.__name__.lower()
-		m = libtrace.measure(events)
+		profile, coverage = libtrace.measure(events)
+
+		for path, counters in self.instrumentation_metrics(llmetrics):
+			coverage[path].update({
+				x[0]: x[-1]
+				for x in counters
+				if x[-1] is not None
+			})
+
 		report = {
 			'test': test.identity,
 			'impact': test.fate.impact,
 			'fate': faten,
 			'duration': int(view()),
 			'error': error,
-			'measurements': m
+			'measurements': (profile, coverage)
 		}
 
 		tid = test.identity.encode('utf-8')
