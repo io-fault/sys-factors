@@ -124,8 +124,12 @@ def main(role='optimal', mount_extensions=True):
 
 			# Collect extensions to be mounted into a package module.
 			for target, tm in root_system_modules:
-				if getattr(tm, 'execution_context_extension', None):
-					exe_ctx_extensions.append((target, tm))
+				for dm in tm.__dict__.values():
+					if not isinstance(dm, types.ModuleType):
+						continue
+					# scan for module.context_extension_probe == True
+					if getattr(dm, 'context_extension_probe', None):
+						exe_ctx_extensions.append((target, tm))
 		else:
 			exe_ctx_extensions = ()
 
