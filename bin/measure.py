@@ -9,15 +9,28 @@ import os
 import functools
 
 from .. import libmetrics
+from .. import libfactor
+from .. import llvm_instr
 
 from ...routes import library as libroutes
 from ...system import libcore
 
-def main(work, target_dir, packages):
+def main(target_dir, packages):
+	global llvm_instr
+
 	target_fsdict = libmetrics.libfs.Dictionary.create(
 		libmetrics.libfs.Hash('fnv1a_32', depth=1), target_dir
 	)
 
+	work = libroutes.File.from_path(target_dir) / '_instr_cov_'
+	if work.exists():
+		work.void()
+	work.init('directory')
+
+	llvm = (work / 'llvm')
+	llvm.init('directory')
+
+	os.environ['LLVM_PROFILE_FILE'] = str(llvm / 'trap.profraw')
 	target_fsdict[b'metrics:packages'] = b'\n'.join(x.encode('utf-8') for x in packages)
 
 	p = None
@@ -26,11 +39,56 @@ def main(work, target_dir, packages):
 		p.execute(p.root(libroutes.Import.from_fullname(package)), ())
 		# Build measurements.
 
-	fct = os.environ.get('FAULT_COVERAGE_TOTALS')
-	if fct:
-		libmetrics.Harness.merge_instrumentation_metrics(work, fct)
-
 	libmetrics.prepare(target_fsdict)
+
+	# &libmetrics.prepare manages the data produced by Python,
+	# but the instrumentation is managed by llvm-profdata merge.
+	fct = os.environ.get('FAULT_COVERAGE_TOTALS', str(work / 'totals'))
+	libmetrics.Harness.merge_instrumentation_metrics(work, fct)
+	fct_r = libroutes.File.from_absolute(fct)
+
+	import pickle
+	for x in fct_r.subnodes()[1]:
+		cm = libfactor.extension_composite_name(str(x.identifier))
+		ci = libroutes.Import.from_fullname(cm)
+		src_r = libfactor.sources(ci)
+		prefix = str(src_r) + '/'
+		prefix_len = len(prefix) - 1
+		module = ci.module()
+
+		if libfactor.python_extension(module):
+			so = libfactor.reduction(ci, libfactor.python_triplet, 'metrics')
+		else:
+			so = libfactor.reduction(ci, 'host', 'metrics')
+
+		xc = dict(llvm_instr.extract_counters(str(so), str(x)))
+		xz = dict(llvm_instr.extract_zero_counters(str(so), str(x)))
+		for path in llvm_instr.list_source_files(str(so)):
+			if not path.startswith(prefix):
+				continue
+
+			suffix = path[prefix_len:]
+			key = libfactor.canonical_name(ci) + suffix
+			ek = key.encode('utf-8')
+			covkey = b'coverage:' + ek
+
+			data = pickle.loads(target_fsdict[covkey])
+			data['traversed'] = xc[path]
+
+			# None partitioned list.
+			ll = []
+			i = iter(xz[path])
+			while True:
+				l = list(iter(i.__next__, None))
+				if not l:
+					break
+				ll.append(l)
+
+			data['untraversed'] = ll
+			data['traversable'] = None
+
+			with target_fsdict.route(covkey).open('wb') as f:
+				pickle.dump(data, f)
 
 	raise SystemExit(0)
 
@@ -40,27 +98,9 @@ if __name__ == '__main__':
 	if not packages:
 		raise TypeError("command invoked with one parameter; requires: '.bin.measure target_dir packages ...'")
 
-	# Setup temporary directory for instrumentation/coverage storage.
-	if 'FAULT_COVERAGE_DIRECTORY' in os.environ:
-		work = libroutes.File.from_absolute(os.environ['FAULT_COVERAGE_DIRECTORY'])
-		work.init('directory')
-	else:
-		cm = libroutes.File.temporary()
-		work = cm.__enter__()
-		atexit.register(functools.partial(cm.__exit__, None, None, None))
-
 	# Remove core constraints if any.
-	cm = libcore.constraint(None)
-	cm.__enter__()
-	atexit.register(functools.partial(cm.__exit__, None, None, None))
-
-	# Work CM is here and not further down because it needs to be global
-	# The child processes raise replacements to control the context.
-	llvm = (work / 'llvm')
-	llvm.init('directory')
+	cm = libcore.constraint(None).__enter__()
 
 	# Adjust the profile file environment to a trap file.
 	# The actual file is set before each test.
-	os.environ['LLVM_PROFILE_FILE'] = str(llvm / 'trap.profraw')
-
-	libmetrics.libsys.control(functools.partial(main, work, target_dir, packages))
+	libmetrics.libsys.control(functools.partial(main, target_dir, packages))

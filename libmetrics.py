@@ -192,13 +192,14 @@ def isolate(measures) -> dict:
 	"""
 	Construct a mapping that isolates each project's tests from each other.
 
-	[ Return ]
+	[ Effects ]
 
-	A dictionary instance whose keys are &libroutes.Import instances referring
-	to the project containing the test. The values are a triple containing
-	the &libroutes.Import referring to the test module, the attributes that
-	select the test from the module, and the key used to access the entry
-	in the given &measures dictionary.
+	/Product
+		A dictionary instance whose keys are &libroutes.Import instances referring
+		to the project containing the test. The values are a triple containing
+		the &libroutes.Import referring to the test module, the attributes that
+		select the test from the module, and the key used to access the entry
+		in the given &measures dictionary.
 	"""
 
 	project_tests = collections.defaultdict(list)
@@ -428,10 +429,12 @@ class Harness(libharness.Harness):
 		if not m.exists():
 			m.init('directory')
 
-		mod._instrumentation_set_path(str(m / mod.__name__))
+		mod._instrumentation_path = str(m / mod.__name__)
+		mod._instrumentation_set_path(mod._instrumentation_path)
 		mod._instrumentation_write()
 		mod._instrumentation_reset()
 		self.instrumentation_set.add(mod)
+
 		return mod
 
 	def dispatch(self, test):

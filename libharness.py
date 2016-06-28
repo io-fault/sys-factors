@@ -28,10 +28,6 @@ from . import libfactor
 from . import libcore
 from . import library as libdev
 
-python_triplet = libdev.python_context(
-	sys.implementation.name, sys.version_info, sys.abiflags, sys.platform
-)
-
 class Harness(object):
 	"""
 	The collection and execution of a set of tests.
@@ -128,7 +124,7 @@ class Harness(object):
 		"""
 		global importlib, sys, libfactor
 
-		dll = libfactor.reduction(route, context=python_triplet, role=self.role)
+		dll = libfactor.reduction(route, context=libfactor.python_triplet, role=self.role)
 		name = libfactor.extension_access_name(str(route))
 
 		# Get the loader for the extension file.
@@ -157,17 +153,18 @@ class Harness(object):
 
 		# pseudo-module for absolute root; the initial divisions are built
 		# here and placed in test.root.
-		m = types.ModuleType("test.root")
+		tr = types.ModuleType("test.root")
 
 		module = route.module()
+		ft = getattr(module, '__factor_type__', 'python.module')
 
-		if module.__factor_type__ == 'project':
+		if ft == 'project':
 			extpkg = route / 'extensions'
 			if extpkg.exists() and self.role is not None:
 				self.extensions[str(route)].extend(self._collect_targets(extpkg))
 
-			m.__tests__ = [(route.fullname + '.test', self.package_test)]
-		elif module.__factor_type__ == 'context':
+			tr.__tests__ = [(route.fullname + '.test', self.package_test)]
+		elif ft == 'context':
 			pkg, mods = route.subnodes()
 			if self.role is not None:
 				for x in pkg:
@@ -175,10 +172,13 @@ class Harness(object):
 					if extpkg.exists():
 						self.extensions[str(x)].extend(self._collect_targets(extpkg))
 
-			m.__tests__ = [
+			tr.__tests__ = [
 				(str(x) + '.test', self.package_test)
 				for x in pkg
 				if ((x/'test').module() is not None)
 			]
+		else:
+			# Presume specific test module
+			tr.__tests__ = [(str(route), self.module_test)]
 
-		return m
+		return tr

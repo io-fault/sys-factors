@@ -38,6 +38,8 @@ import types
 import typing
 
 from . import libfactor
+python_triplet = libfactor.python_triplet
+
 from . import include
 from . import library as libdev
 from .probes import libpython # Used to detect Python Extensions.
@@ -78,11 +80,6 @@ def library_filename(platform, name):
 	"""
 	global library_extensions
 	return 'lib' + name.lstrip('lib') + '.' + library_extensions.get(platform, 'so')
-
-# Used as the context name for extension modules.
-python_triplet = libdev.python_context(
-	sys.implementation.name, sys.version_info, sys.abiflags, sys.platform
-)
 
 merge_operations = {
 	set: set.update,

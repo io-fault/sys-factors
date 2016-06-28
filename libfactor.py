@@ -19,6 +19,11 @@ from . import library as libdev
 from ..computation import libmatch
 from ..routes import library as libroutes
 
+# Used as the context name for extension modules.
+python_triplet = libdev.python_context(
+	sys.implementation.name, sys.version_info, sys.abiflags, sys.platform
+)
+
 selections = None
 
 _factor_role_patterns = None
@@ -97,7 +102,7 @@ def cache_directory(module, context, role, subject):
 	# Get a route to a directory in __pycache__.
 	return libroutes.File.from_absolute(module.__file__).container / '__pycache__' / context / role / subject
 
-def extension_access_name(name:str):
+def extension_access_name(name:str) -> str:
 	"""
 	The name, Python module path, that the extension module will be available at.
 
@@ -108,6 +113,18 @@ def extension_access_name(name:str):
 	For instance, `'project.extensions.capi_module'` will become `'project.capi_module'`.
 	"""
 	return '.'.join(name.split('.extensions.', 1))
+
+def extension_composite_name(name:str) -> str:
+	"""
+	Given the name of a Python extension module, inject the identifier `'extension'`
+	between the package and module's identifier.
+
+	[ Effects ]
+	/Product
+		A string referring to a (module) composite factor.
+	"""
+	root = str(libroutes.Import.from_fullname(name).floor())
+	return '.'.join((root, 'extensions', name[len(root)+1:]))
 
 def package_directory(module:libroutes.Import):
 	return module.file().container
