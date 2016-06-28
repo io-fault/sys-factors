@@ -11,13 +11,27 @@ extern "C" {
 #include <fault/internal.h>
 }
 
-#undef isalnum
-#undef isalpha
-#undef islower
-#undef isspace
-#undef isupper
-#undef tolower
-#undef toupper
+#ifdef isalnum
+	#undef isalnum
+#endif
+#ifdef isalpha
+	#undef isalpha
+#endif
+#ifdef islower
+	#undef islower
+#endif
+#ifdef isspace
+	#undef isspace
+#endif
+#ifdef isupper
+	#undef isupper
+#endif
+#ifdef tolower
+	#undef tolower
+#endif
+#ifdef toupper
+	#undef toupper
+#endif
 
 #undef DEBUG
 
@@ -291,6 +305,73 @@ _extract_nonzero_counters(PyObj seq, char *object, char *profile, char *arch)
 					PyObj count_tuple = Py_BuildValue("kkO", (unsigned long) seg.Line, (unsigned long) seg.Col, Py_None);
 					PyList_Append(subseq, count_tuple);
 					Py_DECREF(count_tuple);
+				}
+			}
+		}
+
+		started = false;
+	}
+
+	return(0);
+}
+
+int
+_extract_zero_counters(PyObj seq, char *object, char *profile, char *arch)
+{
+	auto CoverageOrErr = coverage::CoverageMapping::load(object, profile, arch);
+
+	if (auto E = CoverageOrErr.getError())
+	{
+		PyErr_SetString(PyExc_RuntimeError, E.message().c_str());
+		return(1);
+	}
+
+	auto coverage = std::move(CoverageOrErr.get());
+	auto files = coverage.get()->getUniqueSourceFiles();
+
+	for (auto &file : files)
+	{
+		auto data = coverage.get()->getCoverageForFile(file);
+
+		if (data.empty())
+			continue;
+
+		std::string filestr = file;
+		PyObj subseq, path_ob;
+
+		path_ob = PyUnicode_FromStringAndSize(filestr.data(), filestr.size());
+		subseq = PyList_New(0);
+		PyObj x = PyTuple_New(2);
+		PyTuple_SET_ITEM(x, 0, path_ob);
+		PyTuple_SET_ITEM(x, 1, subseq);
+		PyList_Append(seq, x);
+		Py_DECREF(x);
+		x = NULL;
+
+		auto started = false;
+
+		for (auto seg : data)
+		{
+			if (seg.HasCount && seg.Count == 0)
+			{
+				if (!started)
+					started = true;
+
+				PyObj count_tuple = Py_BuildValue("kk", (unsigned long) seg.Line, (unsigned long) seg.Col);
+				PyList_Append(subseq, count_tuple);
+				Py_DECREF(count_tuple);
+			}
+			else
+			{
+				/* End of zero counts */
+				if (started)
+				{
+					started = false;
+
+					PyObj count_tuple = Py_BuildValue("kk", (unsigned long) seg.Line, (unsigned long) seg.Col);
+					PyList_Append(subseq, count_tuple);
+					Py_DECREF(count_tuple);
+					PyList_Append(subseq, Py_None);
 				}
 			}
 		}
