@@ -1217,7 +1217,17 @@ class Construction(libio.Processor):
 				self.cx_context, context, self.cx_role, module, dependents
 			)
 			xf = list(transform(ctx, filtered=self._filter))
-			rd = list(reduce(ctx, filtered=self._filter))
+
+			# If any commands or calls are made by the transformation,
+			# reconstruct the target.
+			for x in xf:
+				if x[0] not in ('directory', 'link'):
+					f = reconstruct
+					break
+			else:
+				f = self._filter
+
+			rd = list(reduce(ctx, filtered=f))
 			tracks.extend((xf, rd))
 
 		if tracks:
