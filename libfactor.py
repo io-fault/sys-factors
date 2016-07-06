@@ -8,6 +8,10 @@ Factor support for Python extensions, archive files, shared objects, and executa
 
 /import_role
 	The default role to import modules with.
+
+/python_triplet
+	The `-` separated strings representing the currently executing Python context.
+	Used to construct directories for Python extension builds.
 """
 import sys
 import imp
