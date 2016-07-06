@@ -563,7 +563,7 @@ class Harness(libharness.Harness):
 		Iterate over the merged profile data in the given &directory
 		to collect the per-file measurements.
 		"""
-		from . import llvm_instr
+		from ..llvm import instr
 
 		for mod in self.instrumentation_set:
 			basename = mod.__name__
@@ -572,7 +572,7 @@ class Harness(libharness.Harness):
 				continue
 
 			# Each file in this directory is the profile emitted by an extension.
-			yield from llvm_instr.extract_nonzero_counters(mod.__file__, str(data))
+			yield from instr.extract_nonzero_counters(mod.__file__, str(data))
 
 	def seal(self, test):
 		"""
