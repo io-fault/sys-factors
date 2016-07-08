@@ -58,7 +58,7 @@ roles = {
 
 	'metrics': 'Test role with profiling and coverage collection enabled',
 
-	'introspection':
+	'inspect':
 		'Role for structuring coefficients (sources) into a form used by documentation tools',
 	'core': 'The role used to represent the conceptual base of other roles.',
 }
@@ -359,6 +359,7 @@ def unix_compiler_collection(context, output, inputs,
 			'test': '0',
 			'profile': '3',
 			'size': 's',
+			'inspect': '0',
 		}
 	):
 	"""
@@ -442,6 +443,24 @@ def unix_compiler_collection(context, output, inputs,
 
 	return command
 compiler_collection = unix_compiler_collection
+
+def inspect_link_editor(context, output, inputs, mechanism=None, format=None, filepath=str):
+	"""
+	Command constructor for Mach-O link editor provided on Apple MacOS X systems.
+	"""
+	get = context.get
+	role = get('role')
+	sys = get('system')
+	typ = sys.get('type')
+
+	command = [None, typ, format]
+	command.extend([filepath(x) for x in inputs])
+	command.append('--library.directories')
+	command.extend([filepath(x) for x in sys['library.directories']])
+	command.append('--library.set')
+	command.extend([filepath(x) for x in sys.get('library.set', ())])
+
+	return command
 
 def windows_link_editor(context, output, inputs):
 	raise libdev.PendingImplementation("cl.exe linker not implemented")
@@ -959,9 +978,8 @@ def transform(context, filtered=reconstruct):
 	if context['system']['type'] == 'interfaces':
 		return
 
-	sys = context['system']
 	loc = context['locations']
-	formats = sys['formats']
+	formats = context['system']['formats']
 
 	emitted = set([loc['output']])
 	emitted.add(loc['logs'])
@@ -1029,10 +1047,16 @@ def transform(context, filtered=reconstruct):
 
 			# compilation
 			go = {}
-			compilation = genobj(context, obj, (src,))
-			compilation[0] = lmech['command']
+			cmd = genobj(context, obj, (src,))
+			if lmech.get('method') == 'python':
+				cmd[0:1] = (sys.executable, '-m', lmech['command'])
+			else:
+				cmd[0] = lmech['command']
 
-			yield ('execute', compilation, logfile)
+			if lmech.get('redirect'):
+				yield ('execute-redirection', cmd, logfile, obj)
+			else:
+				yield ('execute', cmd, logfile)
 
 def reduce(context, filtered=reconstruct, sys_platform=sys.platform):
 	"""
@@ -1058,8 +1082,7 @@ def reduce(context, filtered=reconstruct, sys_platform=sys.platform):
 	mech = context['mechanisms'][subject]['reductions'][None]
 	xf = context_interface(mech['interface'])
 
-	sys = context['system']
-	formats = tuple(sys['formats'])
+	formats = tuple(context['system']['formats'])
 
 	if 'sources' not in context:
 		# Nothing to reduce.
@@ -1088,7 +1111,7 @@ def reduce(context, filtered=reconstruct, sys_platform=sys.platform):
 
 	# Discover the known sources in order to identify which objects should be selected.
 	output_base = context['locations']['reduction']
-	typ = sys['type']
+	typ = context['system']['type']
 	if typ == 'fragment':
 		# Fragments may have multiple builds.
 		# A library may want PIC and an executable, PIE.
@@ -1113,9 +1136,15 @@ def reduce(context, filtered=reconstruct, sys_platform=sys.platform):
 
 		if not filtered((output,), objects, None):
 			cmd = xf(context, output, objects, mechanism=mech, format=fmt)
-			cmd[0] = mech['command']
+			if mech.get('method') == 'python':
+				cmd[0:1] = (sys.executable, '-m', mech['command'])
+			else:
+				cmd[0] = mech['command']
 
-			yield ('execute', cmd, locs['logs'] / fmt / 'reduction')
+			if mech.get('redirect'):
+				yield ('execute-redirection', cmd, locs['logs'] / fmt / 'reduction', output)
+			else:
+				yield ('execute', cmd, locs['logs'] / fmt / 'reduction')
 
 def parse_make_dependencies(make_rule_str):
 	"""
@@ -1292,8 +1321,15 @@ class Construction(libio.Processor):
 			self.fio_enqueue(self.continuation)
 
 	def process_execute(self, instruction):
-		module, (typ, cmd, log) = instruction
-		assert typ == 'execute'
+		module, ins = instruction
+		typ, cmd, log, *out = ins
+		if typ == 'execute-redirection':
+			stdout = str(out[0])
+		else:
+			stdout = '/dev/null'
+
+		assert typ in ('execute', 'execute-redirection')
+
 		strcmd = tuple(map(str, cmd))
 
 		pid = None
@@ -1302,9 +1338,9 @@ class Construction(libio.Processor):
 			f.write(' '.join(strcmd).encode('utf-8'))
 			f.write(b'\n\n[Standard Error]\n')
 
-			ki = libsys.KInvocation(str(cmd[0]), strcmd)
-			with open('/dev/null', 'rb') as ci, open('/dev/null', 'wb') as co:
-				pid = ki(fdmap=((ci.fileno(),0), (co.fileno(),1), (f.fileno(),2)))
+			ki = libsys.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
+			with open('/dev/null', 'rb') as ci, open(stdout, 'wb') as co:
+				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
 				sp = libio.Subprocess(pid)
 
 		print(' '.join(strcmd) + ' #' + str(pid))
@@ -1411,7 +1447,7 @@ class Construction(libio.Processor):
 		self.progress[module] = 0
 
 		for x in self.tracking[module][0]:
-			if x[0] == 'execute':
+			if x[0] in ('execute', 'execute-redirection'):
 				self.command_queue.append((module, x))
 			elif x[0] == 'directory':
 				for y in x[1:]:

@@ -118,7 +118,7 @@ def main(role='optimal', mount_extensions=True):
 			if isinstance(tm, types.ModuleType) and libfactor.composite(target):
 				root_system_modules.append((target, tm))
 
-		if mount_extensions and role not in {'test', 'metrics'}:
+		if mount_extensions and role in {'optimal', 'debug'}:
 			# Construct a separate list of Python extensions for subsequent mounting.
 			exe_ctx_extensions = []
 

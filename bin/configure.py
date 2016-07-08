@@ -323,6 +323,26 @@ def main(name, args, paths=None):
 		}
 	}
 
+	inspect = {
+		'system': {
+			'reductions': {
+				None: {
+					'interface': libconstruct.__name__ + '.inspect_link_editor',
+					'command': 'fault.development.bin.il',
+					'method': 'python',
+					'redirect': 'stdout',
+				},
+			},
+			'transformations': {
+				None: {
+					'command': 'fault.llvm.bin.inspect',
+					'method': 'python',
+					'redirect': 'stdout',
+				},
+			}
+		}
+	}
+
 	if platform == 'darwin':
 		core['system']['objects']['executable'] = {
 			'pie': [
@@ -347,6 +367,7 @@ def main(name, args, paths=None):
 
 	import pprint
 	pprint.pprint(core)
+	pprint.pprint(inspect)
 
 	S = libxml.Serialization()
 	D = S.switch('data:')
@@ -359,14 +380,33 @@ def main(name, args, paths=None):
 			('xmlns:data', 'https://fault.io/xml/data'),
 		)
 	)
-	rolefile = ctx / 'core.xml'
 
+	rolefile = ctx / 'core.xml'
 	with rolefile.open('wb') as f:
 		f.write(xml)
 
+	S = libxml.Serialization()
+	D = S.switch('data:')
+	xml = b''.join(
+		S.root('libconstruct',
+			S.element('context',
+				libxml.Data.serialize(D, inspect),
+			),
+			('xmlns', 'https://fault.io/xml/libconstruct'),
+			('xmlns:data', 'https://fault.io/xml/data'),
+		)
+	)
+
+	with (ctx / 'inspect.xml').open('wb') as f:
+		f.write(xml)
+
 	# Initialize lib directory for context libraries.
+	ctxbin = ctx / 'bin'
+	ctxbin.init('directory')
+
 	ctxlib = ctx / 'lib'
 	ctxlib.init('directory')
+
 	ctxinc = ctx / 'include'
 	ctxinc.init('directory')
 
