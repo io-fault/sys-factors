@@ -614,7 +614,9 @@ def unix_link_editor(context,
 		command.extend(prefix)
 		command.extend(map(filepath, inputs))
 		command.extend(libdirs)
+		command.append('-(')
 		command.extend(libs)
+		command.append('-)')
 
 		if role in {'metrics', 'profile'}:
 			command.append(sysmech['transformations'][None]['resources']['profile'])
