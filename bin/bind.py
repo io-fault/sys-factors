@@ -1,3 +1,7 @@
+"""
+Create a Python executable bound to the execution of a particular module.
+"""
+
 csource = r"""
 #include <Python.h>
 
