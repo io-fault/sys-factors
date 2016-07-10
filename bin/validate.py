@@ -89,19 +89,41 @@ class Harness(libharness.Harness):
 			return {test.fate.impact: 1}
 
 def main(package, modules, role='optimal'):
+	red = lambda x: '\x1b[38;5;196m' + x + '\x1b[0m'
+	green = lambda x: '\x1b[38;5;46m' + x + '\x1b[0m'
+
 	sys.dont_write_bytecode = True
-	sys.stderr.write('^')
-	sys.stderr.flush()
+	root = libroutes.Import.from_fullname(package)
 
-	p = Harness(package, sys.stderr, role=role)
-	p.execute(p.root(libroutes.Import.from_fullname(package)), modules)
-	for x in p.tests:
-		p.complete(x)
+	if root.module().__factor_type__ == 'context':
+		pkgset = root.subnodes()[0]
+		pkgset.sort()
+	else:
+		pkgset = [root]
 
-	sys.stderr.write(';\n')
-	sys.stderr.flush()
+	failures = 0
 
-	failures = p.metrics.get(-1, 0)
+	for pkg in pkgset:
+		sys.stderr.write(str(pkg) + ': ^')
+		sys.stderr.flush()
+
+		p = Harness(str(pkg), sys.stderr, role=role)
+		p.execute(p.root(pkg), [])
+		for x in p.tests:
+			p.complete(x)
+
+		f = p.metrics.get(-1, 0)
+		sys.stderr.write(';\r')
+		if not f:
+			sys.stderr.write(green(str(pkg)))
+		else:
+			sys.stderr.write(red(str(pkg)))
+
+		sys.stderr.write('\n')
+		sys.stderr.flush()
+
+		failures += f
+
 	raise SystemExit(min(failures, 201))
 
 if __name__ == '__main__':
