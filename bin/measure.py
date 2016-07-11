@@ -10,13 +10,13 @@ import functools
 
 from .. import libmetrics
 from .. import libfactor
-from .. import llvm_instr
 
+from ...llvm import instr
 from ...routes import library as libroutes
 from ...system import libcore
 
 def main(target_dir, packages):
-	global llvm_instr
+	global instr
 
 	target_fsdict = libmetrics.libfs.Dictionary.create(
 		libmetrics.libfs.Hash('fnv1a_32', depth=1), target_dir
@@ -61,9 +61,9 @@ def main(target_dir, packages):
 		else:
 			so = libfactor.reduction(ci, 'host', 'metrics')
 
-		xc = dict(llvm_instr.extract_counters(str(so), str(x)))
-		xz = dict(llvm_instr.extract_zero_counters(str(so), str(x)))
-		for path in llvm_instr.list_source_files(str(so)):
+		xc = dict(instr.extract_counters(str(so), str(x)))
+		xz = dict(instr.extract_zero_counters(str(so), str(x)))
+		for path in instr.list_source_files(str(so)):
 			if not path.startswith(prefix):
 				continue
 
