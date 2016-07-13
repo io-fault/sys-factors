@@ -6,6 +6,13 @@ import types
 import typing
 
 from ..routes import library as libroutes
+from ..xml import lxml
+from ..xml import library as libxml
+
+namespaces = {
+	'xlink': 'http://www.w3.org/1999/xlink',
+	'inspect': 'https://fault.io/xml/inspect#set',
+}
 
 def python_context(implementation, version_info, abiflags, platform):
 	"""
@@ -187,6 +194,34 @@ class Sources(types.ModuleType):
 
 	def _init(self):
 		self.factor = Factor.from_fullname(self.__name__)
+
+def extract_inspect(xml, href='{%s}href' %(namespaces['xlink'],)):
+	"""
+	Load the factor of an inspect role run.
+
+	[Effects]
+
+	/return
+		A pair, the former being the command parameters and the latter
+		being the set of sources.
+	"""
+	global namespaces
+
+	e = xml.getroot()
+
+	# Stored parameters of the link. (library.set)
+	params = e.find("./inspect:parameters", namespaces)
+	if params is not None:
+		data, = params
+		s = libxml.Data.structure(data)
+	else:
+		s = None
+
+	# Source file.
+	sources = e.findall("./inspect:source", namespaces)
+	sources = [libroutes.File.from_absolute(x.attrib[href].replace('file://', '', 1)) for x in sources]
+
+	return s, sources
 
 class DevelopmentException(Exception):
 	"""
