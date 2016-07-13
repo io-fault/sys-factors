@@ -45,20 +45,25 @@ def exe(name, *args, pkg = __package__):
 	return subprocess.Popen(cmd)
 
 def main(instance, pkg):
+	os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
+	with timing('preparing for inspection'):
+		os.environ['FAULT_ROLE'] = 'inspect'
+		exit(exe('prepare', pkg).wait())
+
+	del os.environ['PYTHONDONTWRITEBYTECODE']
+
 	os.environ['FAULT_ROLE'] = 'optimal'
 	with timing('preparing for optimal'):
 		exit(exe('prepare', pkg).wait())
 
 	with timing('preparing for metrics'):
 		os.environ['FAULT_ROLE'] = 'metrics'
-		if 'PYTHONDONTWRITEBYTECODE' in os.environ:
-			del os.environ['PYTHONDONTWRITEBYTECODE']
 		exit(exe('prepare', pkg).wait())
 
 	with libroutes.File.temporary() as d:
 		m = d / 'metrics'
 		m.init('directory')
-		with timing('measuring using tests'):
+		with timing('measuring coverage and performance with project tests'):
 			exit(exe('measure', str(m), pkg).wait())
 
 		with timing('instantiating snapshot'):
