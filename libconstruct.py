@@ -151,8 +151,8 @@ def compile_bytecode(target, source):
 
 # Specifically for identifying files to be compiled and how.
 extensions = {
-	'c': ('c',),
-	'c++': ('c++', 'cxx', 'cpp'),
+	'c': ('c','h'),
+	'c++': ('c++', 'cxx', 'cpp', 'hh'),
 	'objective-c': ('m',),
 	'ada': ('ads', 'ada'),
 	'assembly': ('asm',),
@@ -998,8 +998,8 @@ def transform(context, filtered=reconstruct):
 	commands = []
 	for src in context['sources']:
 		fnx = src.extension
-		if fnx in {'h'} or src.identifier.startswith('.'):
-			# Ignore header files and dot-files.
+		if context['role'] != 'inspect' and fnx in {'h'} or src.identifier.startswith('.'):
+			# Ignore header files and dot-files for non-inspect roles.
 			continue
 
 		lang = languages.get(src.extension)
