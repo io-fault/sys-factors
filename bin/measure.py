@@ -7,6 +7,7 @@ directory, for collected data, and the remainder being packages to test.
 import sys
 import os
 import functools
+import pickle
 
 from .. import libmetrics
 from .. import libfactor
@@ -14,6 +15,7 @@ from .. import libfactor
 from ...llvm import instr
 from ...routes import library as libroutes
 from ...system import libcore
+from ...computation import librange
 
 def main(target_dir, packages):
 	global instr
@@ -47,7 +49,7 @@ def main(target_dir, packages):
 	libmetrics.Harness.merge_instrumentation_metrics(work, fct)
 	fct_r = libroutes.File.from_absolute(fct)
 
-	import pickle
+	# Collect the per-test instrumentation data from the filesystem.
 	for x in fct_r.subnodes()[1]:
 		cm = libfactor.extension_composite_name(str(x.identifier))
 		ci = libroutes.Import.from_fullname(cm)
@@ -63,6 +65,7 @@ def main(target_dir, packages):
 
 		xc = dict(instr.extract_counters(str(so), str(x)))
 		xz = dict(instr.extract_zero_counters(str(so), str(x)))
+
 		for path in instr.list_source_files(str(so)):
 			if not path.startswith(prefix):
 				continue
@@ -73,7 +76,7 @@ def main(target_dir, packages):
 			covkey = b'coverage:' + ek
 
 			data = pickle.loads(target_fsdict[covkey])
-			data['traversed'] = xc[path]
+			data['full_counters'] = xc[path]
 
 			# None partitioned list.
 			ll = []
@@ -84,8 +87,23 @@ def main(target_dir, packages):
 					break
 				ll.append(l)
 
-			data['untraversed'] = ll
-			data['traversable'] = None
+			data['zero_counters'] = ll
+
+			# lines with positive counts.
+			stop = start = None
+			traversed_inc = []
+			for lineno, offset, c in xc[path]:
+				if c > 0:
+					stop = lineno
+					if start is None:
+						start = lineno
+				elif stop is not None:
+					traversed_inc.append((start, stop))
+					start = stop = None
+
+			data['untraversed'] = librange.RangeSet.from_normal_sequence([(x[0][0], x[1][0]) for x in data['zero_counters']])
+			data['traversed'] = librange.RangeSet.from_normal_sequence(traversed_inc)
+			data['traversable'] = librange.RangeSet.from_normal_sequence([librange.IRange((1, traversed_inc[-1][1]))])
 
 			with target_fsdict.route(covkey).open('wb') as f:
 				pickle.dump(data, f)

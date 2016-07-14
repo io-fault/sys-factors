@@ -337,22 +337,18 @@ def process(measures, item,
 	for gid, cdata in counts.items():
 		for k, counts in cdata.items():
 			m, *key = k
+
 			if key:
 				# Counts only have per-file-per-test at the floor.
 				key = key[0].decode('utf-8') # The test generating the coverage.
 			else:
 				key = None
 				if isinstance(m, libroutes.Import):
+					# String instances are composite subfactors; Import's are Python factors.
 					traversable, traversed, untraversed = coverage(m, counts)
 					permodule_counts[m]['untraversed'] = untraversed
 					permodule_counts[m]['traversed'] = traversed
 					permodule_counts[m]['traversable'] = traversable
-				else:
-					# str() is called on these fields to get the sequence of ranges.
-					module_name, srcfile = m.split('/', 1)
-					permodule_counts[m]['traversed'] = \
-					permodule_counts[m]['traversable'] = \
-					permodule_counts[m]['untraversed'] = librange.RangeSet.from_string('')
 
 			fcounts = {None:key}
 			fcounts.update(counts)
@@ -362,9 +358,9 @@ def process(measures, item,
 
 def prepare(metrics:libfs.Dictionary, store=pickle.dump):
 	"""
-	Prepare the metrics for formatting by &.factors.
+	Prepare the metrics for formatting by tools like &..factors.
 
-	Given a &libfs.Dictionary of collected metrics(&Harness), process
+	Given a &libfs.Dictionary of collected metrics by &.libmetrics.Harness, process
 	it into a form that is more suitable for consumption by reporting tools.
 	"""
 
