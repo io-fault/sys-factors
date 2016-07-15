@@ -7,6 +7,7 @@ directory, for collected data, and the remainder being packages to test.
 import sys
 import os
 import functools
+import itertools
 import pickle
 
 from .. import libmetrics
@@ -103,7 +104,9 @@ def main(target_dir, packages):
 
 			data['untraversed'] = librange.RangeSet.from_normal_sequence([(x[0][0], x[1][0]) for x in data['zero_counters']])
 			data['traversed'] = librange.RangeSet.from_normal_sequence(traversed_inc)
-			data['traversable'] = librange.RangeSet.from_normal_sequence([librange.IRange((1, traversed_inc[-1][1]))])
+			with open(str(path), 'rb') as f:
+				lc = len(f.readlines())
+			data['traversable'] = librange.RangeSet.from_normal_sequence([librange.IRange((1, lc))])
 
 			with target_fsdict.route(covkey).open('wb') as f:
 				pickle.dump(data, f)
