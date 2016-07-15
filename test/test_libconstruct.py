@@ -158,8 +158,9 @@ def test_sequence(test):
 	]
 	for x in m+n:
 		x.__factor_type__ = 'system.library'
+		x.__factor_composite__ = True
 
-	# M1 -> M2
+	# M1.m2 = M2
 	m[0].m2 = m[1]
 	ms = library.sequence(m)
 	proc = next(ms)[0]
@@ -216,6 +217,11 @@ def test_construction_sequence(test):
 	mt.__builtins__ = builtins
 
 	with libroutes.File.temporary() as tr:
+		import sys
+		sys.path.append(str(tr))
+		(tr / 'pkg' / '__init__.py').init('file')
+		(tr / 'pkg' / 'exe' / '__init__.py').init('file')
+
 		pkgdir = tr / 'pkg' / 'exe'
 		py = pkgdir / '__init__.py'
 		src = pkgdir / 'src'
@@ -226,7 +232,6 @@ def test_construction_sequence(test):
 
 		mt.__file__ = str(py)
 		mt.__package__ = 'pkg.exe'
-		mt._init()
 
 		ctx = library.initialize('host', 'host', 'optimal', mt, ())
 		xf = list(library.transform(ctx))

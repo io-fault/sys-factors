@@ -148,9 +148,10 @@ def work(module:libroutes.Import, context:str, role:str):
 
 def composite(factor:libroutes.Import):
 	"""
-	Whether the given &factor reference is a composite.
+	Whether the given &factor reference is a composite. &factor must be a real route.
 	"""
 	global sources
+
 	if not factor.is_container():
 		return False
 	if factor.module().__dict__.get('__factor_type__') is None:
