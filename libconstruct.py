@@ -220,9 +220,13 @@ def collect(module):
 		if not isinstance(v, ModuleType) or not hasattr(v, '__factor_type__'):
 			continue
 
-		i = libroutes.Import.from_fullname(v.__name__)
-		if is_composite(i) or is_probe(v):
+		if getattr(v, '__factor_composite__', None):
+			# Override for pseudo modules/factors.
 			yield v
+		else:
+			i = libroutes.Import.from_fullname(v.__name__)
+			if is_composite(i) or is_probe(v):
+				yield v
 
 def traverse(working, tree, inverse, module):
 	"""
@@ -257,6 +261,14 @@ def sequence(modules):
 	Generator maintaining the state of sequencing a traversed factor depedency
 	graph. This generator emits factors as they are ready to be processed and receives
 	factors that have completed processing.
+
+	When a set of dependencies has been processed, they should be sent to the generator
+	as a collection; the generator identifies whether another set of modules can be
+	processed based on the completed set.
+
+	Completion is an abstract notion, &sequence has no requirements on the semantics of
+	completion and its effects; it merely communicates what can now be processed based
+	completion state.
 	"""
 	global collections
 
