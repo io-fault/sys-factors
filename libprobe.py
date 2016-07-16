@@ -3,39 +3,6 @@ System feature probes for executables and the runtime environment.
 
 &.libprobe provides a set of system queries for detecting executables,
 compiler collections, headers, and libraries.
-
-[ Matrix Commands ]
-
-/compile.c
-	Compile C source into object files.
-/compile.c++
-	Compile C++ source into object files.
-/compile.objective-c
-	Compile Objective-C source into object files for linking.
-/compile.haskell
-	Compile Haskel source into object files for linking.
-	Usually with the compiler supporting foreign interfaces providing the desired adaptions.
-/compile.pyrex
-	Compile Cython/Pyrex modules into C or C++ source.
-
-/link.executable
-	Link an executable.
-/link.library
-	Link a library for use by the system. Usually a shared library or equivalent concept.
-	If the system does not support the concept of a shared library, this command will do nothing.
-/link.static
-	Link a static library for use by the system.
-/link.dynamic
-	Link a library that can be dynamically loaded by system processes.
-
-/isolate.source.maps
-	Given an static library or shared library, isolate the debugging symbols
-	from the target. Usually ran unconditionally regardless of the target's role.
-
-/coverage
-	Extract coverage information for the given library and source file.
-/profile
-	Extract profile information for the given library and source file.
 """
 import os
 import subprocess
@@ -83,8 +50,7 @@ def environ_paths(env='PATH', sep=os.pathsep):
 
 	return seq
 
-def search(
-		search_paths, xset:typing.Set[str]
+def search(search_paths:typing.Sequence[str], xset:typing.Set[str]
 	) -> typing.Tuple[typing.Mapping[str, libroutes.File], typing.Set[str]]:
 	"""
 	Query the sequence of search paths for the given set of files.
@@ -130,7 +96,7 @@ def runtime(
 		libraries:typing.Sequence[str],
 		directories:typing.Sequence[str]=(),
 		preprocessor:typing.Sequence[str]=(),
-		linker='link.system.executable',
+		ftype='system.executable',
 		compile_only:bool=False,
 	):
 	"""
@@ -244,12 +210,3 @@ def includes(
 
 	runtime(interface, language, reqs+includes+main, (), compile_only=True)
 	return True
-
-if __name__ == '__main__':
-	import sys, os
-	p = os.environ['PATH']
-	paths = list(map(libroutes.File.from_absolute, p.split(':')))
-	present, absent = executables(paths, c_compilers)
-	c = present.pop('clang')
-	testing(c)
-	# Perform initial development probes and emit command Matrix as XML.

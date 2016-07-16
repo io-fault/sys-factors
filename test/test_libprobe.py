@@ -1,12 +1,33 @@
 """
 Check environment and probe classes.
 """
+import os
 from .. import libprobe as library
+from ...routes import library as libroutes
 
 def test_executables(test):
-	return
-	found, unavail = p.executables(['test', 'cat', 'cc', 'clang', 'xxxx--yy..no_such_exe'])
-	test/unavail == set(['xxxx--yy..no_such_exe'])
+	with libroutes.File.temporary() as td:
+		b = td / 'bin'
+		x = b / 'x'
+		x.init('file')
+
+		p = os.environ['PATH']
+		os.environ['PATH'] = str(b)
+
+		# One found
+		found, unavail = library.executables(['test', 'cat', 'x'])
+		test/unavail == set(['test', 'cat'])
+		test/found == {'x': x}
+
+		# None found
+		found, unavail = library.executables(['y'])
+		test/unavail == set(['y'])
+		test/found == {}
+
+		# None queried
+		found, unavail = library.executables([])
+		test/unavail == set([])
+		test/found == {}
 
 if __name__ == '__main__':
 	from .. import libtest; import sys
