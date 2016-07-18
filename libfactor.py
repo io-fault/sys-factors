@@ -130,14 +130,21 @@ def extension_composite_name(name:str) -> str:
 	root = str(libroutes.Import.from_fullname(name).floor())
 	return '.'.join((root, 'extensions', name[len(root)+1:]))
 
-def package_directory(module:libroutes.Import):
-	return module.file().container
+def package_directory(import_route:libroutes.Import):
+	return import_route.file().container
 
-def sources(factor:libroutes.Import, dirname='src'):
+def sources(factor:libroutes.Import, dirname='src', module=None):
 	"""
 	Return the &libroutes.File instance to the set of sources.
 	"""
-	return package_directory(factor) / dirname
+	global libroutes
+
+	if module is not None:
+		pkgdir = libroutes.File.from_absolute(module.__file__).container
+	else:
+		pkgdir = package_directory(factor)
+
+	return pkgdir / dirname
 
 def work(module:libroutes.Import, context:str, role:str):
 	"""
@@ -164,14 +171,19 @@ def composite(factor:libroutes.Import):
 def probe(module:types.ModuleType):
 	return module.__factor_type__ == 'system.probe'
 
-def reduction(composite:libroutes.Import, context=None, role=None):
+def reduction(composite:libroutes.Import, context=None, role=None, module=None):
 	"""
 	The reduction of the &composite.
 
 	The file is relative to the Python cache directory of the package module
 	identifying itself as a system module: (fs-path)`{context}/{role}/factor`.
 	"""
-	return composite.file().container / '__pycache__' / context / role / 'factor'
+	if module is not None:
+		pkgdir = libroutes.File.from_absolute(module.__file__).container
+	else:
+		pkgdir = composite.file().container
+
+	return pkgdir / '__pycache__' / context / role / 'factor'
 
 def dependencies(factor:types.ModuleType):
 	"""

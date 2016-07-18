@@ -284,7 +284,7 @@ def sequence(modules):
 		completion = (yield tuple(new), {x: tuple(inverse[x]) for x in new if inverse[x]})
 		new = set() # &completion triggers new additions to &working
 
-		for module in completion:
+		for module in (completion or ()):
 			# completed.
 			working.discard(module)
 
@@ -802,7 +802,7 @@ def mechanism(directory, context, role):
 
 def initialize(
 		selection:str, context:str, role:str,
-		module:libdev.Sources, dependents,
+		module:types.ModuleType, dependents,
 		lcd=None
 	):
 	"""
@@ -845,7 +845,7 @@ def initialize(
 	mechanisms = mechanism(lcd or root_context_directory(), selection, role)
 
 	ir = libroutes.Import.from_fullname(module.__name__)
-	reduction = libfactor.reduction(ir, context=context, role=role)
+	reduction = libfactor.reduction(ir, context=context, role=role, module=module)
 	if module.__factor_type__ == 'system.fragment':
 		# fragments can have multiple reductions.
 		# in order to accommodate for its dependents,
@@ -864,7 +864,7 @@ def initialize(
 		'references': refs,
 
 		'locations': {
-			'sources': libfactor.sources(ir),
+			'sources': libfactor.sources(ir, module=module),
 			'work': work, # normally, __pycache__ subdirectory.
 			'output': libfactor.cache_directory(module, context, role, 'out'),
 			'reduction': reduction,
@@ -1112,7 +1112,8 @@ def reduce(context, filtered=reconstruct, sys_platform=sys.platform):
 		# with a large number of dependencies.
 
 		# Explicit link of factor.
-		libdep = libfactor.reduction(libroutes.Import.from_fullname(x.__name__), context=ctx, role=role)
+		xir = libroutes.Import.from_fullname(x.__name__)
+		libdep = libfactor.reduction(xir, context=ctx, role=role, module=module)
 		li = identity(x)
 		lib = libdir / library_filename(sys_platform, li)
 		yield ('link', libdep, lib)
@@ -1299,35 +1300,34 @@ class Construction(libio.Processor):
 			# Needed report is cached.
 			self.progress[module] += 1
 		else:
-			xreport = module.deploy(module, ctx, role, dep)
-			if isinstance(xreport, types.CoroutineType):
-				# wait for completion
-				cop = libio.Coroutine(xreport)
-				self.sector.dispatch(cop)
-				cop.atexit(functools.partial(self.probe_complete,
-						module=module,
-						reports=reports,
-						key=key
-					),
-				)
-			else:
-				reports[key] = xreport
-				if xreport is not None:
-					# &None indicates constant probe; &report will build on demand.
-					probe_record(module, reports, ctx, role)
+			t = libio.Thread()
+			t.requisite(functools.partial(self.probe_dispatch, module, ctx, role, dep, key))
+			self.sector.dispatch(t)
 
-				self.progress[module] += 1
+	def probe_dispatch(self, module, ctx, role, dep, key, tproc):
+		# Executed in thread.
+		sector = self.controller # Allow libio.context()
 
-	def probe_exit(self, processor, module=None, reports=None, key=None):
+		report = module.deploy(module, ctx, role, dep)
+		self.fio_enqueue(
+			functools.partial(
+				self.probe_exit,
+				tproc,
+				context=ctx,
+				role=role,
+				module=module,
+				report=report,
+				key=key
+			),
+		)
+
+	def probe_exit(self, processor, context=None, role=None, module=None, report=None, key=None):
 		self.progress[module] += 1
 		self.activity.add(module)
 
-		try:
-			report = processor.product
-			reports[key] = report
-			probe_record(module, reports, ctx, role)
-		finally:
-			pass
+		reports = probe_retrieve(module, context, role)
+		reports[key] = report
+		probe_record(module, reports, context, role)
 
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.
@@ -1357,7 +1357,7 @@ class Construction(libio.Processor):
 				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
 				sp = libio.Subprocess(pid)
 
-		print(' '.join(strcmd) + ' #' + str(pid))
+		#print(' '.join(strcmd) + ' #' + str(pid))
 		self.sector.dispatch(sp)
 		sp.atexit(functools.partial(self.process_exit, start=libtime.now(), descriptor=(typ, cmd, log), module=module))
 

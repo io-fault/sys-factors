@@ -11,9 +11,12 @@ import functools
 import itertools
 import collections.abc
 import typing
+import types
 
 from . import libconstruct
+from . import libfactor
 from ..routes import library as libroutes
+from ..io import library as libio
 
 def fs_routes(i:typing.Iterator[str]) -> typing.Sequence[libroutes.File]:
 	"""
@@ -89,67 +92,88 @@ def executables(xset:typing.Set[str]):
 	global search, environ_paths
 	return search(environ_paths(), xset)
 
-def runtime(
+def prepare(
+		directory,
 		context,
 		language:collections.abc.Hashable,
 		source:str,
-		libraries:typing.Sequence[str],
+		libraries:typing.Sequence[str]=(),
 		directories:typing.Sequence[str]=(),
 		preprocessor:typing.Sequence[str]=(),
 		ftype='system.executable',
 		compile_only:bool=False,
-	):
+		lmap={
+			'c': 'c',
+			'c++': 'cxx',
+			'objective-c': 'm',
+		}
+	) -> typing.Tuple[libroutes.File, libconstruct.Construction]:
 	"""
-	Given a &str of source code acceptable by the &compiler identified in the &matrix,
-	compile, link, and execute a program returning the binary data written to standard
-	output by the process.
+	Prepare a probe by initializing the given &directory as a composite factor
+	containing a single source file whose content is defined by &source. Often, &directory
+	is a temporary directory created by &..routes.library.File.temporary.
 
-	The process must return zero in order to identify success. If a non-zero result is
-	returned the binary data written to standard error will be collected and an exception
-	will be raised containing the result code and the standard error data.
+	The reduction of the composite (executable file) with respect to the &context and the
+	&libconstruct.Construction instance are returned in a &tuple. After construction is
+	complete, the executable reduction should be executed in order to retrieve the data
+	collected by the sensors.
 	"""
 
 	output = None
 
+	src = directory/'src'
+	exe = directory/'fault_probe_runtime_check.exe'
+	cache = directory/'__pycache__'
+	fsrc = src / ('probe.' + lmap[language])
+	fsrc.init('file')
+
+	mod = types.ModuleType("fault_probe")
+	mod.__file__ = (str(directory / '__init__.py'))
+	mod.__factor_type__ = 'system.executable'
+	mod.libraries = set(libraries)
+	mod.library_directories = set(directories)
+	mod.source_parameters = list(preprocessor)
+
+	with fsrc.open('wb') as f:
+		f.write(source.encode('utf-8'))
+
+	return libfactor.reduction(None, context, 'debug', module=mod), \
+		libconstruct.Construction(context, 'debug', [('fault_probe', mod)])
+
+def _execute_probe(factor):
+	p = subprocess.Popen(
+		[str(factor)],
+		stdin=None,
+		stdout=subprocess.PIPE,
+		stderr=subprocess.PIPE,
+	)
+	output = p.stdout.read()
+	errors = p.stderr.read()
+	rc = p.wait()
+
+	return output
+
+def runtime(language, source, **parameters):
+	tr = None
+	cxn = None
+	exe = None
+
+	def init(unit):
+		nonlocal tr, cxn, exe
+		s = libio.Sector()
+		s.subresource(unit)
+		unit.place(s, "bin", "construction")
+		unit.context.enqueue(s.actuate)
+		exe, cxn = prepare(tr, 'host', language, source, **parameters)
+		s.dispatch(cxn)
+
 	with libroutes.File.temporary() as tr:
-		src = tr/'source'
-		obj = tr/'object'
-		exe = tr/'fault_probe_runtime_check.exe'
+		with libio.parallel(init) as u:
+			pass
 
-		src.init('file')
+		out = _execute_probe(exe)
 
-		with src.open('wb') as f:
-			f.write(source.encode('utf-8'))
-
-		params = ccmd.allocate()
-		params['input'].append(src)
-		params['output'] = obj
-
-		lparams = lcmd.allocate()
-		sl = lparams['system.libraries']
-		sl.append('c')
-		sl.extend(libraries)
-		lparams['input'].append(obj)
-		lparams['output'] = exe
-
-		for ref in (compile_ref, link_ref):
-			if ref is None:
-				break
-			env, er, args = ref.render()
-			p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-			so = p.stdout.read()
-			se = p.stderr.read()
-			r = p.wait()
-		else:
-			p = subprocess.Popen(
-				[str(exe)],
-				stdin=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-			)
-			output = p.stdout.read()
-			errors = p.stderr.read()
-			rc = p.wait()
-
-		return output
+	return out
 
 def sysctl(names, route=None):
 	"""
@@ -171,11 +195,10 @@ def sysctl(names, route=None):
 	command += names
 
 def includes(
-		context,
 		language:collections.abc.Hashable,
 		includes:typing.Sequence[str],
-		directories:typing.Sequence[str]=(),
 		requisites:typing.Sequence[str]=(),
+		**parameters
 	) -> bool:
 	"""
 	Search for &includes present in the environment described by &matrix.
@@ -188,19 +211,16 @@ def includes(
 	perform the check.
 
 	[ Parameters ]
-	/context
-		The construction context managing compilation.
 	/language
 		The identifier of the language that is to be compiled.
 	/includes
 		A sequence of includes to test for. A sequence is used so that
 		dependencies may be included prior to the actual header or headers of interest.
 		The check is only interested in whether or not compilation succeeded.
-	/directories
-		Include search paths.
 	"""
 
 	main = "\nint main(int argc, char *argv[]) { return 0; }"
+
 	reqs = ''.join([
 		('#include <%s>\n' * len(requisites)) %requisites
 	])
@@ -208,5 +228,4 @@ def includes(
 		('#include <%s>\n' * len(includes)) %includes
 	])
 
-	runtime(interface, language, reqs+includes+main, (), compile_only=True)
-	return True
+	return runtime(language, reqs+includes+main, **parameters) is not None
