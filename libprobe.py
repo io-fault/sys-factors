@@ -171,7 +171,10 @@ def runtime(language, source, **parameters):
 		with libio.parallel(init) as u:
 			pass
 
-		out = _execute_probe(exe)
+		if os.path.exists(str(exe)):
+			out = _execute_probe(exe)
+		else:
+			out = None
 
 	return out
 

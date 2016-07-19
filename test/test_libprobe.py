@@ -35,7 +35,8 @@ def test_runtime(test):
 	test/b'test\n' == library.runtime('c', src)
 
 def test_includes(test):
-	pass
+	test/library.includes("c", ("fault/roles.h",)) == True
+	test/library.includes("c", ("fault/nosuchfile.h",)) == False
 
 if __name__ == '__main__':
 	from .. import libtest; import sys
