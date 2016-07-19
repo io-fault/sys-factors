@@ -32,7 +32,10 @@ def test_executables(test):
 
 def test_runtime(test):
 	src = "#include <stdio.h>\nint main(int ac, char *av[]) {printf(\"test\\n\");return(0);}"
-	test/b'test\n' == library.runtime('c', src)
+	test/b'test\n' == library.runtime('c', src, libraries=['c'])
+
+	syntax_error = "...int i = $\n"
+	test/None == library.runtime('c', syntax_error)
 
 def test_includes(test):
 	test/library.includes("c", ("fault/roles.h",)) == True

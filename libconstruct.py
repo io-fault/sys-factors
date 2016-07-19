@@ -38,7 +38,6 @@ python_triplet = libfactor.python_triplet
 
 from . import include
 from . import library as libdev
-from .probes import libpython # Used to detect Python Extensions.
 
 from ..chronometry import library as libtime
 from ..io import library as libio
@@ -947,6 +946,7 @@ def initialize(
 		report = probe_report(probe, selection or 'host', role, module)
 		merge(parameters, report) # probe parameter merge
 
+	from .probes import libpython
 	if libpython in probes:
 		# Note as building a Python extension.
 		parameters['execution_context_extension'] = True
@@ -960,6 +960,9 @@ def initialize(
 	parameters['system']['source.parameters'].append(
 		('PRODUCT_ARCHITECTURE', mechanisms['system']['platform'])
 	)
+
+	if hasattr(module, 'system'):
+		merge(parameters['system'], module.system)
 
 	return parameters
 

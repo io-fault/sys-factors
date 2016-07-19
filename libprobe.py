@@ -13,8 +13,9 @@ import collections.abc
 import typing
 import types
 
-from . import libconstruct
 from . import libfactor
+from . import libconstruct
+
 from ..routes import library as libroutes
 from ..io import library as libio
 
@@ -98,7 +99,8 @@ def prepare(
 		language:collections.abc.Hashable,
 		source:str,
 		libraries:typing.Sequence[str]=(),
-		directories:typing.Sequence[str]=(),
+		library_directories:typing.Sequence[str]=(),
+		include_directories:typing.Sequence[str]=(),
 		preprocessor:typing.Sequence[str]=(),
 		ftype='system.executable',
 		compile_only:bool=False,
@@ -130,9 +132,12 @@ def prepare(
 	mod = types.ModuleType("fault_probe")
 	mod.__file__ = (str(directory / '__init__.py'))
 	mod.__factor_type__ = 'system.executable'
-	mod.libraries = set(libraries)
-	mod.library_directories = set(directories)
-	mod.source_parameters = list(preprocessor)
+	mod.system = {
+		'source.parameters': list(preprocessor),
+		'library.set': set(libraries),
+		'library.directories': set(library_directories),
+		'include.directories': list(include_directories),
+	}
 
 	with fsrc.open('wb') as f:
 		f.write(source.encode('utf-8'))
@@ -216,6 +221,7 @@ def includes(
 	[ Parameters ]
 	/language
 		The identifier of the language that is to be compiled.
+
 	/includes
 		A sequence of includes to test for. A sequence is used so that
 		dependencies may be included prior to the actual header or headers of interest.

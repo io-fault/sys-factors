@@ -12,8 +12,8 @@ import functools
 import collections
 import types
 
-from .. import libfactor
 from .. import include
+from .. import libfactor
 from .. import libconstruct
 from .. import library as libdev
 
