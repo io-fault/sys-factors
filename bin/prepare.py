@@ -7,10 +7,11 @@ import sys
 import contextlib
 import itertools
 import py_compile
-import importlib.machinery
 import functools
 import collections
 import types
+import importlib.machinery
+import importlib.util
 
 from .. import include
 from .. import libfactor
@@ -32,7 +33,7 @@ def status(message):
 		duration = elapsed()
 		seconds = duration.select('second')
 		ms = duration.select('millisecond', 'second')
-		sys.stderr.write(' ' + str(seconds) + '.' + str(ms) + '\n')
+		sys.stderr.write(' ' + str(seconds) + '.' + str(ms) + 's\n')
 
 def set_exit_code(cxn, unit=None):
 	"""
@@ -41,7 +42,10 @@ def set_exit_code(cxn, unit=None):
 	# Restrict revealed count to 201. The exit code is rather small.
 	unit.result = min(cxn.failures, 201)
 
-def main(role='optimal', mount_extensions=True):
+def main(role='optimal',
+		mount_extensions=True,
+		cache_from_source=importlib.util.cache_from_source
+	):
 	"""
 	Prepare the entire package building factor targets and writing bytecode.
 	"""
@@ -96,19 +100,24 @@ def main(role='optimal', mount_extensions=True):
 
 		if not dont_write_bytecode:
 			for x in itertools.chain(roots, packages, modules):
-				if not x.exists():
+				xf = x.file()
+				fp = str(xf)
+				if not x.exists() or not fp.endswith('.py'):
 					continue
 
+				cache_file = libroutes.File.from_path(cache_from_source(fp, optimization=opt))
+				if cache_file.exists():
+					if cache_file.last_modified() > xf.last_modified():
+						continue
+
 				with status(str(x)):
-					fp = str(x.file())
-					if fp.endswith('.py'):
-						try:
-							py_compile.compile(fp, optimize=opt, doraise=True)
-							continue
-						except py_compile.PyCompileError as err:
-							exc = err.__context__
-							exc.__traceback__ = None
-						raise exc
+					try:
+						py_compile.compile(fp, optimize=opt, doraise=True)
+						continue
+					except py_compile.PyCompileError as err:
+						exc = err.__context__
+						exc.__traceback__ = None
+					raise exc
 
 		# Identify all system modules in project/context package.
 		root_system_modules = []
