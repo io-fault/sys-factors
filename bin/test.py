@@ -162,6 +162,8 @@ class Harness(libharness.Harness):
 			self.status.write(bottom_fate_messages + '\n')
 
 def main(package, modules, role='test'):
+	role = os.environ.get('FAULT_ROLE', role)
+
 	p = Harness(package, sys.stderr, role=role)
 	p.execute(p.root(libroutes.Import.from_fullname(package)), modules)
 
