@@ -1,10 +1,9 @@
-identity = 'https://fault.io/project/python/development'
+identity = 'https://fault.io/project/python/fault.development'
 name = 'development'
-fork = 'bootstraps'
-release = None
+abstract = 'Construction, coverage, and testing for Python, C, C++, and Objective-C.'
 icon = '🐜'
 
-abstract = 'tools and libraries for supporting a development environment'
+fork = 'bootstraps'
 
 controller = 'fault.io'
 contact = 'mailto:critical@fault.io'
