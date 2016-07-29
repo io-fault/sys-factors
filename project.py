@@ -4,6 +4,7 @@ abstract = 'Construction, coverage, and testing for Python, C, C++, and Objectiv
 icon = '🐜'
 
 fork = 'bootstraps'
+status = 'flux'
 
 controller = 'fault.io'
 contact = 'mailto:critical@fault.io'
