@@ -1,6 +1,7 @@
 """
 Configure the initialization of the construction context.
 """
+import os
 import sys
 import functools
 import shell_command
@@ -9,6 +10,17 @@ from ...routes import library as libroutes
 from ...xml import library as libxml
 from .. import libprobe
 from .. import libconstruct
+from .. import web
+
+javascript_combiners_preference = ['uglifyjs']
+web_compiler_collections = {
+	'emcc': (
+		'c', 'c++', 'objective-c', 'objective-c++',
+		'fortran', 'ada', # via dragonegg
+	),
+}
+web_compiler_collection_preference = ('emcc',)
+web_linker_preference = ('emcc',)
 
 compiler_collections = {
 	'clang': (
@@ -83,14 +95,6 @@ def debug_isolate(self, target):
 		(objcopy, '--add-gnu-debuglink', target, debug),
 	]
 
-# libconstruct directory ->
-	# context ->
-		# role ->
-			# purpose ->
-				# default language handler
-				# role file
-				# language -> parameters
-
 def select(paths, possibilities, preferences):
 	global libprobe
 
@@ -142,20 +146,155 @@ def compiler_libraries(compiler, prefix, version, executable, target):
 	else:
 		pass
 
-def main(name, args, paths=None):
-	global libroutes
-	import os
+def init(ctx):
+	# Initialize lib directory for context libraries.
+	for x in ('bin', 'lib', 'include'):
+		(ctx / x).init('directory')
 
-	if args:
-		libconstruct_dir, = args
-	else:
-		libconstruct_dir = libconstruct.root_context_directory()
+	return ctx
 
-	ctx = libconstruct_dir / 'host'
+def javascript_subject(paths):
+	"""
+	Initialize the web subject for JavaScript and CSS compilation.
 
-	if paths is None:
-		paths = libprobe.environ_paths()
+	This primarily means "minification" and mere concatenation, but languages
+	targeting JavaScript can be added.
+	"""
+	jscname, jsc = select(paths, ['uglifyjs'], javascript_combiners_preference)
 
+	return {
+		'formats': {
+			'library': 'js',
+			'fragment': 'js',
+		},
+
+		'reductions': {
+			'library': {
+				'interface': web.__name__ + '.javascript_uglify',
+				'type': 'linker',
+				'name': jscname,
+				'command': str(jsc),
+			},
+		},
+
+		'transformations': {
+			'javascript': {
+				'interface': libconstruct.__name__ + '.transparent',
+				'type': 'transparent',
+				'command': '/bin/ln',
+			},
+		}
+	}
+
+def css_subject(paths):
+	"""
+	Initialize the CSS subject for CSS compilation.
+	"""
+	css_combine = select(paths, ['cleancss', 'cat'], ('cleancss', 'cat',))
+	cssname, cssc = css_combine
+
+	css = {
+		'formats': {
+			'library': 'css',
+		},
+
+		'reductions': {
+			'library': {
+				'interface': web.__name__ + '.css_cleancss',
+				'type': 'minify',
+				'name': cssname,
+				'command': str(cssc),
+			},
+		},
+
+		'transformations': {
+			'css': {
+				'interface': libconstruct.__name__ + '.transparent',
+				'type': 'transparent',
+				'command': '/bin/ln',
+			},
+		}
+	}
+
+	sass = select(paths, ['sass'], ('sass',))
+	if sass is not None:
+		sassname, sassc = sass
+		css['transformations'].update({
+			'sass': {
+				'interface': web.__name__ + '.sass',
+				'type': 'compiler',
+				'name': sassname,
+				'command': str(sassc),
+			},
+			'scss': {
+				'interface': web.__name__ + '.sass',
+				'type': 'compiler',
+				'name': sassname,
+				'command': str(sassc),
+			},
+		})
+
+	less = select(paths, ['lessc'], ('lessc',))
+	if less is not None:
+		lessname, lessc = less
+		css['transformations'].update({
+			'less': {
+				'interface': web.__name__ + '.lessc',
+				'type': 'compiler',
+				'name': lessname,
+				'command': str(lessc),
+			},
+		})
+
+	return css
+
+def xml_subject(paths):
+	"""
+	Construct the subject for XML files.
+	"""
+	xmlname, xmlc = select(paths, ['xmllint'], ('xmllint',))
+
+	xml = {
+		'formats': {
+			'executable': 'xml',
+			'library': 'xml',
+		},
+
+		'reductions': {
+			'executable': {
+				'interface': web.__name__ + '.xinclude',
+				'type': 'xinclude',
+				'name': xmlname,
+				'command': str(xmlc),
+				'redirect': 'stdout',
+				'root': 'root.xml',
+			},
+
+			'library': {
+				'interface': web.__name__ + '.xinclude',
+				'type': 'xinclude',
+				'name': xmlname,
+				'command': str(xmlc),
+				'redirect': 'stdout',
+				'root': 'root.xml',
+			},
+		},
+
+		'transformations': {
+			'xml': {
+				'interface': libconstruct.__name__ + '.transparent',
+				'type': 'transparent',
+				'command': '/bin/ln',
+			},
+		}
+	}
+
+	return xml
+
+def host(ctx, paths):
+	"""
+	Initialize a (libconstruct:context)`host` context.
+	"""
 	# default command
 	if 'CC' in os.environ:
 		cc = libroutes.File.from_absolute(os.environ['CC'])
@@ -254,6 +393,9 @@ def main(name, args, paths=None):
 	prepare = lambda x: tuple(map(str, [y for y in x if y]))
 
 	core = {
+		'javascript': javascript_subject(paths),
+		'css': css_subject(paths),
+		'xml': xml_subject(paths),
 		'system': {
 			# subject data
 			'platform': target,
@@ -400,15 +542,152 @@ def main(name, args, paths=None):
 	with (ctx / 'inspect.xml').open('wb') as f:
 		f.write(xml)
 
-	# Initialize lib directory for context libraries.
-	ctxbin = ctx / 'bin'
-	ctxbin.init('directory')
+def web_context(ctx, paths):
+	# default command
+	ccname, cc = select(paths, ['emcc'], web_compiler_collection_preference)
 
-	ctxlib = ctx / 'lib'
-	ctxlib.init('directory')
+	# Extract the default target from the compiler.
+	target = 'js-web'
 
-	ctxinc = ctx / 'include'
-	ctxinc.init('directory')
+	# First field of the target string.
+	arch = target[:target.find('-')]
+	arch_alt = arch.replace('_', '-')
+
+	libdirs = []
+
+	core = {
+		'system': {
+			# subject data
+			'platform': target,
+
+			'reference-types': {'weak', 'lazy', 'upward', 'default'},
+
+			# Formats to build for targets.
+			# Fragments inherit the code type.
+			'formats': {
+				'executable': 'emscripten',
+				'library': 'emscripten',
+				'extension': 'emscripten',
+			},
+
+			# objects used to support the construction of system targets
+			# The split (prefix objects and suffix objects) is used to support
+			# linkers where the positioning of the parameters is significant.
+			'objects': {
+				'executable': {
+					'emscripten': [],
+				},
+				'library': {
+					'emscripten': [],
+				},
+				'extension': {
+					'emscripten': [],
+				},
+				# fragments do not have requirements.
+				'fragment': None,
+			},
+
+			# subject interfaces.
+			'reductions': {
+				None: {
+					'interface': libconstruct.__name__ + '.link_editor',
+					'type': 'linker',
+					'name': 'void',
+					'command': None,
+					'defaults': {},
+				},
+			},
+
+			'transformations': {
+				None: {
+					'interface': libconstruct.__name__ + '.compiler_collection',
+					'type': 'collection',
+					'name': 'emcc',
+					'command': 'emcc',
+					'implementation': 'emscripten',
+					'libraries': [],
+					'version': None,
+					'release': None,
+					'defaults': {},
+					'resources': {
+						'profile': None,
+						'builtins': None
+					},
+				},
+			},
+		}
+	}
+
+	inspect = {
+		'system': {
+			'reductions': {
+				None: {
+					'interface': libconstruct.__name__ + '.inspect_link_editor',
+					'command': 'fault.development.bin.il',
+					'method': 'python',
+					'redirect': 'stdout',
+				},
+			},
+			'transformations': {
+				None: {
+					'command': 'fault.llvm.bin.inspect',
+					'method': 'python',
+					'redirect': 'stdout',
+				},
+			}
+		}
+	}
+
+	import pprint
+	print('web')
+	pprint.pprint(core)
+	pprint.pprint(inspect)
+
+	S = libxml.Serialization()
+	D = S.switch('data:')
+	xml = b''.join(
+		S.root('libconstruct',
+			S.element('context',
+				libxml.Data.serialize(D, core),
+			),
+			('xmlns', 'https://fault.io/xml/libconstruct'),
+			('xmlns:data', 'https://fault.io/xml/data'),
+		)
+	)
+
+	rolefile = ctx / 'core.xml'
+	with rolefile.open('wb') as f:
+		f.write(xml)
+
+	S = libxml.Serialization()
+	D = S.switch('data:')
+	xml = b''.join(
+		S.root('libconstruct',
+			S.element('context',
+				libxml.Data.serialize(D, inspect),
+			),
+			('xmlns', 'https://fault.io/xml/libconstruct'),
+			('xmlns:data', 'https://fault.io/xml/data'),
+		)
+	)
+
+	with (ctx / 'inspect.xml').open('wb') as f:
+		f.write(xml)
+
+def main(name, args, paths=None):
+	global libroutes
+	import os
+
+	if args:
+		libconstruct_dir, = args
+	else:
+		libconstruct_dir = libconstruct.root_context_directory()
+
+	if paths is None:
+		paths = libprobe.environ_paths()
+
+	host(init(libconstruct_dir / 'host'), paths)
+	web_context(init(libconstruct_dir / 'web'), paths)
 
 if __name__ == '__main__':
 	import sys

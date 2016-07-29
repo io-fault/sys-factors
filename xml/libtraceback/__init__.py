@@ -11,3 +11,5 @@ def serialize():
 
 from ....xml import libfactor
 libfactor.load('schema', fragment=True)
+
+__factor_type__ = 'xml.library'

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- XML description of a language agnostic Traceback; a stack of frames !-->
+<!-- XML description of a language independent Traceback; a stack of frames !-->
 <grammar
 	xmlns="http://relaxng.org/ns/structure/1.0"
 	xmlns:xlink="http://www.w3.org/1999/xlink"

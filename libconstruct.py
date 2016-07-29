@@ -156,8 +156,13 @@ extensions = {
 	'ada': ('ads', 'ada'),
 	'assembly': ('asm',),
 	'bitcode': ('bc',), # clang
-
 	'haskell': ('hs', 'hsc'),
+
+	'javascript': ('json', 'javascript', 'js'),
+	'css': ('css',),
+	'sass': ('sass',),
+	'scss': ('scss',),
+	'xml': ('xml', 'xsl', 'rdf'),
 }
 
 languages = {}
@@ -329,16 +334,41 @@ def disabled(*args, **kw):
 	"""
 	return ()
 
+def transparent(context, output, inputs,
+		mechanism=None,
+		language=None,
+		format=None,
+		verbose=True,
+	):
+	"""
+	Create links from the input to the output; used for zero transformations.
+	"""
+	input, = inputs # Rely on exception from unpacking.
+	#return ('link', input, output)
+	return [None, '-sf', input, output]
+
+def concatenation(context, output, inputs,
+		mechanism=None,
+		language=None,
+		format=None,
+		verbose=True,
+	):
+	"""
+	Create the factor by concatenating the files. Only used in cases
+	where the order of concatentation is already managed or irrelevant.
+
+	Requires 'execute-redirect'.
+	"""
+	return ['cat'] + list(inputs)
+
 def unix_compiler_collection(context, output, inputs,
 		mechanism=None,
 		language=None, # The selected language.
 		format=None, # PIC vs PIE vs PDC
 		verbose=True, # Enable verbose output.
-		emit_dependencies=False,
 
 		verbose_flag='-v',
 		language_flag='-x', standard_flag='-std',
-		emit_dependencies_flag='-M',
 		visibility='-fvisibility=hidden',
 		color='-fcolor-diagnostics',
 
@@ -439,13 +469,6 @@ def unix_compiler_collection(context, output, inputs,
 	for x in sis:
 		command.extend((si_flag, x))
 
-	if emit_dependencies:
-		command.append(emit_dependencies_flag)
-		for k, v, default in dependency_options:
-			setting = get(k)
-			if setting or setting is None and default:
-				command.append(v)
-
 	command.extend(sys.get('command.option.injection', ()))
 
 	# finally, the output file and the inputs as the remainder.
@@ -485,12 +508,12 @@ def macosx_link_editor(context, output, inputs,
 		rpath_flag='-rpath',
 		output_flag='-o',
 		link_flag='-l',
-		ref_flags = {
+		ref_flags={
 			'weak': '-weak-l',
 			'lazy': '-lazy-l',
 			'default': '-l',
 		},
-		type_map = {
+		type_map={
 			'executable': '-execute',
 			'library': '-dylib',
 			'extension': '-bundle',
@@ -675,7 +698,7 @@ def updated(outputs, inputs, depfile, requirement=None):
 		return False
 
 	for x in inputs:
-		if not x.exists() or olm < x.last_modified():
+		if not x.exists() or olm <= x.last_modified():
 			# rebuild if any output is older than any source.
 			return False
 
@@ -819,6 +842,8 @@ def initialize(
 
 	# Factor dependencies stated by imports.
 	td = list(libfactor.dependencies(module))
+	ftype = module.__factor_type__
+	subject, typ = ftype.split('.')
 
 	# Categorize the module's dependencies.
 	incdirs = [libfactor.sources(libroutes.Import.from_fullname(include.__name__))]
@@ -858,6 +883,7 @@ def initialize(
 		'role': role,
 		'module': module,
 		'import': ir,
+		'subject': subject,
 
 		'probes': probes,
 		'references': refs,
@@ -869,15 +895,15 @@ def initialize(
 			'reduction': reduction,
 			'logs': libfactor.cache_directory(module, context, role, 'log'),
 			'libraries': libfactor.cache_directory(module, context, role, 'lib'),
-			'dependencies': libfactor.cache_directory(module, context, role, 'dl'),
+			'dependencies': libfactor.cache_directory(module, context, 'inspect', 'out'),
 		},
 
 		# Mechanisms (compiler/linker) for the context+role combination.
 		'mechanisms': mechanisms,
 
 		# Context data for system subject.
-		'system': {
-			'type': module.__factor_type__.split('.')[1], # Conceptual
+		subject: {
+			'type': typ, # Conceptual
 			'abi': getattr(module, 'abi', None), # -soname for unix/elf.
 			'formats': set(),
 			'libraries': libs, # dependencies that are system libraries.
@@ -898,11 +924,11 @@ def initialize(
 	# Dependents ultimately determine what this means by designating
 	# the type of link that should be used for a given role.
 
-	sys = parameters['system']
+	sys = parameters[subject]
 	typ = sys['type']
-	sysformats = mechanisms['system']['formats'] # code types used by the object types
+	sysformats = mechanisms[subject]['formats'] # code types used by the object types
 
-	if typ in {'executable', 'extension', 'library'}:
+	if typ not in ('fragment', 'interfaces'):
 		# system/user is the dependent.
 		# Usually, PIC for extensions, PDC/PIE for executables.
 		sys['formats'].add(sysformats[typ])
@@ -928,12 +954,12 @@ def initialize(
 		parameters['sources'] = parameters['locations']['sources'].tree()[1]
 
 	# Local dependency set comes first.
-	parameters['system']['library.directories'] = [parameters['locations']['libraries']]
+	parameters[subject]['library.directories'] = [parameters['locations']['libraries']]
 
 	libdir = parameters['locations']['libraries']
 	for lib in libs:
 		libname = identity(lib)
-		parameters['system']['library.set'].add(libname)
+		parameters[subject]['library.set'].add(libname)
 
 	# Add include directories from libraries and fragments.
 	for inc in itertools.chain(libs, fragments):
@@ -956,13 +982,13 @@ def initialize(
 		parameters['execution_context_extension'] = False
 		idefines = factor_defines(module.__name__)
 
-	parameters['system']['source.parameters'].extend(idefines)
-	parameters['system']['source.parameters'].append(
+	parameters[subject]['source.parameters'].extend(idefines)
+	parameters[subject]['source.parameters'].append(
 		('PRODUCT_ARCHITECTURE', mechanisms['system']['platform'])
 	)
 
-	if hasattr(module, 'system'):
-		merge(parameters['system'], module.system)
+	if hasattr(module, subject):
+		merge(parameters[subject], module.system)
 
 	return parameters
 
@@ -990,13 +1016,15 @@ def transform(context, filtered=reconstruct):
 	"""
 	global languages, include
 
+	subject = context['subject']
+
 	if 'sources' not in context:
 		return
-	if context['system']['type'] == 'interfaces':
+	if context[subject]['type'] == 'interfaces':
 		return
 
 	loc = context['locations']
-	formats = context['system']['formats']
+	formats = context[subject]['formats']
 
 	emitted = set([loc['output']])
 	emitted.add(loc['logs'])
@@ -1007,7 +1035,7 @@ def transform(context, filtered=reconstruct):
 		yield ('directory', x)
 
 	mech = context['mechanisms']
-	mech = mech['system']['transformations']
+	mech = mech[subject]['transformations']
 	mech_cache = {}
 
 	commands = []
@@ -1086,7 +1114,9 @@ def reduce(context, filtered=reconstruct, sys_platform=sys.platform):
 		The construction context created by &initialize.
 	"""
 
-	if context['system']['type'] == 'interfaces':
+	subject = context.get('subject', 'system')
+	typ = context[subject]['type']
+	if typ == 'interfaces':
 		return
 
 	ctx = context['name']
@@ -1095,11 +1125,15 @@ def reduce(context, filtered=reconstruct, sys_platform=sys.platform):
 	locs = context['locations']
 	libdir = locs['libraries']
 
-	subject = context.get('subject', 'system')
-	mech = context['mechanisms'][subject]['reductions'][None]
+	reductions = context['mechanisms'][subject]['reductions']
+	if typ in reductions:
+		mech = reductions[typ]
+	else:
+		mech = reductions[None]
+
 	xf = context_interface(mech['interface'])
 
-	formats = tuple(context['system']['formats'])
+	formats = tuple(context[subject]['formats'])
 
 	if 'sources' not in context:
 		# Nothing to reduce.
@@ -1109,7 +1143,7 @@ def reduce(context, filtered=reconstruct, sys_platform=sys.platform):
 
 	libs = []
 
-	for x in context['system']['libraries']:
+	for x in context[subject]['libraries']:
 		# Create symbolic links inside the target's local library directory.
 		# This is done to avoid a large number of -L options in targets
 		# with a large number of dependencies.
@@ -1124,12 +1158,12 @@ def reduce(context, filtered=reconstruct, sys_platform=sys.platform):
 
 	fragments = [
 		libfactor.reduction(libroutes.Import.from_fullname(x.__name__), context=ctx, role=role)
-		for x in context['system']['fragments']
+		for x in context[subject]['fragments']
 	]
 
 	# Discover the known sources in order to identify which objects should be selected.
 	output_base = context['locations']['reduction']
-	typ = context['system']['type']
+	typ = context[subject]['type']
 	if typ == 'fragment':
 		# Fragments may have multiple builds.
 		# A library may want PIC and an executable, PIE.
@@ -1153,6 +1187,12 @@ def reduce(context, filtered=reconstruct, sys_platform=sys.platform):
 			objects.extend([x / fmt for x in fragments])
 
 		if not filtered((output,), objects, None):
+			# Mechanisms with a configured root means that the
+			# transformed objects are referenced by the root file.
+			root = mech.get('root')
+			if root is not None:
+				objects = [objdir / root]
+
 			cmd = xf(context, output, objects, mechanism=mech, format=fmt)
 			if mech.get('method') == 'python':
 				cmd[0:1] = (sys.executable, '-m', mech['command'])
