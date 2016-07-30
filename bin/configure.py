@@ -216,24 +216,6 @@ def css_subject(paths):
 		}
 	}
 
-	sass = select(paths, ['sass'], ('sass',))
-	if sass is not None:
-		sassname, sassc = sass
-		css['transformations'].update({
-			'sass': {
-				'interface': web.__name__ + '.sass',
-				'type': 'compiler',
-				'name': sassname,
-				'command': str(sassc),
-			},
-			'scss': {
-				'interface': web.__name__ + '.sass',
-				'type': 'compiler',
-				'name': sassname,
-				'command': str(sassc),
-			},
-		})
-
 	less = select(paths, ['lessc'], ('lessc',))
 	if less is not None:
 		lessname, lessc = less

@@ -160,8 +160,6 @@ extensions = {
 
 	'javascript': ('json', 'javascript', 'js'),
 	'css': ('css',),
-	'sass': ('sass',),
-	'scss': ('scss',),
 	'xml': ('xml', 'xsl', 'rdf'),
 }
 
