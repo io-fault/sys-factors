@@ -139,6 +139,7 @@ def test_updated(test):
 
 		of.void()
 		of.init('file')
+		of.set_last_modified(sf.last_modified().elapse(second=10))
 		test/library.updated([of], [sf], None) == True
 
 def test_sequence(test):
