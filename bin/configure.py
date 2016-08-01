@@ -578,7 +578,10 @@ def host(ctx, paths):
 
 def web_context(ctx, paths):
 	# default command
-	ccname, cc = select(paths, ['emcc'], web_compiler_collection_preference)
+	webcc = select(paths, ['emcc'], web_compiler_collection_preference)
+	if webcc is None:
+		return None
+	ccname, cc = webcc
 
 	# Extract the default target from the compiler.
 	target = 'js-web'
