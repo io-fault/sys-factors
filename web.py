@@ -55,8 +55,6 @@ def css_cleancss(context, output, inputs,
 	"""
 	Command constructor for (system:command)`cleancss`.
 	"""
-	assert context['role'] != 'inspect'
-
 	css = context['css']
 	typ = css.get('type', 'library')
 	output = filepath(output)
@@ -82,8 +80,6 @@ def javascript_uglify(context, output, inputs,
 	"""
 	Command constructor for (system:command)`uglifyjs`.
 	"""
-	assert context['role'] != 'inspect'
-
 	js = context['javascript']
 	typ = js.get('type', 'library')
 	output = filepath(output)

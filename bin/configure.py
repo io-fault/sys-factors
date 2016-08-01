@@ -155,7 +155,7 @@ def init(ctx):
 
 def javascript_subject(paths):
 	"""
-	Initialize the web subject for JavaScript and CSS compilation.
+	Initialize the javascript subject for JavaScript file compilation.
 
 	This primarily means "minification" and mere concatenation, but languages
 	targeting JavaScript can be added.
@@ -447,7 +447,40 @@ def host(ctx, paths):
 		}
 	}
 
+	iempty = {
+		'command': 'fault.development.bin.empty_introspection',
+		'interface': libconstruct.__name__ + '.empty',
+		'method': 'python',
+		'redirect': 'stdout',
+	}
+	il = {
+		'interface': libconstruct.__name__ + '.inspect_link_editor',
+		'command': 'fault.development.bin.il',
+		'method': 'python',
+		'redirect': 'stdout',
+	}
+
+	unsupported = {
+		'reductions': {
+			None: il,
+			'library': il,
+			'executable': il,
+			'fragmnt': il,
+		},
+
+		'transformations': {
+			None: iempty,
+			'javascript': iempty,
+			'css': iempty,
+			'less': iempty,
+		},
+	}
+
 	inspect = {
+		'javascript': unsupported,
+		'xml': unsupported,
+		'css': unsupported,
+
 		'system': {
 			'reductions': {
 				None: {
@@ -459,7 +492,26 @@ def host(ctx, paths):
 			},
 			'transformations': {
 				None: {
+					'command': 'fault.development.bin.empty_introspection',
+					'interface': libconstruct.__name__ + '.empty',
+					'method': 'python',
+					'redirect': 'stdout',
+				},
+				'objective-c': {
 					'command': 'fault.llvm.bin.inspect',
+					'interface': libconstruct.__name__ + '.compiler_collection',
+					'method': 'python',
+					'redirect': 'stdout',
+				},
+				'c++': {
+					'command': 'fault.llvm.bin.inspect',
+					'interface': libconstruct.__name__ + '.compiler_collection',
+					'method': 'python',
+					'redirect': 'stdout',
+				},
+				'c': {
+					'command': 'fault.llvm.bin.inspect',
+					'interface': libconstruct.__name__ + '.compiler_collection',
 					'method': 'python',
 					'redirect': 'stdout',
 				},

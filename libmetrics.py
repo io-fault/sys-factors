@@ -579,6 +579,7 @@ class Harness(libharness.Harness):
 		subscribe = trace.subscribe
 		cancel = trace.cancel
 
+		# Get timing of test execution.
 		with self.libtime.clock.stopwatch() as view:
 			try:
 				llmetrics = self.prepare_extensions(test.identity)

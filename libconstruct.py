@@ -343,7 +343,7 @@ def transparent(context, output, inputs,
 	"""
 	input, = inputs # Rely on exception from unpacking.
 	#return ('link', input, output)
-	return [None, '-sf', input, output]
+	return [None, '-f', input, output]
 
 def concatenation(context, output, inputs,
 		mechanism=None,
@@ -358,6 +358,18 @@ def concatenation(context, output, inputs,
 	Requires 'execute-redirect'.
 	"""
 	return ['cat'] + list(inputs)
+
+def empty(context, output, inputs,
+		mechanism=None,
+		language=None,
+		format=None,
+		verbose=True,
+	):
+	"""
+	Create the factor by executing a command without arguments.
+	Used to create constant outputs for reduction.
+	"""
+	return ['empty']
 
 def unix_compiler_collection(context, output, inputs,
 		mechanism=None,
@@ -416,7 +428,7 @@ def unix_compiler_collection(context, output, inputs,
 		command.append(verbose_flag)
 
 	# Add language flag if it's a compiler collection.
-	if mechanism['type'] == 'collection':
+	if mechanism.get('type') == 'collection':
 		if language is not None:
 			command.extend((language_flag, language))
 
@@ -482,15 +494,15 @@ def inspect_link_editor(context, output, inputs, mechanism=None, format=None, fi
 	"""
 	get = context.get
 	role = get('role')
-	sys = get('system')
-	typ = sys.get('type')
+	sub = get(context['subject'])
+	typ = sub.get('type')
 
 	command = [None, typ, format]
 	command.extend([filepath(x) for x in inputs])
 	command.append('--library.directories')
-	command.extend([filepath(x) for x in sys['library.directories']])
+	command.extend([filepath(x) for x in sub.get('library.directories', ())])
 	command.append('--library.set')
-	command.extend([filepath(x) for x in sys.get('library.set', ())])
+	command.extend([filepath(x) for x in sub.get('library.set', ())])
 
 	return command
 
