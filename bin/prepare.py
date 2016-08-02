@@ -63,7 +63,7 @@ def main(role='optimal',
 	dont_write_bytecode = env.get('PYTHONDONTWRITEBYTECODE') == '1'
 	reconstruct = env.get('FAULT_RECONSTRUCT') == '1'
 
-	context_name = None
+	context_name = env.get('FAULT_CONTEXT') or None
 	role = env.get('FAULT_ROLE', role) or role
 	stack = contextlib.ExitStack()
 

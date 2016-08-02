@@ -575,6 +575,98 @@ def macosx_link_editor(context, output, inputs,
 
 	return command
 
+def _r_file_ext(r, ext):
+	return r.container / (r.identifier.split('.', 1)[0] + ext)
+
+def web_compiler_collection(context,
+		output:libroutes.File,
+		inputs:typing.Sequence[libroutes.File],
+		**kw
+	):
+	"""
+	"""
+	output = _r_file_ext(output, '.bc')
+	return unix_compiler_collection(context, output, inputs, **kw)
+
+def web_link_editor(context,
+		output:libroutes.File,
+		inputs:typing.Sequence[libroutes.File],
+
+		mechanism=None,
+		format=None,
+		verbose=True,
+
+		filepath=str,
+		verbose_flag='-v',
+		link_flag='-l', libdir_flag='-L',
+		output_flag='-o',
+		type_map={
+			'executable': None,
+			'library': '-shared',
+			'extension': '-shared',
+			'fragment': '-r',
+		},
+	):
+	"""
+	Command constructor for the emcc link editor.
+
+	[Parameters]
+
+	/output
+		The file system location to write the linker output to.
+
+	/inputs
+		The set of object files to link.
+
+	/verbose
+		Enable or disable the verbosity of the command. Defaults to &True.
+	"""
+	get = context.get
+	sys = get('system')
+	typ = sys.get('type')
+	role = get('role')
+
+	command = ['emcc']
+
+	# emcc is not terribly brilliant; file extensions are used to determine operation.
+	if typ == 'fragment':
+		suffix = '.bc'
+	elif typ == 'executable':
+		suffix = '.js'
+		command.append('--emrun')
+	else:
+		suffix = '.js'
+	output = output.suffix(suffix)
+
+	add = command.append
+	iadd = command.extend
+
+	if verbose:
+		add(verbose_flag)
+
+	loutput_type = type_map[typ] # failure indicates bad type parameter to libfactor.load()
+	if loutput_type:
+		add(loutput_type)
+
+	if typ != 'fragment':
+		sld = sys.get('library.directories', ())
+		libdirs = [libdir_flag + filepath(x) for x in sld]
+
+		sls = sys.get('library.set', ())
+		libs = [link_flag + filepath(x) for x in sls]
+
+		sysmech = context['mechanisms']['system']
+
+		command.extend(map(filepath, [_r_file_ext(x, '.bc') for x in inputs]))
+		command.extend(libdirs)
+		command.extend(libs)
+	else:
+		# fragment is an incremental link. Most options are irrelevant.
+		command.extend(map(filepath, inputs))
+
+	command.extend((output_flag, output))
+	return command
+
 def unix_link_editor(context,
 		output:libroutes.File,
 		inputs:typing.Sequence[libroutes.File],

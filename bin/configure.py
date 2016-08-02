@@ -273,6 +273,81 @@ def xml_subject(paths):
 
 	return xml
 
+def inspect_role():
+	iempty = {
+		'command': 'fault.development.bin.empty_introspection',
+		'interface': libconstruct.__name__ + '.empty',
+		'method': 'python',
+		'redirect': 'stdout',
+	}
+	il = {
+		'interface': libconstruct.__name__ + '.inspect_link_editor',
+		'command': 'fault.development.bin.il',
+		'method': 'python',
+		'redirect': 'stdout',
+	}
+
+	unsupported = {
+		'reductions': {
+			None: il,
+			'library': il,
+			'executable': il,
+			'fragmnt': il,
+		},
+
+		'transformations': {
+			None: iempty,
+			'javascript': iempty,
+			'css': iempty,
+			'less': iempty,
+		},
+	}
+
+	inspect = {
+		'javascript': unsupported,
+		'xml': unsupported,
+		'css': unsupported,
+
+		'system': {
+			'reductions': {
+				None: {
+					'interface': libconstruct.__name__ + '.inspect_link_editor',
+					'command': 'fault.development.bin.il',
+					'method': 'python',
+					'redirect': 'stdout',
+				},
+			},
+			'transformations': {
+				None: {
+					'command': 'fault.development.bin.empty_introspection',
+					'interface': libconstruct.__name__ + '.empty',
+					'method': 'python',
+					'redirect': 'stdout',
+				},
+				'objective-c': {
+					'command': 'fault.llvm.bin.inspect',
+					'interface': libconstruct.__name__ + '.compiler_collection',
+					'method': 'python',
+					'redirect': 'stdout',
+				},
+				'c++': {
+					'command': 'fault.llvm.bin.inspect',
+					'interface': libconstruct.__name__ + '.compiler_collection',
+					'method': 'python',
+					'redirect': 'stdout',
+				},
+				'c': {
+					'command': 'fault.llvm.bin.inspect',
+					'interface': libconstruct.__name__ + '.compiler_collection',
+					'method': 'python',
+					'redirect': 'stdout',
+				},
+			}
+		}
+	}
+
+	return inspect
+
 def host(ctx, paths):
 	"""
 	Initialize a (libconstruct:context)`host` context.
@@ -447,78 +522,6 @@ def host(ctx, paths):
 		}
 	}
 
-	iempty = {
-		'command': 'fault.development.bin.empty_introspection',
-		'interface': libconstruct.__name__ + '.empty',
-		'method': 'python',
-		'redirect': 'stdout',
-	}
-	il = {
-		'interface': libconstruct.__name__ + '.inspect_link_editor',
-		'command': 'fault.development.bin.il',
-		'method': 'python',
-		'redirect': 'stdout',
-	}
-
-	unsupported = {
-		'reductions': {
-			None: il,
-			'library': il,
-			'executable': il,
-			'fragmnt': il,
-		},
-
-		'transformations': {
-			None: iempty,
-			'javascript': iempty,
-			'css': iempty,
-			'less': iempty,
-		},
-	}
-
-	inspect = {
-		'javascript': unsupported,
-		'xml': unsupported,
-		'css': unsupported,
-
-		'system': {
-			'reductions': {
-				None: {
-					'interface': libconstruct.__name__ + '.inspect_link_editor',
-					'command': 'fault.development.bin.il',
-					'method': 'python',
-					'redirect': 'stdout',
-				},
-			},
-			'transformations': {
-				None: {
-					'command': 'fault.development.bin.empty_introspection',
-					'interface': libconstruct.__name__ + '.empty',
-					'method': 'python',
-					'redirect': 'stdout',
-				},
-				'objective-c': {
-					'command': 'fault.llvm.bin.inspect',
-					'interface': libconstruct.__name__ + '.compiler_collection',
-					'method': 'python',
-					'redirect': 'stdout',
-				},
-				'c++': {
-					'command': 'fault.llvm.bin.inspect',
-					'interface': libconstruct.__name__ + '.compiler_collection',
-					'method': 'python',
-					'redirect': 'stdout',
-				},
-				'c': {
-					'command': 'fault.llvm.bin.inspect',
-					'interface': libconstruct.__name__ + '.compiler_collection',
-					'method': 'python',
-					'redirect': 'stdout',
-				},
-			}
-		}
-	}
-
 	if platform == 'darwin':
 		core['system']['objects']['executable'] = {
 			'pie': [
@@ -543,7 +546,6 @@ def host(ctx, paths):
 
 	import pprint
 	pprint.pprint(core)
-	pprint.pprint(inspect)
 
 	S = libxml.Serialization()
 	D = S.switch('data:')
@@ -566,7 +568,7 @@ def host(ctx, paths):
 	xml = b''.join(
 		S.root('libconstruct',
 			S.element('context',
-				libxml.Data.serialize(D, inspect),
+				libxml.Data.serialize(D, inspect_role()),
 			),
 			('xmlns', 'https://fault.io/xml/libconstruct'),
 			('xmlns:data', 'https://fault.io/xml/data'),
@@ -582,6 +584,12 @@ def web_context(ctx, paths):
 	if webcc is None:
 		return None
 	ccname, cc = webcc
+
+	# Execution method for targets.
+	node = select(paths, ['emcc'], web_compiler_collection_preference)
+	if node is None:
+		return None
+	node_name, node_c = node
 
 	# Extract the default target from the compiler.
 	target = 'js-web'
@@ -627,20 +635,20 @@ def web_context(ctx, paths):
 			# subject interfaces.
 			'reductions': {
 				None: {
-					'interface': libconstruct.__name__ + '.link_editor',
+					'interface': libconstruct.__name__ + '.web_link_editor',
 					'type': 'linker',
-					'name': 'void',
-					'command': None,
+					'name': 'emcc',
+					'command': str(cc),
 					'defaults': {},
 				},
 			},
 
 			'transformations': {
 				None: {
-					'interface': libconstruct.__name__ + '.compiler_collection',
+					'interface': libconstruct.__name__ + '.web_compiler_collection',
 					'type': 'collection',
 					'name': 'emcc',
-					'command': 'emcc',
+					'command': str(cc),
 					'implementation': 'emscripten',
 					'libraries': [],
 					'version': None,
@@ -654,31 +662,6 @@ def web_context(ctx, paths):
 			},
 		}
 	}
-
-	inspect = {
-		'system': {
-			'reductions': {
-				None: {
-					'interface': libconstruct.__name__ + '.inspect_link_editor',
-					'command': 'fault.development.bin.il',
-					'method': 'python',
-					'redirect': 'stdout',
-				},
-			},
-			'transformations': {
-				None: {
-					'command': 'fault.llvm.bin.inspect',
-					'method': 'python',
-					'redirect': 'stdout',
-				},
-			}
-		}
-	}
-
-	import pprint
-	print('web')
-	pprint.pprint(core)
-	pprint.pprint(inspect)
 
 	S = libxml.Serialization()
 	D = S.switch('data:')
@@ -701,7 +684,7 @@ def web_context(ctx, paths):
 	xml = b''.join(
 		S.root('libconstruct',
 			S.element('context',
-				libxml.Data.serialize(D, inspect),
+				libxml.Data.serialize(D, inspect_role()),
 			),
 			('xmlns', 'https://fault.io/xml/libconstruct'),
 			('xmlns:data', 'https://fault.io/xml/data'),
