@@ -601,6 +601,9 @@ def web_context(ctx, paths):
 	libdirs = []
 
 	core = {
+		'javascript': javascript_subject(paths),
+		'css': css_subject(paths),
+		'xml': xml_subject(paths),
 		'system': {
 			# subject data
 			'platform': target,

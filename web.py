@@ -1,5 +1,5 @@
 """
-Interfaces for &..development.libconstruct context definitions.
+Web context support for &..development.libconstruct.
 
 Provides command constructors for the (libconstruct:context)`web` context.
 
