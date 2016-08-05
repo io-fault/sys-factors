@@ -1,8 +1,17 @@
 """
-Code coverage and profiling for use with &.libtest and &..factors.
+Coverage and profiling data collection.
 
-The serialization process accounts for two perspectives: the test, and the factor.
-This allows &..factors to provide actual dependents of a given factor.
+! WARNING:
+	&Collector instances *must* be per-thread in order for &measure to
+	properly calculate call timings.
+
+Common usage:
+
+#!/pl/python
+	collector, events = libtrace.prepare()
+	with collector:
+		...
+	aggregate = libtrace.measure(events)
 
 [ Development Tasks ]
 
@@ -107,15 +116,17 @@ def prepare(
 		Sequence=list,
 		Chronometer=None,
 		Collector=(Collector if trace is None else trace.Collector),
-	):
+	) -> typing.Tuple[Collector, typing.Sequence]:
 	"""
-	Construct trace event collection using a &collections.deque instance
-	as the destination.
+	Construct trace event collection using a &list instance
+	as the destination. This is the primary entry point for this module and should
+	be used to create the necessary per-thread &Collector instances.
 
-	[ Return ]
+	[ Effects ]
 
-	Returns a pair containing the &Collector instance and the events instance
-	of the configured &Queue type.
+	/product
+		Returns a pair containing the &Collector instance and the events instance
+		of the configured &Sequence type.
 	"""
 
 	if Chronometer is None:
@@ -163,16 +174,17 @@ def measure(
 		Usually, a triple whose first key is the calling context, the second is
 		the traced events, and the third is the time index.
 
-	[ Return ]
+	[ Effects ]
 
-	A pair consisting of the exact call times, cumulative and resident, and the line counts.
+	/Product
+		A pair consisting of the exact call times, cumulative and resident, and the line counts.
 
-	Each item in the tuple is a mapping. The line counts is a two-level mapping
-	keyed with the filename followed with the line number. The line number is a key
-	to a &collections.Counter instance. The exact timings is a mapping whose keys
-	are tuples whose contents are the calling context of the time measurements. The
-	value of the mapping is a sequence of pairs describing the cumulative and resident
-	times of the call context (key).
+		Each item in the tuple is a mapping. The line counts is a two-level mapping
+		keyed with the filename followed with the line number. The line number is a key
+		to a &collections.Counter instance. The exact timings is a mapping whose keys
+		are tuples whose contents are the calling context of the time measurements. The
+		value of the mapping is a sequence of pairs describing the cumulative and resident
+		times of the call context (key).
 	"""
 
 	call_state = deque((0,))
