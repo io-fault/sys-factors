@@ -57,8 +57,6 @@ roles = {
 
 	'metrics': 'Test role with profiling and coverage collection enabled',
 
-	'inspect':
-		'Role for structuring coefficients (sources) into a form used by documentation tools',
 	'core': 'The role used to represent the conceptual base of other roles.',
 }
 
@@ -410,7 +408,6 @@ def unix_compiler_collection(context, output, inputs,
 			'test': '0',
 			'profile': '3',
 			'size': 's',
-			'inspect': '0',
 		}
 	):
 	"""
@@ -1143,8 +1140,8 @@ def transform(context, filtered=reconstruct):
 	commands = []
 	for src in context['sources']:
 		fnx = src.extension
-		if context['role'] != 'inspect' and fnx in {'h'} or src.identifier.startswith('.'):
-			# Ignore header files and dot-files for non-inspect roles.
+		if context['name'] != 'inspect' and fnx in {'h'} or src.identifier.startswith('.'):
+			# Ignore header files and dot-files for non-inspect contexts.
 			continue
 
 		lang = languages.get(src.extension)
@@ -1502,7 +1499,7 @@ class Construction(libio.Processor):
 				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
 				sp = libio.Subprocess(pid)
 
-		#print(' '.join(strcmd) + ' #' + str(pid))
+		print(' '.join(strcmd) + ' #' + str(pid))
 		self.sector.dispatch(sp)
 		sp.atexit(functools.partial(self.process_exit, start=libtime.now(), descriptor=(typ, cmd, log), module=module))
 
