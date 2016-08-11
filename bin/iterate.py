@@ -3,8 +3,9 @@ Perform the full procedure for constructing an inspectable snapshot of a product
 
 This executes sequence of executable modules to produce a snapshot for publication.
 
-	# &.bin.prepare [optimal]
-	# &.bin.prepare [metrics]
+	# &.bin.prepare [host:optimal]
+	# &.bin.prepare [inspect:optimal]
+	# &.bin.prepare [host:metrics]
 	# &.bin.measure
 	# &.factors.bin.instantiate
 """
@@ -45,19 +46,23 @@ def exe(name, *args, pkg = __package__):
 	return subprocess.Popen(cmd)
 
 def main(instance, pkg):
+	ctx = os.environ.get('FAULT_CONTEXT', '') or 'host'
 	os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
-	with timing('preparing for inspection'):
-		del os.environ['FAULT_ROLE']
+
+	with timing('preparing [host:optimal]'):
+		os.environ['FAULT_CONTEXT'] = ctx
+		os.environ['FAULT_ROLE'] = 'optimal'
+		exit(exe('prepare', pkg).wait())
+
+	with timing('preparing [inspect:optimal]'):
 		os.environ['FAULT_CONTEXT'] = 'inspect'
+		os.environ['FAULT_ROLE'] = 'optimal'
 		exit(exe('prepare', pkg).wait())
 
 	del os.environ['PYTHONDONTWRITEBYTECODE']
 
-	os.environ['FAULT_ROLE'] = 'optimal'
-	with timing('preparing for optimal'):
-		exit(exe('prepare', pkg).wait())
-
-	with timing('preparing for metrics'):
+	with timing('preparing [host:metrics]'):
+		os.environ['FAULT_CONTEXT'] = ctx
 		os.environ['FAULT_ROLE'] = 'metrics'
 		exit(exe('prepare', pkg).wait())
 
@@ -71,6 +76,8 @@ def main(instance, pkg):
 			exit(exe('instantiate', instance, str(m), pkg=factors_bin.__name__).wait())
 
 	with timing('validating optimal'):
+		os.environ['FAULT_CONTEXT'] = ctx
+		os.environ['FAULT_ROLE'] = 'optimal'
 		raise SystemExit(exe('validate', pkg).wait())
 
 if __name__ == '__main__':
