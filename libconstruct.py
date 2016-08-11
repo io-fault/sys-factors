@@ -797,7 +797,7 @@ def updated(outputs, inputs, depfile, requirement=None):
 		return False
 
 	for x in inputs:
-		if not x.exists() or olm <= x.last_modified():
+		if not x.exists() or x.last_modified() > olm:
 			# rebuild if any output is older than any source.
 			return False
 
@@ -810,7 +810,7 @@ def updated(outputs, inputs, depfile, requirement=None):
 			deps = list(map(libroutes.File.from_absolute, pmd))
 
 		for dep in deps:
-			if olm < dep.last_modified():
+			if dep.last_modified() > olm:
 				return False
 
 	# object has already been updated.
