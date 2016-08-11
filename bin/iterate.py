@@ -47,7 +47,8 @@ def exe(name, *args, pkg = __package__):
 def main(instance, pkg):
 	os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
 	with timing('preparing for inspection'):
-		os.environ['FAULT_ROLE'] = 'inspect'
+		del os.environ['FAULT_ROLE']
+		os.environ['FAULT_CONTEXT'] = 'inspect'
 		exit(exe('prepare', pkg).wait())
 
 	del os.environ['PYTHONDONTWRITEBYTECODE']

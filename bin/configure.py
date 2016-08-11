@@ -273,7 +273,10 @@ def xml_subject(paths):
 
 	return xml
 
-def inspect_role():
+def inspect(ctx, paths):
+	"""
+	Initialize a (libconstruct:context)`inspect` context.
+	"""
 	iempty = {
 		'command': 'fault.development.bin.empty_introspection',
 		'interface': libconstruct.__name__ + '.empty',
@@ -286,8 +289,15 @@ def inspect_role():
 		'method': 'python',
 		'redirect': 'stdout',
 	}
+	formats = {
+		'executable': 'xml',
+		'library': 'xml',
+		'extension': 'xml',
+		'fragment': 'xml',
+	}
 
 	unsupported = {
+		'formats': formats,
 		'reductions': {
 			None: il,
 			'library': il,
@@ -303,12 +313,14 @@ def inspect_role():
 		},
 	}
 
-	inspect = {
+	core = {
 		'javascript': unsupported,
 		'xml': unsupported,
 		'css': unsupported,
 
 		'system': {
+			'formats': formats,
+			'platform': 'xml-' + sys.platform,
 			'reductions': {
 				None: {
 					'interface': libconstruct.__name__ + '.inspect_link_editor',
@@ -346,7 +358,21 @@ def inspect_role():
 		}
 	}
 
-	return inspect
+	S = libxml.Serialization()
+	D = S.switch('data:')
+	xml = b''.join(
+		S.root('libconstruct',
+			S.element('context',
+				libxml.Data.serialize(D, core),
+			),
+			('xmlns', 'https://fault.io/xml/libconstruct'),
+			('xmlns:data', 'https://fault.io/xml/data'),
+		)
+	)
+
+	rolefile = ctx / 'core.xml'
+	with rolefile.open('wb') as f:
+		f.write(xml)
 
 def host(ctx, paths):
 	"""
@@ -563,21 +589,6 @@ def host(ctx, paths):
 	with rolefile.open('wb') as f:
 		f.write(xml)
 
-	S = libxml.Serialization()
-	D = S.switch('data:')
-	xml = b''.join(
-		S.root('libconstruct',
-			S.element('context',
-				libxml.Data.serialize(D, inspect_role()),
-			),
-			('xmlns', 'https://fault.io/xml/libconstruct'),
-			('xmlns:data', 'https://fault.io/xml/data'),
-		)
-	)
-
-	with (ctx / 'inspect.xml').open('wb') as f:
-		f.write(xml)
-
 def web_context(ctx, paths):
 	# default command
 	webcc = select(paths, ['emcc'], web_compiler_collection_preference)
@@ -682,21 +693,6 @@ def web_context(ctx, paths):
 	with rolefile.open('wb') as f:
 		f.write(xml)
 
-	S = libxml.Serialization()
-	D = S.switch('data:')
-	xml = b''.join(
-		S.root('libconstruct',
-			S.element('context',
-				libxml.Data.serialize(D, inspect_role()),
-			),
-			('xmlns', 'https://fault.io/xml/libconstruct'),
-			('xmlns:data', 'https://fault.io/xml/data'),
-		)
-	)
-
-	with (ctx / 'inspect.xml').open('wb') as f:
-		f.write(xml)
-
 def main(name, args, paths=None):
 	global libroutes
 	import os
@@ -710,6 +706,7 @@ def main(name, args, paths=None):
 		paths = libprobe.environ_paths()
 
 	host(init(libconstruct_dir / 'host'), paths)
+	inspect(init(libconstruct_dir / 'inspect'), paths)
 	web_context(init(libconstruct_dir / 'web'), paths)
 
 if __name__ == '__main__':
