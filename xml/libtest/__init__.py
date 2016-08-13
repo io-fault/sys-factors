@@ -38,7 +38,4 @@ def serialize(serialization, report, timestamp=None, chain=itertools.chain.from_
 from .. import libtraceback
 del libtraceback
 
-from ....xml import libfactor
-libfactor.load('schema')
-
-__factor_type__ = 'xml.library'
+__factor_type__ = 'xml.executable'

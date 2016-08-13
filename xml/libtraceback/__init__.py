@@ -8,8 +8,6 @@ def serialize():
 	"""
 	Serialize a Python traceback to XML.
 	"""
+	pass
 
-from ....xml import libfactor
-libfactor.load('schema', fragment=True)
-
-__factor_type__ = 'xml.library'
+__factor_type__ = 'xml.executable'

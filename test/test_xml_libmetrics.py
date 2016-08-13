@@ -1,6 +1,7 @@
 """
 Metrics validation.
 """
+from ...xml import libfactor
 from ..xml import libmetrics
 
 valids = {
@@ -75,10 +76,10 @@ invalids = {
 
 def test_valids(test):
 	for label, x in valids.items():
-		x = libmetrics.etree.XML(x)
-		test/libmetrics.valid(x) == True
+		x = libfactor.readstring(x)
+		libfactor.validate(libmetrics, x)
 
 def test_invalids(test):
 	for label, x in invalids.items():
-		x = libmetrics.etree.XML(x)
-		test/libmetrics.valid(x) == False
+		x = libfactor.readstring(x)
+		test/libfactor.validate(libmetrics, x) == False

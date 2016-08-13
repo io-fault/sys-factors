@@ -87,7 +87,4 @@ def coverage(serialization, report,
 		('xmlns:key', 'https://fault.io/xml/key'),
 	)
 
-from ....xml import libfactor
-libfactor.load('schema')
-
-__factor_type__ = 'xml.library'
+__factor_type__ = 'xml.executable'
