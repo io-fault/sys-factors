@@ -2,7 +2,6 @@
 Project development interfaces for software engineers.
 """
 import functools
-import types
 import typing
 
 from ..routes import library as libroutes
@@ -159,41 +158,6 @@ class Project(object):
 		"""
 		Modify the package to become a release.
 		"""
-
-class Sources(types.ModuleType):
-	"""
-	Class for factor modules that represent a set of source files.
-	"""
-	constructed = False
-
-	@property
-	def identifier(self):
-		"""
-		The module's basename. The final part of the module's (python:attribute)`__name__`.
-		"""
-		return self.factor.route.identifier
-
-	@property
-	def sources(self):
-		"""
-		The directory containing the sources of the factor.
-		"""
-		global libroutes
-		return libroutes.File.from_absolute(self.__file__).container / 'src'
-
-	def dependencies(self):
-		"""
-		Collect and yield a sequence of dependencies identified by
-		the dependent's presence in the module's globals.
-		"""
-		global Sources
-
-		for k, v in self.__dict__.items():
-			if isinstance(v, Sources):
-				yield v
-
-	def _init(self):
-		self.factor = Factor.from_fullname(self.__name__)
 
 def extract_inspect(xml, href='{%s}href' %(namespaces['xlink'],)):
 	"""
