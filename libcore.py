@@ -1,5 +1,5 @@
 """
-Tools for enabling core dumps and resolving the location of the core files.
+Tool interfaces for extracting infomration from core file and interacting with them.
 """
 import sys
 import os
@@ -8,19 +8,6 @@ import contextlib
 import functools
 import subprocess
 import shutil
-
-try:
-	import resource
-except ImportError:
-	import types
-	resource = types.ModuleType("resource-null", "this platform does not have the resource module")
-	del types
-	def nothing(*args):
-		pass
-	resource.getrlimit = nothing
-	resource.setrlimit = nothing
-	resource.RLIMIT_CORE = 0
-	del types, nothing
 
 # Replace this with a sysctl c-extension
 if os.path.exists('/proc/sys/kernel/core_pattern'):
@@ -83,5 +70,6 @@ def snapshot(corefile, executable=sys.executable):
 		stdout=subprocess.PIPE,
 	)
 	p.stdin.write(('\n'.join(commands)+'\n').encode('ascii'))
-	p.stdout.read()
+	out = p.stdout.read()
 	p.wait()
+	return out
