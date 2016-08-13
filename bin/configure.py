@@ -77,6 +77,13 @@ haskell_compilers = {
 
 platform = sys.platform.strip('0123456789')
 
+def init(ctx):
+	# Initialize lib directory for context libraries.
+	for x in ('bin', 'lib', 'include'):
+		(ctx / x).init('directory')
+
+	return ctx
+
 def debug_isolate(self, target):
 	dtarget = target + '.dSYM'
 	return dtarget, [
@@ -96,6 +103,10 @@ def debug_isolate(self, target):
 	]
 
 def select(paths, possibilities, preferences):
+	"""
+	Select a file from the given &paths using the &possibilities and &preferences
+	to identify the most desired.
+	"""
 	global libprobe
 
 	found, missing = libprobe.search(paths, tuple(possibilities))
@@ -114,6 +125,8 @@ def select(paths, possibilities, preferences):
 
 	return name, path
 
+# These object files are searched for in the directories scraped from
+# the compiler collection's -v invocation.
 runtime_objects = set([
 	'crt0.o', # No constructor support.
 	'crt1.o', # Constructor Support.
@@ -145,13 +158,6 @@ def compiler_libraries(compiler, prefix, version, executable, target):
 		return prefix / 'lib' / 'gcc' / target / version
 	else:
 		pass
-
-def init(ctx):
-	# Initialize lib directory for context libraries.
-	for x in ('bin', 'lib', 'include'):
-		(ctx / x).init('directory')
-
-	return ctx
 
 def javascript_subject(paths):
 	"""
@@ -374,10 +380,7 @@ def inspect(ctx, paths):
 	with rolefile.open('wb') as f:
 		f.write(xml)
 
-def host(ctx, paths):
-	"""
-	Initialize a (libconstruct:context)`host` context.
-	"""
+def host_system_subject(paths):
 	# default command
 	if 'CC' in os.environ:
 		cc = libroutes.File.from_absolute(os.environ['CC'])
@@ -474,82 +477,76 @@ def host(ctx, paths):
 	# scan for system objects (crt1.o, crt0.o, etc)
 	found, missing = libprobe.search(libdirs, runtime_objects)
 	prepare = lambda x: tuple(map(str, [y for y in x if y]))
+	system = {
+		# subject data
+		'platform': target,
 
-	core = {
-		'javascript': javascript_subject(paths),
-		'css': css_subject(paths),
-		'xml': xml_subject(paths),
-		'system': {
-			# subject data
-			'platform': target,
+		'reference-types': {'weak', 'lazy', 'upward', 'default'},
 
-			'reference-types': {'weak', 'lazy', 'upward', 'default'},
+		# Formats to build for targets.
+		# Fragments inherit the code type.
+		'formats': {
+			'executable': 'pie',
+			'library': 'pic',
+			'extension': 'pic',
+		},
 
-			# Formats to build for targets.
-			# Fragments inherit the code type.
-			'formats': {
-				'executable': 'pie',
-				'library': 'pic',
-				'extension': 'pic',
+		# objects used to support the construction of system targets
+		# The split (prefix objects and suffix objects) is used to support
+		# linkers where the positioning of the parameters is significant.
+		'objects': {
+			'library': {
+				'pdc': [
+					prepare((found.get('crti.o'), found.get('crtbegin.o')),),
+					prepare((found.get('crtend.o'), found.get('crtn.o')),),
+				],
+				'pic': [
+					prepare((found.get('crti.o'), found.get('crtbeginS.o')),),
+					prepare((found.get('crtendS.o'), found.get('crtn.o')),),
+				],
 			},
-
-			# objects used to support the construction of system targets
-			# The split (prefix objects and suffix objects) is used to support
-			# linkers where the positioning of the parameters is significant.
-			'objects': {
-				'library': {
-					'pdc': [
-						prepare((found.get('crti.o'), found.get('crtbegin.o')),),
-						prepare((found.get('crtend.o'), found.get('crtn.o')),),
-					],
-					'pic': [
-						prepare((found.get('crti.o'), found.get('crtbeginS.o')),),
-						prepare((found.get('crtendS.o'), found.get('crtn.o')),),
-					],
-				},
-				'extension': {
-					'pic': [
-						prepare((found.get('crti.o'), found.get('crtbeginS.o')),),
-						prepare((found.get('crtendS.o'), found.get('crtn.o')),),
-					],
-				},
-				# fragments do not have requirements.
-				'fragment': None,
+			'extension': {
+				'pic': [
+					prepare((found.get('crti.o'), found.get('crtbeginS.o')),),
+					prepare((found.get('crtendS.o'), found.get('crtn.o')),),
+				],
 			},
+			# fragments do not have requirements.
+			'fragment': None,
+		},
 
-			# subject interfaces.
-			'reductions': {
-				None: {
-					'interface': libconstruct.__name__ + '.link_editor',
-					'type': 'linker',
-					'name': ldname,
-					'command': str(ld),
-					'defaults': {},
-				}
-			},
+		# subject interfaces.
+		'reductions': {
+			None: {
+				'interface': libconstruct.__name__ + '.link_editor',
+				'type': 'linker',
+				'name': ldname,
+				'command': str(ld),
+				'defaults': {},
+			}
+		},
 
-			'transformations': {
-				None: {
-					'interface': libconstruct.__name__ + '.compiler_collection',
-					'type': 'collection',
-					'name': ccname,
-					'implementation': cctype,
-					'libraries': str(cclib),
-					'version': tuple(map(int, version_info)),
-					'release': release,
-					'command': str(cc),
-					'defaults': {},
-					'resources': {
-						'profile': str(profile_lib),
-						'builtins': str(builtins),
-					},
+		'transformations': {
+			None: {
+				'interface': libconstruct.__name__ + '.compiler_collection',
+				'type': 'collection',
+				'name': ccname,
+				'implementation': cctype,
+				'libraries': str(cclib),
+				'version': tuple(map(int, version_info)),
+				'release': release,
+				'command': str(cc),
+				'defaults': {},
+				'resources': {
+					'profile': str(profile_lib),
+					'builtins': str(builtins),
 				},
 			},
-		}
+		},
 	}
 
 	if platform == 'darwin':
-		core['system']['objects']['executable'] = {
+		system['objects']['executable'] = {
 			'pie': [
 				prepare((found.get('crt1.o'), found.get('crti.o'), found.get('crtbeginS.o')),),
 				prepare((found.get('crtendS.o'), found.get('crtn.o')),),
@@ -557,7 +554,7 @@ def host(ctx, paths):
 		}
 	else:
 		# FreeBSD and many Linux systems.
-		core['system']['objects']['executable'] = {
+		system['objects']['executable'] = {
 			# PDC or PIE based executables. PIC is, essentially, PIE.
 			# PDC does not mean that the library is a (completely) statically link binary.
 			'pdc': [
@@ -569,6 +566,19 @@ def host(ctx, paths):
 				prepare((found.get('crtendS.o'), found.get('crtn.o')),),
 			],
 		}
+
+	return system
+
+def host(ctx, paths):
+	"""
+	Initialize a (libconstruct:context)`host` context.
+	"""
+	core = {
+		'javascript': javascript_subject(paths),
+		'css': css_subject(paths),
+		'xml': xml_subject(paths),
+		'system': host_system_subject(paths),
+	}
 
 	import pprint
 	pprint.pprint(core)
