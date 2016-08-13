@@ -279,6 +279,35 @@ def xml_subject(paths):
 
 	return xml
 
+def resource_subject(paths):
+	"""
+	Initialize a (libconstruct:subject)`resource` subject for inclusion in a context.
+	"""
+	subject = {
+		'formats': {
+			'library': 'octets',
+		},
+
+		'reductions': {
+			'library': {
+				'interface': libconstruct.__name__ + '.inspect_link_editor',
+				'command': 'fault.development.bin.il',
+				'method': 'python',
+				'redirect': 'stdout',
+			},
+		},
+
+		'transformations': {
+			None: {
+				'interface': libconstruct.__name__ + '.transparent',
+				'type': 'transparent',
+				'command': '/bin/cp',
+			},
+		}
+	}
+
+	return subject
+
 def inspect(ctx, paths):
 	"""
 	Initialize a (libconstruct:context)`inspect` context.
@@ -323,6 +352,7 @@ def inspect(ctx, paths):
 		'javascript': unsupported,
 		'xml': unsupported,
 		'css': unsupported,
+		'resource': unsupported,
 
 		'system': {
 			'formats': formats,
@@ -578,6 +608,7 @@ def host(ctx, paths):
 		'css': css_subject(paths),
 		'xml': xml_subject(paths),
 		'system': host_system_subject(paths),
+		'resource': resource_subject(paths),
 	}
 
 	import pprint
@@ -625,6 +656,8 @@ def web_context(ctx, paths):
 		'javascript': javascript_subject(paths),
 		'css': css_subject(paths),
 		'xml': xml_subject(paths),
+		'resource': resource_subject(paths),
+
 		'system': {
 			# subject data
 			'platform': target,
