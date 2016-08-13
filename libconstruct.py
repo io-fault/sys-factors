@@ -158,7 +158,7 @@ extensions = {
 
 	'javascript': ('json', 'javascript', 'js'),
 	'css': ('css',),
-	'xml': ('xml', 'xsl', 'rdf'),
+	'xml': ('xml', 'xsl', 'rdf', 'rng'),
 }
 
 languages = {}
