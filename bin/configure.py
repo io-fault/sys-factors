@@ -169,6 +169,8 @@ def javascript_subject(paths):
 	jscname, jsc = select(paths, ['uglifyjs'], javascript_combiners_preference)
 
 	return {
+		'encoding': 'utf-8',
+
 		'formats': {
 			'library': 'js',
 			'fragment': 'js',
@@ -187,7 +189,7 @@ def javascript_subject(paths):
 			'javascript': {
 				'interface': libconstruct.__name__ + '.transparent',
 				'type': 'transparent',
-				'command': '/bin/ln',
+				'command': '/bin/cp',
 			},
 		}
 	}
@@ -200,6 +202,8 @@ def css_subject(paths):
 	cssname, cssc = css_combine
 
 	css = {
+		'encoding': 'utf-8',
+
 		'formats': {
 			'library': 'css',
 		},
@@ -217,7 +221,7 @@ def css_subject(paths):
 			'css': {
 				'interface': libconstruct.__name__ + '.transparent',
 				'type': 'transparent',
-				'command': '/bin/ln',
+				'command': '/bin/cp',
 			},
 		}
 	}
@@ -243,6 +247,8 @@ def xml_subject(paths):
 	xmlname, xmlc = select(paths, ['xmllint'], ('xmllint',))
 
 	xml = {
+		'encoding': 'ascii',
+
 		'formats': {
 			'executable': 'xml',
 			'library': 'xml',
@@ -272,7 +278,7 @@ def xml_subject(paths):
 			'xml': {
 				'interface': libconstruct.__name__ + '.transparent',
 				'type': 'transparent',
-				'command': '/bin/ln',
+				'command': '/bin/cp',
 			},
 		}
 	}
@@ -325,19 +331,21 @@ def inspect(ctx, paths):
 		'redirect': 'stdout',
 	}
 	formats = {
-		'executable': 'xml',
 		'library': 'xml',
+		'executable': 'xml',
 		'extension': 'xml',
 		'fragment': 'xml',
+		None: 'xml',
 	}
 
 	unsupported = {
 		'formats': formats,
 		'reductions': {
-			None: il,
 			'library': il,
 			'executable': il,
+			'extension': il,
 			'fragmnt': il,
+			None: il,
 		},
 
 		'transformations': {
