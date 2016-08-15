@@ -18,13 +18,19 @@ import imp
 import types
 import importlib
 
-from . import core
-from . import library as libdev
 from ..computation import libmatch
 from ..routes import library as libroutes
 
+def python_context(implementation, version_info, abiflags, platform):
+	"""
+	Construct the triplet representing the Python context for the platform.
+	Used to define the construction context for Python extension modules.
+	"""
+	pyversion = ''.join(map(str, version_info[:2]))
+	return '-'.join((implementation, pyversion + abiflags, platform))
+
 # Used as the context name for extension modules.
-python_triplet = libdev.python_context(
+python_triplet = python_context(
 	sys.implementation.name, sys.version_info, sys.abiflags, sys.platform
 )
 

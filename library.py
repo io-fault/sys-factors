@@ -13,14 +13,6 @@ namespaces = {
 	'inspect': 'https://fault.io/xml/inspect#set',
 }
 
-def python_context(implementation, version_info, abiflags, platform):
-	"""
-	Construct the triplet representing the Python context for the platform.
-	Used to define the construction context for Python extension modules.
-	"""
-	pyversion = ''.join(map(str, version_info[:2]))
-	return '-'.join((implementation, pyversion + abiflags, platform))
-
 class Factor(tuple):
 	"""
 	The abstract factor that makes up part of a product.
