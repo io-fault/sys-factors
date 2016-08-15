@@ -36,7 +36,7 @@ import importlib.machinery
 import types
 import typing
 
-from . import libfactor
+from ..system import libfactor
 python_triplet = libfactor.python_triplet
 
 from . import include

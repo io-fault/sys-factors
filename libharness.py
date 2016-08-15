@@ -24,9 +24,8 @@ import imp
 import collections
 
 from ..routes import library as libroutes
-from . import libfactor
+from ..system import libfactor
 from . import libcore
-from . import library as libdev
 
 class Harness(object):
 	"""

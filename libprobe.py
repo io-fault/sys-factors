@@ -13,8 +13,8 @@ import collections.abc
 import typing
 import types
 
-from . import libfactor
 from . import libconstruct
+libfactor = libconstruct.libfactor
 
 from ..routes import library as libroutes
 from ..io import library as libio

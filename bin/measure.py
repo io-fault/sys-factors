@@ -11,7 +11,7 @@ import itertools
 import pickle
 
 from .. import libmetrics
-from .. import libfactor
+from ...system import libfactor
 
 from ...llvm import instr
 from ...routes import library as libroutes

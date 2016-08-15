@@ -5,9 +5,9 @@ transcript to standard out.
 import sys
 import importlib
 
-from .. import libfactor
 from ..probes import libpython
 
+from ...system import libfactor
 from ...routes import library as libroutes
 
 if __name__ == '__main__':

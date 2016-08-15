@@ -21,9 +21,11 @@ import resource
 import subprocess
 import types
 
-from ..routes import library as libroutes
 from ..system import library as libsys
 from ..system import libcore
+from ..system import libfactor
+
+from ..routes import library as libroutes
 from ..filesystem import library as libfs
 from ..computation import librange
 from ..xml import library as libxml
@@ -35,7 +37,6 @@ from .xml import libmetrics
 from . import libpython
 from . import libtrace
 from . import libharness
-from . import libfactor
 
 def statistics(
 		data,

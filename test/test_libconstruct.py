@@ -146,7 +146,6 @@ def test_sequence(test):
 	"""
 	Check the sequencing of a traversed Sources graph.
 	"""
-	from .. import libfactor
 	m = [
 		types.ModuleType("M1"),
 		types.ModuleType("M2"),
@@ -211,7 +210,6 @@ def test_construction_sequence(test):
 		Performs no tests aside from execution.
 	"""
 	import builtins
-	from .. import libfactor
 
 	mt = types.ModuleType("pkg.exe", "docstring")
 	mt.__factor_type__ = 'system.executable'
