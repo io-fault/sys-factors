@@ -18,8 +18,11 @@ necessary procedures for constructing a target.
 
 [ Environment ]
 
+/FAULT_CONTEXT
+	Construction Context to build with.
+
 /FAULT_ROLE
-	Role to construct targets with.
+	Role to construct targets for.
 """
 import os
 import sys
@@ -51,11 +54,11 @@ roles = {
 	'optimal': 'Maximum optimizations with debugging symbols separated or stripped',
 
 	'debug': 'Reduced optimizations and defines for debugging',
-	'test': 'Debug role with minor optimizations and support for injections',
-	'profile': 'Raw profiling for custom collections',
-	'coverage': 'Raw coverage for custom collections',
-
+	'test': 'Debug role with support for injections for comprehensive testing',
 	'metrics': 'Test role with profiling and coverage collection enabled',
+
+	'profile': 'Raw profiling build for custom collections',
+	'coverage': 'Raw coverage build for custom collections',
 
 	'core': 'The role used to represent the conceptual base of other roles.',
 }
