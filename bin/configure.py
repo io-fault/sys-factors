@@ -364,7 +364,7 @@ def inspect(ctx, paths):
 
 		'system': {
 			'formats': formats,
-			'platform': 'xml-' + sys.platform,
+			'platform': 'xml-inspect-' + sys.platform,
 			'reductions': {
 				None: {
 					'interface': libconstruct.__name__ + '.inspect_link_editor',
