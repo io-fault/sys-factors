@@ -1,6 +1,6 @@
-identity = 'https://fault.io/project/python/fault.development'
+identity = 'http://fault.io/python/fault.development'
 name = 'development'
-abstract = 'Construction, coverage, and testing for Python, C, C++, and Objective-C'
+abstract = 'Construction, coverage, testing for software development'
 icon = '🐜'
 
 fork = 'bootstraps'
