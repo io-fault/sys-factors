@@ -82,6 +82,8 @@ def main(role='optimal',
 	]
 
 	for route, ref in zip(roots, args):
+		if not route.exists():
+			raise RuntimeError("module does not exist in environment: " + repr(route))
 		package_file = route.file()
 
 		if package_file is None:
