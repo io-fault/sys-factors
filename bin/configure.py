@@ -415,8 +415,7 @@ def inspect(ctx, paths):
 	)
 
 	rolefile = ctx / 'core.xml'
-	with rolefile.open('wb') as f:
-		f.write(xml)
+	rolefile.store(xml)
 
 def host_system_subject(paths):
 	# default command
@@ -635,8 +634,7 @@ def host(ctx, paths):
 	)
 
 	rolefile = ctx / 'core.xml'
-	with rolefile.open('wb') as f:
-		f.write(xml)
+	rolefile.store(xml)
 
 def web_context(ctx, paths):
 	# default command
@@ -741,8 +739,7 @@ def web_context(ctx, paths):
 	)
 
 	rolefile = ctx / 'core.xml'
-	with rolefile.open('wb') as f:
-		f.write(xml)
+	rolefile.store(xml)
 
 def main(name, args, paths=None):
 	global libroutes
