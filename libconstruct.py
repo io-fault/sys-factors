@@ -1424,7 +1424,7 @@ class Construction(libio.Processor):
 			if self.continued is False:
 				# Consolidate loading of the next set of processors.
 				self.continued = True
-				self.fio_enqueue(self.continuation)
+				self.ctx_enqueue_task(self.continuation)
 
 	def probe_execute(self, module, instruction):
 		assert instruction[0] == 'probe'
@@ -1454,7 +1454,7 @@ class Construction(libio.Processor):
 		sector = self.controller # Allow libio.context()
 
 		report = module.deploy(module, ctx, role, dep)
-		self.fio_enqueue(
+		self.ctx_enqueue_task(
 			functools.partial(
 				self.probe_exit,
 				tproc,
@@ -1477,7 +1477,7 @@ class Construction(libio.Processor):
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.
 			self.continued = True
-			self.fio_enqueue(self.continuation)
+			self.ctx_enqueue_task(self.continuation)
 
 	def process_execute(self, instruction):
 		module, ins = instruction
@@ -1536,7 +1536,7 @@ class Construction(libio.Processor):
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.
 			self.continued = True
-			self.fio_enqueue(self.continuation)
+			self.ctx_enqueue_task(self.continuation)
 
 	def drain_process_queue(self):
 		"""
@@ -1626,7 +1626,7 @@ class Construction(libio.Processor):
 
 			if self.continued is False:
 				self.continued = True
-				self.fio_enqueue(self.continuation)
+				self.ctx_enqueue_task(self.continuation)
 
 	def finish(self, modules):
 		try:
