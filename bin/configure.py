@@ -4,7 +4,7 @@ Configure the initialization of the construction context.
 import os
 import sys
 import functools
-import shell_command
+import subprocess
 
 from ...routes import library as libroutes
 from ...xml import library as libxml
@@ -430,7 +430,10 @@ def host_system_subject(paths):
 	ccprefix = bindir.container
 
 	# gather compiler information.
-	data = shell_command.shell_output(str(cc) + ' --version').split('\n')
+	p = subprocess.Popen([str(cc), '--version'],
+		stderr=subprocess.STDOUT, stdout=subprocess.PIPE, stdin=None)
+	data = p.communicate(None)[0].decode('utf-8').split('\n')
+
 	version_line = data[0]
 	cctype, version_spec = version_line.split(' version ')
 	version_info, release = version_spec.split('(', 1)
@@ -502,8 +505,11 @@ def host_system_subject(paths):
 
 	# Analyze the library search directories.
 	# Primarily interested in finding the crt*.o files for linkage.
-	data = shell_command.shell_output(str(cc) + ' -print-search-dirs').split('\n')
-	data = [x.split('=', 1) for x in data]
+	p = subprocess.Popen([str(cc), '-print-search-dirs'],
+		stderr=subprocess.STDOUT, stdout=subprocess.PIPE, stdin=None)
+	data = p.communicate(None)[0].decode('utf-8').split('\n')
+
+	data = [x.split(':', 1) for x in data if x]
 	data = dict([(k.strip(' =:'), v.split(':')) for k, v in data])
 	root = libroutes.File.from_absolute('/')
 
