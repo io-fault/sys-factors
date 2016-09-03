@@ -18,10 +18,10 @@ necessary procedures for constructing a target.
 
 [ Environment ]
 
-/FAULT_CONTEXT
+/libfc_CONTEXT
 	Construction Context to build with.
 
-/FAULT_ROLE
+/libfc_ROLE
 	Role to construct targets for.
 """
 import os
@@ -113,11 +113,11 @@ xml_namespaces = {
 	'd': 'https://fault.io/xml/data',
 }
 
-def root_context_directory(env='FAULT_LIBCONSTRUCT'):
+def root_context_directory(env='libfc_PATH'):
 	"""
 	Return the &libroutes.File instance to the root context.
 	By default, this is (fs:path)`~/.fault/libconstruct`, but can
-	be overridden by the (environ)`FAULT_LIBCONSTRUCT` variable.
+	be overridden by the (system:environment)`libfc_PATH` variable.
 
 	The result of this should only be cached in order to maintain a consistent
 	perspective; this function polls the environment for the appropriate version.
@@ -158,6 +158,7 @@ extensions = {
 	'assembly': ('asm',),
 	'bitcode': ('bc',), # clang
 	'haskell': ('hs', 'hsc'),
+	'python': ('py',),
 
 	'javascript': ('json', 'javascript', 'js'),
 	'css': ('css',),
@@ -170,7 +171,35 @@ for k, v in extensions.items():
 		languages[y] = k
 del k, y, v
 
-def mount(role, route, target, ext_suffixes=importlib.machinery.EXTENSION_SUFFIXES):
+def simulate_composite(route):
+	"""
+	Given a Python package route, fabricate a composite factor in order
+	to process Python module sources.
+
+	[ Returns ]
+
+	A pair consisting of the fabricated module and the next set of packages to process.
+	"""
+	global libfactor
+	pkgs, modules = route.subnodes()
+
+	modules.append(route)
+	sources = [
+		x.__class__(x.container, (x.identifier,))
+		for x in [x.file() for x in modules]
+		if x.extension == 'py'
+	]
+	pkgfile = route.file()
+
+	mod = types.ModuleType(str(route), "Simulated composite factor for bytecode compilation")
+	mod.__factor_type__ = 'python.extension'
+	mod.__factor_sources__ = sources
+	mod.__factor_context__ = libfactor.bytecode_triplet
+	mod.__file__ = str(pkgfile)
+
+	return mod, pkgs
+
+def mount(role, route, target, condition=None, ext_suffixes=importlib.machinery.EXTENSION_SUFFIXES):
 	"""
 	Mount an execution context extension module so that the constructed binary can be
 	used by the context (Python).
@@ -195,10 +224,12 @@ def mount(role, route, target, ext_suffixes=importlib.machinery.EXTENSION_SUFFIX
 	pkg = pkg.container
 
 	link_target = pkg.file().container.extend(names)
-	for suf in ext_suffixes + ['.pyd', '.dylib']:
+	final = link_target.suffix(ext_suffixes[0])
+
+	for suf in ext_suffixes[1:] + ['.pyd', '.dylib']:
 		rmf = link_target.suffix(suf)
 		if rmf.exists():
-			print('removing', str(rmf))
+			print('removing possible conflict', str(rmf))
 			rmf.void()
 
 	dsym = link_target.suffix('.so.dSYM')
@@ -206,9 +237,13 @@ def mount(role, route, target, ext_suffixes=importlib.machinery.EXTENSION_SUFFIX
 		print('removing', str(dsym))
 		dsym.void()
 
-	link_target = link_target.suffix(ext_suffixes[0])
-	print('linking', outfile, '->', link_target)
-	link_target.link(outfile, relative=True)
+	if not condition((final,), (outfile,)):
+		print('implementing', outfile, '->', final)
+		final.replace(outfile)
+
+	if link_target.suffix('.py').exists() and role != 'optimal':
+		print('[removing implement for %s role]' %(role,), str(final))
+		final.void()
 
 def collect(module):
 	"""
@@ -487,6 +522,24 @@ def unix_compiler_collection(context, output, inputs,
 
 	return command
 compiler_collection = unix_compiler_collection
+
+def python_bytecode_compiler(context, output, inputs,
+		mechanism=None, format=None, language='python',
+		verbose=True, filepath=str):
+	"""
+	Command constructor for compiling Python bytecode to an arbitrary file.
+	"""
+	assert language == 'python'
+	get = context.get
+	role = get('role')
+	sub = get(context['subject'])
+	typ = sub.get('type')
+
+	inf, = inputs
+
+	command = [None, filepath(output), filepath(inf), '2' if role == 'optimal' else '0']
+
+	return command
 
 def inspect_link_editor(context, output, inputs, mechanism=None, format=None, filepath=str):
 	"""
@@ -774,13 +827,13 @@ elif sys.platform in ('win32', 'win64'):
 else:
 	link_editor = unix_link_editor
 
-def reconstruct(outputs, inputs, depfile):
+def reconstruct(outputs, inputs):
 	"""
 	Unconditionally report the &outputs as outdated.
 	"""
 	return False
 
-def updated(outputs, inputs, depfile, requirement=None):
+def updated(outputs, inputs, requirement=None):
 	"""
 	Return whether or not the &outputs are up-to-date.
 
@@ -803,18 +856,6 @@ def updated(outputs, inputs, depfile, requirement=None):
 		if not x.exists() or x.last_modified() > olm:
 			# rebuild if any output is older than any source.
 			return False
-
-	if depfile is not None and depfile.exists():
-		# Alter to only pay attention to project and context files.
-
-		# check identified dependencies if any
-		with depfile.open('r') as f:
-			pmd = parse_make_dependencies(f.read())
-			deps = list(map(libroutes.File.from_absolute, pmd))
-
-		for dep in deps:
-			if dep.last_modified() > olm:
-				return False
 
 	# object has already been updated.
 	return True
@@ -936,6 +977,13 @@ def initialize(
 	target of the given &module.
 
 	[ Parameters ]
+	/selection
+		The context that was explicitly specified.
+
+	/context
+		The cache directory subpath that reductions will be placed into.
+		For Python extension modules, `cpython-{version}-{platform}` is used.
+
 	/lcd
 		Optional directory path overriding the environment variable or the default home
 		path. Normally unused.
@@ -997,7 +1045,6 @@ def initialize(
 			'reduction': reduction,
 			'logs': libfactor.cache_directory(module, context, role, 'log'),
 			'libraries': libfactor.cache_directory(module, context, role, 'lib'),
-			'dependencies': libfactor.cache_directory(module, context, 'inspect', 'out'),
 		},
 
 		# Mechanisms (compiler/linker) for the context+role combination.
@@ -1052,8 +1099,11 @@ def initialize(
 			links.add(dparams.get(module))
 
 	# Full set of regular files in the sources location.
-	if parameters['locations']['sources'].exists():
-		parameters['sources'] = parameters['locations']['sources'].tree()[1]
+	if '__factor_sources__' in module.__dict__:
+		parameters['sources'] = module.__factor_sources__
+	else:
+		if parameters['locations']['sources'].exists():
+			parameters['sources'] = parameters['locations']['sources'].tree()[1]
 
 	# Local dependency set comes first.
 	parameters[subject]['library.directories'] = [parameters['locations']['libraries']]
@@ -1174,17 +1224,18 @@ def transform(context, filtered=reconstruct):
 		ifpath = lmech['interface'] # python
 		xf = context_interface(ifpath)
 
-		depfile = libroutes.File(loc['dependencies'], src.points)
+		#depfile = libroutes.File(loc['dependencies'], src.points)
+		depfile = None
 		for fmt in formats:
 			# Iterate over formats (pic, pdc, pie).
 			obj = libroutes.File(loc['output'] / fmt, src.points)
 
-			if filtered((obj,), (src,), depfile):
+			if filtered((obj,), (src,)):
 				continue
 
 			logfile = libroutes.File(loc['logs'] / fmt, src.points)
 
-			for x in (obj, depfile, logfile):
+			for x in (obj, logfile):
 				d = x.container
 				if d not in emitted:
 					emitted.add(d)
@@ -1288,7 +1339,7 @@ def reduce(context, filtered=reconstruct, sys_platform=sys.platform):
 		if fragments:
 			objects.extend([x / fmt for x in fragments])
 
-		if not filtered((output,), objects, None):
+		if not filtered((output,), objects):
 			# Mechanisms with a configured root means that the
 			# transformed objects are referenced by the root file.
 			root = mech.get('root')
@@ -1386,11 +1437,11 @@ class Construction(libio.Processor):
 				context = python_triplet
 			else:
 				# Default 'host' context.
-				context = 'host'
+				context = module.__dict__.get('__factor_context__', 'host')
 		else:
 			# context was explicitly stated meaning
 			# extension modules are not built for mounting.
-			pass
+			context = module.__dict__.get('__factor_context__', context)
 
 		if getattr(module, '__factor_type__', None) == 'system.probe':
 			# Needs to be transformed into a job.

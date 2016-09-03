@@ -159,6 +159,44 @@ def compiler_libraries(compiler, prefix, version, executable, target):
 	else:
 		pass
 
+def python_subject(paths):
+	"""
+	Constructs the subject for building Python bytecode for a host context.
+
+	Currently, only builds subject for the executing Python.
+
+	! FUTURE:
+		Must provide a means for compiling with versions of
+		Python aside from the one that is running. A reasonable
+		possibility is constructing the the `-c` command.
+	"""
+	pyname, pycommand = select(paths, ['python3'], [])
+
+	return {
+		'formats': {
+			'extension': 'pyc',
+		},
+
+		'reductions': {
+			'extension': {
+				'interface': libconstruct.__name__ + '.inspect_link_editor',
+				'command': 'fault.development.bin.il',
+				'name': 'index-linker',
+				'method': 'python',
+				'redirect': 'stdout',
+			},
+		},
+
+		'transformations': {
+			'python': {
+				'interface': libconstruct.__name__ + '.python_bytecode_compiler',
+				'name': 'pyc',
+				'command': 'fault.development.bin.pyc',
+				'method': 'python',
+			},
+		}
+	}
+
 def javascript_subject(paths):
 	"""
 	Initialize the javascript subject for JavaScript file compilation.
@@ -617,6 +655,7 @@ def host(ctx, paths):
 	Initialize a (libconstruct:context)`host` context.
 	"""
 	core = {
+		'python': python_subject(paths),
 		'javascript': javascript_subject(paths),
 		'css': css_subject(paths),
 		'xml': xml_subject(paths),
