@@ -145,10 +145,6 @@ def root_context(directory, selection, role):
 	data = libxml.Data.structure(d)
 	return xml, data
 
-def compile_bytecode(target, source):
-	global importlib
-	pyc_cache = importlib.util.cache_from_source(source)
-
 # Specifically for identifying files to be compiled and how.
 extensions = {
 	'c': ('c','h'),
@@ -637,6 +633,7 @@ def web_compiler_collection(context,
 		**kw
 	):
 	"""
+	Command constructor for emscripten.
 	"""
 	output = _r_file_ext(output, '.bc')
 	return unix_compiler_collection(context, output, inputs, **kw)

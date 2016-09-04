@@ -82,7 +82,12 @@ class Harness(libharness.Harness):
 		self._status_test_sealing(test)
 
 		# seal fate in a child process
-		seal = self.concurrently(functools.partial(self.seal, test))
+		def manage():
+			nonlocal self
+			nonlocal test
+			with test.exits:
+				self.seal(test)
+		seal = self.concurrently(manage)
 
 		l = []
 		report = seal(status_ref = l.append)

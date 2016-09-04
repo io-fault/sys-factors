@@ -439,6 +439,7 @@ class Harness(libharness.Harness):
 		self._status_test_sealing(test)
 
 		# seal fate in a child process
+
 		seal = self.concurrently(functools.partial(self.seal, test))
 
 		l = []
@@ -585,7 +586,8 @@ class Harness(libharness.Harness):
 			try:
 				llmetrics = self.prepare_extensions(test.identity)
 				subscribe()
-				test.seal()
+				with test.exits:
+					test.seal()
 			finally:
 				cancel()
 

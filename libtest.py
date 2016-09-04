@@ -10,6 +10,7 @@ are allowed to raise normally in order to report failures of any kind.
 import gc
 import operator
 import functools
+import contextlib
 
 def get_test_index(tester, int=int, set=set, AttributeError=AttributeError):
 	"Returns the first line number of the underlying code object."
@@ -318,8 +319,12 @@ class Test(object):
 
 	/fate
 		The conclusion of the Test; pass, fail, error, skip. An instance of &Fate.
+
+	/exits
+		A &contextlib.ExitStack for cleaning up allocations made during the test.
+		The harness running the test decides when the stack's exit is processed.
 	"""
-	__slots__ = ('focus', 'identity', 'constraints', 'fate',)
+	__slots__ = ('focus', 'identity', 'constraints', 'fate', 'exits')
 
 	# These referenced via Test instances to allow subclasses to override
 	# the implementations.
@@ -343,11 +348,12 @@ class Test(object):
 	Interrupt = Interrupt
 	Core = Core
 
-	def __init__(self, identity, focus, *constraints):
+	def __init__(self, identity, focus, *constraints, ExitStack=contextlib.ExitStack):
 		# allow explicit identity as the callable may be a wrapped function
 		self.identity = identity
 		self.focus = focus
 		self.constraints = constraints
+		self.exits = ExitStack()
 
 	def __truediv__(self, object):
 		return self.Contention(self, object)
@@ -465,7 +471,8 @@ def execute(module):
 	"""
 	for id, func in gather(module):
 		test = Test(id, func)
-		test.seal()
+		with test.exits:
+			test.seal()
 		if test.fate.impact < 0:
 			raise test.fate
 
