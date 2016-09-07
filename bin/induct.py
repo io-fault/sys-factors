@@ -1,5 +1,5 @@
 """
-Implement the constructed targets of the configured construction context.
+Induct the constructed targets of the configured construction context.
 
 This copies constructed files into a filesystem location that Python requires them
 to be in order for them to be used. For fabricated targets, this means placing
@@ -36,15 +36,24 @@ def update_cache(opt, src, implement, condition=libconstruct.updated, mkr=librou
 
 	fp = str(src)
 	if not src.exists() or not fp.endswith('.py'):
-		return False
+		return (False, 'source does not exist or does not end with ".py"')
 
-	cache_file = mkr(cache_from_source(fp, optimization=opt))
+	# Validate that the links are installed for single pyc config.
+	off_opt = mkr(cache_from_source(fp, optimization=0))
+	one_opt = mkr(cache_from_source(fp, optimization=1))
+	two_opt = mkr(cache_from_source(fp, optimization=2))
+
+	cache_file = mkr(cache_from_source(fp, optimization=None))
+	# Update local links.
+	off_opt.link(cache_file)
+	two_opt.link(cache_file)
+	one_opt.link(cache_file)
 
 	if condition((cache_file,), (implement,)):
-		return False
+		return (False, 'update condition was not present')
 
 	cache_file.replace(implement)
-	return True
+	return (True, cache_file)
 
 def main(role='optimal'):
 	"""
@@ -96,8 +105,9 @@ def main(role='optimal'):
 			outdir = outdir / 'pyc'
 			for src in mod.__factor_sources__:
 				implement = outdir / src.identifier
-				if update_cache(opt, src, implement, condition=condition):
-					print(str(implement), '->', str(src) + '[cache]')
+				uc_report = update_cache(opt, src, implement, condition=condition)
+				if uc_report[0]:
+					print(str(implement), '->', uc_report[1])
 
 	if role not in {'optimal', 'debug'}:
 		return
