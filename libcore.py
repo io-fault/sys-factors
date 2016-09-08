@@ -9,27 +9,6 @@ import functools
 import subprocess
 import shutil
 
-# Replace this with a sysctl c-extension
-if os.path.exists('/proc/sys/kernel/core_pattern'):
-	def kernel_core_pattern():
-		with open('/proc/sys/kernel/core_pattern') as f:
-			return f.read()
-elif 'freebsd' in sys.platform or 'darwin' in sys.platform:
-	def kernel_core_pattern():
-		import subprocess
-		p = subprocess.Popen(('sysctl', 'kern.corefile'),
-			stdout = subprocess.PIPE, stderr = None, stdin = None)
-		corepat = p.stdout.read().decode('utf-8')
-		prefix, corefile = corepat.split(':', 1)
-		return corefile.strip()
-else:
-	def kernel_core_pattern():
-		raise RuntimeError("cannot resolve coredump pattern for this platform")
-
-def corelocation(pid, pattern = functools.partial(os.environ.get, 'COREPATTERN', '/cores/core.{pid}')):
-	import getpass
-	return pattern().format(**{'pid': pid, 'uid': os.getuid(), 'user': getpass.getuser(), 'home': os.environ['HOME']})
-
 def debug(corefile, executable=sys.executable):
 	"""
 	Load the debugger for a given core file, `corefile` and `executable`.
@@ -39,8 +18,7 @@ def debug(corefile, executable=sys.executable):
 	"""
 
 	debugger = shutil.which('lldb') or shutil.which('gdb')
-	p = subprocess.Popen((debugger, '--core=' + corefile, executable))
-	return p.wait()
+	return subprocess.Popen((debugger, '--core=' + corefile, executable))
 
 gdb_snapshot = [
 	'info shared',
@@ -67,9 +45,9 @@ def snapshot(corefile, executable=sys.executable):
 	p = subprocess.Popen(
 		(debugger, '--core=' + corefile, executable),
 		stdin=subprocess.PIPE,
+		stderr=subprocess.STDOUT,
 		stdout=subprocess.PIPE,
 	)
-	p.stdin.write(('\n'.join(commands)+'\n').encode('ascii'))
-	out = p.stdout.read()
-	p.wait()
-	return out
+	stdout, stderr = p.communicate(('\n'.join(commands)+'\n').encode('ascii'))
+
+	return stdout
