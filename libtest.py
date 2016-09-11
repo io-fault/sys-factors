@@ -425,6 +425,9 @@ class Test(object):
 	def fail(self, cause):
 		raise self.Fail(cause)
 
+	def timeout(self, *args, cause='signal'):
+		raise self.Expire(cause)
+
 	def trap(self):
 		"""
 		Set a trap for exceptions converting a would-be &Error fate on exit to a &Failure.

@@ -8,8 +8,7 @@ def test_unix_compiler_collection(test):
 	}
 	stdhead = [None, '-c', '-v', '-fvisibility=hidden', '-fcolor-diagnostics', '-O3', '-g', '-DFAULT_TYPE=unspecified']
 	context = {
-		'role': 'optimal',
-		'name': 'host',
+		'variants': {'purpose':'optimal', 'name':'host'},
 		'system': {
 			'type': None,
 		}
@@ -19,8 +18,7 @@ def test_unix_compiler_collection(test):
 	test/cmd == stdhead + ['-o', 'out.o', 'input.c']
 
 	context = {
-		'role': 'optimal',
-		'name': 'host',
+		'variants': {'purpose':'optimal', 'name':'host'},
 		'system': {
 			'source.parameters': [
 				('TEST', 'VALUE'),
@@ -32,8 +30,7 @@ def test_unix_compiler_collection(test):
 
 	# coverage flags from metrics role.
 	context = {
-		'role': 'metrics',
-		'name': 'host',
+		'variants': {'purpose':'metrics', 'name':'host'},
 		'system': {
 			'source.parameters': [
 				('TEST', 'VALUE'),
@@ -48,8 +45,7 @@ def test_unix_compiler_collection(test):
 
 	# include directories
 	context = {
-		'role': 'optimal',
-		'name': 'host',
+		'variants': {'purpose':'optimal', 'name':'host'},
 		'system': {
 			'include.directories': [
 				'incdir1', 'incdir2',
@@ -66,8 +62,7 @@ def test_unix_compiler_collection(test):
 
 	# include set
 	context = {
-		'role': 'optimal',
-		'name': 'host',
+		'variants': {'purpose':'optimal', 'name':'host'},
 		'system': {
 			'include.set': [
 				'inc1.h', 'inc2.h',
@@ -82,8 +77,7 @@ def test_unix_compiler_collection(test):
 
 	# injection
 	context = {
-		'role': 'optimal',
-		'name': 'host',
+		'variants': {'purpose':'optimal', 'name':'host'},
 		'system': {
 			'command.option.injection': ['-custom-op'],
 		}
@@ -93,8 +87,7 @@ def test_unix_compiler_collection(test):
 
 	# undefines
 	context = {
-		'role': 'optimal',
-		'name': 'host',
+		'variants': {'purpose':'optimal', 'name':'host'},
 		'system': {
 			'compiler.preprocessor.undefines': [
 				'TEST1', 'TEST2',
@@ -106,8 +99,7 @@ def test_unix_compiler_collection(test):
 
 	# language
 	context = {
-		'role': 'optimal',
-		'name': 'host',
+		'variants': {'purpose':'optimal', 'name':'host'},
 		'system': {
 		}
 	}
@@ -116,7 +108,7 @@ def test_unix_compiler_collection(test):
 
 	# language and standard
 	context = {
-		'role': 'optimal',
+		'variants': {'purpose':'optimal', 'name':'host'},
 		'system': {
 			'standards': {'c': 'c99'},
 		}
@@ -212,7 +204,8 @@ def test_construction_sequence(test):
 	import builtins
 
 	mt = types.ModuleType("pkg.exe", "docstring")
-	mt.__factor_type__ = 'system.executable'
+	mt.__factor_type__ = 'system'
+	mt.__factor_dynamics__ = 'executable'
 	mt.__builtins__ = builtins
 
 	with libroutes.File.temporary() as tr:
@@ -232,9 +225,9 @@ def test_construction_sequence(test):
 		mt.__file__ = str(py)
 		mt.__package__ = 'pkg.exe'
 
-		ctx = library.initialize('host', 'host', 'optimal', mt, ())
-		xf = list(library.transform(ctx))
-		rd = list(library.reduce(ctx))
+		mech, ctx = library.initialize([], mt, ())
+		xf = list(library.transform(ctx, mt))
+		rd = list(library.reduce(ctx, mt))
 
 if __name__ == '__main__':
 	from .. import libtest; import sys

@@ -3,7 +3,7 @@
 <grammar
 	xmlns="http://relaxng.org/ns/structure/1.0"
 	xmlns:xlink="http://www.w3.org/1999/xlink"
-	ns="https://fault.io/xml/traceback"
+	ns="http://fault.io/xml/dev/traceback"
 	datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes"
 	xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0">
 

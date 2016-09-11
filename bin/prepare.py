@@ -1,6 +1,6 @@
 """
 Prepare the targets of a package hierachry for direct use. This executes &.bin.construct
-and &.bin.implement for the same context and role.
+and &.bin.induct for the same context and role.
 
 Usual entry point for managing a package's build during development.
 """
@@ -9,7 +9,6 @@ import sys
 import subprocess
 import contextlib
 
-from ...routes import library as libroutes
 from ...chronometry import library as libtime
 
 def status(text, newline=True, target=sys.stderr, color=(lambda x: '\x1b[38;5;202m' + x + '\x1b[0m')):
@@ -41,11 +40,7 @@ def exe(name, *args, pkg = __package__):
 	return subprocess.Popen(cmd)
 
 def main(instance, pkg):
-	env = os.environ
-	ctx = env.get('libfc_CONTEXT') or 'host'
-	role = env.get('libfc_ROLE') or 'optimal'
-
-	with timing('constructing [%s:%s]' %(ctx, role)):
+	with timing('constructing'):
 		crc = exit(exe('construct', pkg).wait())
 
 	if crc != 0:
@@ -53,10 +48,14 @@ def main(instance, pkg):
 		status("Logs are in __pycache__.")
 		raise SystemExit(100)
 
-	with timing('implementing [%s:%s]' %(ctx, role)):
-		irc = exit(exe('implement', pkg).wait())
+	with timing('inducting'):
+		irc = exit(exe('induct', pkg).wait())
 
 if __name__ == '__main__':
 	os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
+	try:
+		del os.environ['PYTHONOPTIMIZE']
+	except KeyError:
+		pass
 	sys.dont_write_bytecode = True
 	main(*sys.argv)

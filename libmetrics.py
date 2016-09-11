@@ -28,11 +28,9 @@ from ..system import libfactor
 from ..routes import library as libroutes
 from ..filesystem import library as libfs
 from ..computation import librange
-from ..xml import library as libxml
 
-# xml schemas and serialization.
-from .xml import libtest
-from .xml import libmetrics
+from ..xml import library as libxml
+from . import libxml as devxml
 
 from . import libpython
 from . import libtrace
@@ -275,7 +273,7 @@ def group(times, counts):
 
 	return times_groups, counts_groups
 
-def coverage(module, counts, RangeSet=librange.RangeSet):
+def coverage(module, counts, RangeSet=librange.Set):
 	"""
 	Identify the uncovered units (lines) from the line counts.
 
@@ -440,7 +438,7 @@ class Harness(libharness.Harness):
 
 		# seal fate in a child process
 
-		seal = self.concurrently(functools.partial(self.seal, test))
+		seal = self.concurrently(lambda: self.seal(test))
 
 		l = []
 		report = seal(status_ref = l.append)

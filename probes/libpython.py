@@ -6,7 +6,8 @@ extension module. Enables special cases for Python extension modules for relocat
 (python:string)`'system.extension'` factors that import this probe will be identified as
 Python extensions.
 """
-__factor_type__ = 'system.probe'
+__factor_type__ = 'system'
+__factor_dynamics__ = 'probe'
 
 import sys
 import sysconfig

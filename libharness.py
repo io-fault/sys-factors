@@ -14,18 +14,15 @@ of the test and any collected coverage or profile data.
 """
 import os
 import sys
-import contextlib
-import signal
-import functools
 import types
 import importlib
 import importlib.machinery
-import imp
 import collections
 
-from ..routes import library as libroutes
+from ..routes.library import Import
 from ..system import libfactor
-from . import libcore
+
+from . import libconstruct
 
 class Harness(object):
 	"""
@@ -37,20 +34,18 @@ class Harness(object):
 
 	[ Properties ]
 
-	/role
-		The role to use when importing extensions.
-		&None if extensions are *not* to be loaded by a role.
+	/contexts
+		The construction contexts that will be referenced to identify
+		the builds to test.
 	"""
 	from . import libtest # class attribute for general access.
+	Test = libtest.Test
+	gather = staticmethod(libtest.gather)
 
 	def __init__(self, package, role=None):
-		global collections
-
 		self.package = package
 		self.role = role
 		self.extensions = collections.defaultdict(list)
-
-	gather = staticmethod(libtest.gather)
 
 	def module_test(self, test):
 		"""
@@ -77,7 +72,7 @@ class Harness(object):
 		# The package module
 		module = importlib.import_module(test.identity)
 		test/module.__name__ == test.identity
-		ir = libroutes.Import.from_fullname(module.__name__)
+		ir = Import.from_fullname(module.__name__)
 		tid = str(ir.floor())
 
 		# Preload all extensions inside the package.
@@ -101,18 +96,23 @@ class Harness(object):
 	def dispatch(self, test):
 		"""
 		Execute the test directly using &test.seal.
+
+		This method is often overwritten in subclasses to control execution.
 		"""
 		test.seal()
 
 	def execute(self, container, modules):
 		"""
-		Execute the tests of the given container.
+		Execute the *tests* of the given container.
+
+		Construct the Test instances for the tests gathered in &container
+		and perform them using &dispatch.
 		"""
 		for tid, tcall in getattr(container, '__tests__', ()):
-			test = self.libtest.Test(tid, tcall)
+			test = self.Test(tid, tcall)
 			self.dispatch(test)
 
-	def preload_extension(self, test_id, route:libroutes.Import):
+	def preload_extension(self, test_id, route:Import):
 		"""
 		Given an extension route, &route, import the module using
 		the configured &role. 
@@ -120,10 +120,19 @@ class Harness(object):
 		Used by the harness to import extensions that are being tested in a fashion
 		that allows for coverage and profile data to be collected and for injection
 		dependent tests.
-		"""
-		global importlib, sys, libfactor
 
-		dll = libfactor.reduction(route, context=libfactor.python_triplet, role=self.role)
+		! DEVELOPMENT: Warning
+			The variant resolution needs to be based on libconstruct.initialize.
+		"""
+
+		variants = dict(
+			name='host',
+			purpose='test',
+			format='pic',
+			python_implementation=libconstruct.python_triplet,
+		)
+
+		dll = libconstruct.reduction(route, variants) / 'pf.lnk'
 		name = libfactor.extension_access_name(str(route))
 
 		# Get the loader for the extension file.
@@ -133,7 +142,7 @@ class Harness(object):
 
 		# Update containing package dictionary and sys.modules
 		sys.modules[name] = mod
-		route = libroutes.Import.from_fullname(name)
+		route = Import.from_fullname(name)
 		parent = importlib.import_module(str(route.container))
 		setattr(parent, route.identifier, mod)
 
@@ -148,6 +157,10 @@ class Harness(object):
 	def root(self, route):
 		"""
 		Generate the root test from the given route.
+
+		This creates a pseudo-module that holds the selected test modules
+		to run. Using &Harness.root allows &Harness to operate the initial
+		stage identically to how divisions are handled at later stages.
 		"""
 
 		# pseudo-module for absolute root; the initial divisions are built
@@ -155,7 +168,7 @@ class Harness(object):
 		tr = types.ModuleType("test.root")
 
 		module = route.module()
-		ft = getattr(module, '__factor_type__', 'python.module')
+		ft = getattr(module, '__factor_type__', 'python')
 
 		if ft == 'project':
 			extpkg = route / 'extensions'

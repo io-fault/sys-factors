@@ -12,6 +12,9 @@ from .. import libprobe
 from .. import libconstruct
 from .. import web
 
+from itertools import chain
+chain = chain.from_iterable
+
 javascript_combiners_preference = ['uglifyjs']
 web_compiler_collections = {
 	'emcc': (
@@ -159,7 +162,7 @@ def compiler_libraries(compiler, prefix, version, executable, target):
 	else:
 		pass
 
-def python_subject(paths):
+def python_type(paths):
 	"""
 	Constructs the subject for building Python bytecode for a host context.
 
@@ -173,6 +176,8 @@ def python_subject(paths):
 	pyname, pycommand = select(paths, ['python3'], [])
 
 	return {
+		'target-file-extensions': {None:'.xml'},
+
 		'formats': {
 			'extension': 'pyc',
 		},
@@ -197,7 +202,7 @@ def python_subject(paths):
 		}
 	}
 
-def javascript_subject(paths):
+def javascript_type(paths):
 	"""
 	Initialize the javascript subject for JavaScript file compilation.
 
@@ -208,6 +213,7 @@ def javascript_subject(paths):
 
 	return {
 		'encoding': 'utf-8',
+		'target-file-extensions': {None:'.js'},
 
 		'formats': {
 			'library': 'js',
@@ -232,7 +238,7 @@ def javascript_subject(paths):
 		}
 	}
 
-def css_subject(paths):
+def css_type(paths):
 	"""
 	Initialize the CSS subject for CSS compilation.
 	"""
@@ -241,6 +247,7 @@ def css_subject(paths):
 
 	css = {
 		'encoding': 'utf-8',
+		'target-file-extensions': {None:'.css'},
 
 		'formats': {
 			'library': 'css',
@@ -278,7 +285,7 @@ def css_subject(paths):
 
 	return css
 
-def xml_subject(paths):
+def xml_type(paths):
 	"""
 	Construct the subject for XML files.
 	"""
@@ -286,6 +293,7 @@ def xml_subject(paths):
 
 	xml = {
 		'encoding': 'ascii',
+		'target-file-extensions': {None:'.xml'},
 
 		'formats': {
 			'executable': 'xml',
@@ -323,11 +331,13 @@ def xml_subject(paths):
 
 	return xml
 
-def resource_subject(paths):
+def resource_type(paths):
 	"""
-	Initialize a (libconstruct:subject)`resource` subject for inclusion in a context.
+	Initialize a (ctx:ftype)`resource` subject for inclusion in a context.
 	"""
 	subject = {
+		'target-file-extensions': {None:''}, # Resources manage their own.
+
 		'formats': {
 			'library': 'octets',
 		},
@@ -377,6 +387,7 @@ def inspect(ctx, paths):
 	}
 
 	unsupported = {
+		'target-file-extensions': {None:'.void'},
 		'formats': formats,
 		'reductions': {
 			'library': il,
@@ -399,9 +410,11 @@ def inspect(ctx, paths):
 		'xml': unsupported,
 		'css': unsupported,
 		'resource': unsupported,
+		'python': unsupported,
 
 		'system': {
 			'formats': formats,
+			'target-file-extensions': {None:'.xml'},
 			'platform': 'xml-inspect-' + sys.platform,
 			'reductions': {
 				None: {
@@ -443,19 +456,35 @@ def inspect(ctx, paths):
 	S = libxml.Serialization()
 	D = S.switch('data:')
 	xml = b''.join(
-		S.root('libconstruct',
-			S.element('context',
-				libxml.Data.serialize(D, core),
-			),
-			('xmlns', 'https://fault.io/xml/libconstruct'),
-			('xmlns:data', 'https://fault.io/xml/data'),
-		)
+		S.root('context',
+			libxml.Data.serialize(D, core),
+			('name', 'inspect'),
+			('xmlns', 'http://fault.io/xml/dev/fpi'),
+			('xmlns:data', 'http://fault.io/xml/data'),
+		),
 	)
 
-	rolefile = ctx / 'core.xml'
-	rolefile.store(xml)
+	corefile = ctx / 'core.xml'
+	corefile.store(xml)
 
-def host_system_subject(paths):
+	purposes(corefile)
+
+def host_system_type(paths):
+	target_file_extensions = {
+		'executable': '.exe',
+		'library': '.so',
+		'extension': '.so',
+		'fragment': '.fo',
+		None: '.so',
+	}
+
+	if platform in {'darwin', 'macos'}:
+		target_file_extensions['library'] = '.dylib'
+		target_file_extensions['extension'] = '.dylib'
+	elif platform in {'win', 'msw'}:
+		target_file_extensions['library'] = '.dll'
+		target_file_extensions['extension'] = '.dll'
+
 	# default command
 	if 'CC' in os.environ:
 		cc = libroutes.File.from_absolute(os.environ['CC'])
@@ -561,6 +590,7 @@ def host_system_subject(paths):
 	system = {
 		# subject data
 		'platform': target,
+		'target-file-extensions': target_file_extensions,
 
 		'reference-types': {'weak', 'lazy', 'upward', 'default'},
 
@@ -650,17 +680,83 @@ def host_system_subject(paths):
 
 	return system
 
+common_purposes = {
+	'debug': 'Reduced optimizations and defines for debugging',
+	'optimal': 'Subjective performance selection',
+
+	'test': 'Debug role with support for injections for comprehensive testing',
+	'metrics': 'Test role with profiling and coverage collection enabled',
+
+	'profiling': 'Raw profiling build for custom collections',
+	'coverage': 'Raw coverage build for custom collections',
+}
+
+def purposes(corefile):
+	ctx = corefile.container
+	S = libxml.Serialization()
+	D = S.switch('data:')
+
+	empty = {}
+	for x, abstract in common_purposes.items():
+		ctxfile = ctx / (x + '.xml')
+
+		xml = b''.join(
+			S.root('libconstruct', chain((
+					S.element('xi:include',
+						(),
+						('href', corefile.identifier),
+					),
+					S.element('context',
+						libxml.Data.serialize(D, empty),
+						('purpose', x),
+					),
+				)),
+				('xmlns', 'http://fault.io/xml/dev/fpi'),
+				('xmlns:data', 'http://fault.io/xml/data'),
+				('xmlns:xi', libxml.namespaces['xinclude']),
+			)
+		)
+		ctxfile.store(xml)
+
+def static(ctx, paths):
+	"""
+	Platform independent processing.
+	"""
+	core = {
+		'resource': resource_type(paths),
+		'javascript': javascript_type(paths),
+		'css': css_type(paths),
+		'xml': xml_type(paths),
+	}
+
+	import pprint
+	pprint.pprint(core)
+
+	S = libxml.Serialization()
+	D = S.switch('data:')
+
+	xml = b''.join(
+		S.root('context',
+			libxml.Data.serialize(D, core),
+			('name', 'static'),
+			('xmlns', 'http://fault.io/xml/dev/fpi'),
+			('xmlns:data', 'http://fault.io/xml/data'),
+		)
+	)
+
+	corefile = ctx / 'core.xml'
+	corefile.store(xml)
+
+	purposes(corefile)
+
 def host(ctx, paths):
 	"""
 	Initialize a (libconstruct:context)`host` context.
 	"""
 	core = {
-		'python': python_subject(paths),
-		'javascript': javascript_subject(paths),
-		'css': css_subject(paths),
-		'xml': xml_subject(paths),
-		'system': host_system_subject(paths),
-		'resource': resource_subject(paths),
+		'system': host_system_type(paths),
+		# Move to static.
+		'python': python_type(paths),
 	}
 
 	import pprint
@@ -669,17 +765,18 @@ def host(ctx, paths):
 	S = libxml.Serialization()
 	D = S.switch('data:')
 	xml = b''.join(
-		S.root('libconstruct',
-			S.element('context',
-				libxml.Data.serialize(D, core),
-			),
-			('xmlns', 'https://fault.io/xml/libconstruct'),
-			('xmlns:data', 'https://fault.io/xml/data'),
-		)
+		S.element('context',
+			libxml.Data.serialize(D, core),
+			('name', 'host'),
+			('xmlns', 'http://fault.io/xml/dev/fpi'),
+			('xmlns:data', 'http://fault.io/xml/data'),
+		),
 	)
 
-	rolefile = ctx / 'core.xml'
-	rolefile.store(xml)
+	corefile = ctx / 'core.xml'
+	corefile.store(xml)
+
+	purposes(corefile)
 
 def web_context(ctx, paths):
 	# default command
@@ -704,14 +801,16 @@ def web_context(ctx, paths):
 	libdirs = []
 
 	core = {
-		'javascript': javascript_subject(paths),
-		'css': css_subject(paths),
-		'xml': xml_subject(paths),
-		'resource': resource_subject(paths),
-
 		'system': {
 			# subject data
 			'platform': target,
+			'source.parameters': [
+				('PRODUCT_ARCHITECTURE', target),
+			],
+
+			'target-file-extensions': {
+				None: '.js',
+			},
 
 			'reference-types': {'weak', 'lazy', 'upward', 'default'},
 
@@ -774,17 +873,18 @@ def web_context(ctx, paths):
 	S = libxml.Serialization()
 	D = S.switch('data:')
 	xml = b''.join(
-		S.root('libconstruct',
-			S.element('context',
-				libxml.Data.serialize(D, core),
-			),
-			('xmlns', 'https://fault.io/xml/libconstruct'),
-			('xmlns:data', 'https://fault.io/xml/data'),
-		)
+		S.root('context',
+			libxml.Data.serialize(D, core),
+			('name', 'web'),
+			('xmlns', 'http://fault.io/xml/dev/fpi'),
+			('xmlns:data', 'http://fault.io/xml/data'),
+		),
 	)
 
-	rolefile = ctx / 'core.xml'
-	rolefile.store(xml)
+	corefile = ctx / 'core.xml'
+	corefile.store(xml)
+
+	purposes(corefile)
 
 def main(name, args, paths=None):
 	global libroutes
@@ -799,6 +899,7 @@ def main(name, args, paths=None):
 		paths = libprobe.environ_paths()
 
 	host(init(libconstruct_dir / 'host'), paths)
+	static(init(libconstruct_dir / 'static'), paths)
 	inspect(init(libconstruct_dir / 'inspect'), paths)
 	web_context(init(libconstruct_dir / 'web'), paths)
 

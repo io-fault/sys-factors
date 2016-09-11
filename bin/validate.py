@@ -1,10 +1,11 @@
 """
-Validate a project as functioning by performing its tests against the configured role.
+Validate a project as functioning by performing its tests against the *active variant*.
 """
 import os
 import sys
 import functools
 import collections
+import signal
 
 from ...system import library as libsys
 from ...system import libcore
@@ -20,6 +21,7 @@ exits = {
 	'divide': '\x1b[38;5;237m' '/' '\x1b[0m',
 	'fail': '\x1b[38;5;196m' '!' '\x1b[0m',
 	'core': '\x1b[38;5;202m' '!' '\x1b[0m',
+	'expire': '\x1b[38;5;202m' '!' '\x1b[0m',
 }
 
 class Harness(libharness.Harness):
@@ -40,7 +42,7 @@ class Harness(libharness.Harness):
 
 	def dispatch(self, test):
 		# Run self.seal() in a fork
-		seal = self.concurrently(functools.partial(self.seal, test))
+		seal = self.concurrently(lambda: self.seal(test))
 		self.tests.append(seal)
 
 	def complete(self, test):
@@ -57,7 +59,6 @@ class Harness(libharness.Harness):
 			fate = 'core'
 		elif not os.WIFEXITED(status):
 			# redrum
-			import signal
 			try:
 				os.kill(pid, signal.SIGKILL)
 			except OSError:
@@ -68,7 +69,16 @@ class Harness(libharness.Harness):
 	def seal(self, test):
 		self.status.write('\x1b[38;5;234m' '>' '\x1b[0m')
 		self.status.flush() # Clear local buffers before fork.
-		test.seal()
+
+		try:
+			signal.signal(signal.SIGALRM, test.timeout)
+			signal.alarm(8)
+
+			with test.exits:
+				test.seal()
+		finally:
+			signal.alarm(0)
+			signal.signal(signal.SIGALRM, signal.SIG_IGN)
 
 		if isinstance(test.fate, self.libtest.Divide):
 			# Descend. Clear in case of subdivide.
@@ -77,7 +87,9 @@ class Harness(libharness.Harness):
 
 			# Divide returned the gathered tests,
 			# dispatch all of them and wait for completion.
-			self.execute(test.fate.content, ())
+
+			divisions = test.fate.content
+			self.execute(divisions, ())
 			for x in self.tests:
 				self.complete(x)
 
@@ -95,7 +107,7 @@ def main(package, modules, role='optimal'):
 	sys.dont_write_bytecode = True
 	root = libroutes.Import.from_fullname(package)
 
-	if root.module().__factor_type__ == 'context':
+	if getattr(root.module(), '__factor_type__', None) == 'context':
 		pkgset = root.subnodes()[0]
 		pkgset.sort()
 	else:

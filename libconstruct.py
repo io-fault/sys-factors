@@ -8,7 +8,7 @@ necessary procedures for constructing a target.
 
 [ Properties ]
 
-/roles
+/variants
 	Dictionary of construction roles used by libconstruct to manage different
 	transformations of &libdev.Sources modules.
 
@@ -16,13 +16,28 @@ necessary procedures for constructing a target.
 	Used by &library_filename to select the appropriate extension
 	for `system.library` and `system.extension` factors.
 
+/selected_context
+	Construction context to load from. Variant is specified after `'#'`.
+
+/selections
+	A mapping providing the selected role to use for the factor module.
+
+/python_triplet
+	The `-` separated strings representing the currently executing Python context.
+	Used to construct directories for Python extension builds.
+
+/bytecode_triplet
+	The `-` separated strings representing the bytecode used by the executing Python
+	context.
+
 [ Environment ]
 
-/libfc_CONTEXT
-	Construction Context to build with.
+/libfpi_context
+	Construction Context to build with. Absolute path to XML or a relative
+	path designating the variant-set pair.
 
-/libfc_ROLE
-	Role to construct targets for.
+/libfpi_directory
+	Path to the collection of construction context sets.
 """
 import os
 import sys
@@ -36,32 +51,24 @@ import importlib.machinery
 import types
 import typing
 
-from ..system import libfactor
-python_triplet = libfactor.python_triplet
-
 from . import include
 from . import library as libdev
 
 from ..chronometry import library as libtime
+from ..routes import library as libroutes
 from ..io import library as libio
 from ..system import library as libsys
-from ..routes import library as libroutes
+from ..system import libfactor
+from ..filesystem import library as libfs
 
 from ..xml import library as libxml
 from ..xml import lxml
 
-roles = {
-	'optimal': 'Maximum optimizations with debugging symbols separated or stripped',
+Import = libroutes.Import
 
-	'debug': 'Reduced optimizations and defines for debugging',
-	'test': 'Debug role with support for injections for comprehensive testing',
-	'metrics': 'Test role with profiling and coverage collection enabled',
+fpi_addressing = libfs.Hash('fnv1a_32', depth=1, length=4)
 
-	'profile': 'Raw profiling build for custom collections',
-	'coverage': 'Raw coverage build for custom collections',
-
-	'core': 'The role used to represent the conceptual base of other roles.',
-}
+selected_context = 'host#optimal'
 
 library_extensions = {
 	'msw': 'dll',
@@ -76,6 +83,135 @@ def library_filename(platform, name):
 	"""
 	global library_extensions
 	return 'lib' + name.lstrip('lib') + '.' + library_extensions.get(platform, 'so')
+
+def python_context(implementation, version_info, abiflags, platform):
+	"""
+	Construct the triplet representing the Python context for the platform.
+	Used to define the construction context for Python extension modules.
+	"""
+	pyversion = ''.join(map(str, version_info[:2]))
+	return '-'.join((implementation, pyversion + abiflags, platform))
+
+# Used as the context name for extension modules.
+python_triplet = python_context(
+	sys.implementation.name, sys.version_info, sys.abiflags, sys.platform
+)
+
+bytecode_triplet = python_context(
+	sys.implementation.name, sys.version_info, '', 'bytecode'
+)
+
+selections = None
+
+_factor_role_patterns = None
+_factor_roles = None # exact matches
+
+def select(module, role, context=None):
+	"""
+	Designate that the given role should be used for the identified &package and its content.
+
+	&select should only be used during development or development related operations. Notably,
+	selecting the role for a given package during the testing of a project.
+
+	It can also be used for one-off debugging purposes where a particular target is of interest.
+	"""
+	global _factor_roles, _factor_role_patterns
+	if _factor_roles is None:
+		_factor_roles = {}
+
+	if module.endswith('.'):
+		path = tuple(module.split('.')[:-1])
+		from ..computation import libmatch
+
+		if _factor_role_patterns is None:
+			_factor_role_patterns = libmatch.SubsequenceScan([path])
+		else:
+			x = list(_factor_role_patterns.sequences)
+			x.append(path)
+			_factor_role_patterns = libmatch.SubsequenceScan(x)
+
+		_factor_roles[module[:-1]] = role
+	else:
+		# exact
+		_factor_roles[module] = role
+
+def scan_modification_times(factor, aggregate=max):
+	"""
+	Scan the factor's sources for the latest modification time.
+	"""
+	dirs, files = libfactor.sources(factor).tree()
+	del dirs
+
+	glm = libroutes.File.get_last_modified
+	return aggregate(x for x in map(glm, files))
+
+def variant(module, role='optimal', context=None):
+	"""
+	Get the configured role for the given module path.
+	"""
+	global _factor_roles, _factor_role_patterns
+
+	path = str(module)
+
+	if _factor_roles is None:
+		return role
+
+	if path in _factor_roles:
+		return _factor_roles[path]
+
+	if _factor_role_patterns is not None:
+		# check for pattern
+		path = _factor_role_patterns.get(tuple(path.split('.')))
+		return _factor_roles['.'.join(path)]
+
+	return default_role
+
+def work_directory(import_route:Import, cache='__pycache__', name='.fpi'):
+	"""
+	Get the relevant work directory inside the associated
+	(system:relpath)`__pycache__/.fpi` directory.
+	"""
+
+	# Get a route to the FPI build set in __pycache__.
+	return import_route.file().container / '__pycache__' / name
+
+def fpi_work_key(variants):
+	"""
+	Calculate the key from the sorted list.
+
+	Sort function is of minor importance, there is no warranty
+	of consistent accessibility across platform.
+	"""
+	vl = list(variants.items())
+	vl.sort()
+	return ';'.join('='.join((k,v)) for k,v in vl).encode('utf-8')
+
+def context_work_route(fpi, variants):
+	"""
+	Get the work directory of the factor.
+	"""
+
+	wd = libfs.Dictionary.use(fpi, addressing=fpi_addressing)
+	k = fpi_work_key(variants)
+	r = wd.route(k)
+
+	return r
+
+def context_work(import_route, variants):
+	"""
+	Get the work directory of the factor.
+	"""
+
+	fpi = work_directory(import_route)
+	return context_work_route(fpi, variants)
+
+def reduction(import_route, variants):
+	"""
+	Get the reduction for a construction context.
+	"""
+
+	ftr = context_work(import_route, variants) / 'ftr'
+	return ftr
 
 merge_operations = {
 	set: set.update,
@@ -109,15 +245,15 @@ def merge(parameters, source, operations = merge_operations):
 			parameters[key] = source[key]
 
 xml_namespaces = {
-	'lc': 'https://fault.io/xml/libconstruct',
-	'd': 'https://fault.io/xml/data',
+	'lc': 'http://fault.io/xml/dev/fpi',
+	'd': 'http://fault.io/xml/data',
 }
 
-def root_context_directory(env='libfc_PATH'):
+def root_context_directory(env='FPI_DIRECTORY'):
 	"""
 	Return the &libroutes.File instance to the root context.
-	By default, this is (fs:path)`~/.fault/libconstruct`, but can
-	be overridden by the (system:environment)`libfc_PATH` variable.
+	By default, this is (fs:path)`~/.fault/fpi`, but can
+	be overridden by the (system:environment)`FPI_DIRECTORY` variable.
 
 	The result of this should only be cached in order to maintain a consistent
 	perspective; this function polls the environment for the appropriate version.
@@ -131,19 +267,49 @@ def root_context_directory(env='libfc_PATH'):
 	if env in os.environ:
 		return libroutes.File.from_absolute(os.environ[env])
 
-	return libroutes.File.home() / '.fault' / 'libconstruct'
+	return libroutes.File.home() / '.fault' / 'fpi'
+
+def load_context(route:libroutes.File):
+	"""
+	Load the context selected by &route and process the 
+	"""
+
+	with route.open('r') as f:
+		xml = lxml.etree.parse(f)
+
+	variants = {}
+	context = {}
+
+	# XInclude is how imports/refs to other contexts are managed.
+	xml.xinclude()
+	d = xml.xpath('/lc:libconstruct/lc:context', namespaces=xml_namespaces)
+
+	# Merge context data in the order they appear.
+	for x in d:
+		# Attributes on the context element define the variant.
+		variants.update(x.attrib)
+		data = libxml.Data.structure(list(x)[0])
+		merge(context, data)
+
+	context['variants'] = variants
+	return xml, context
 
 def root_context(directory, selection, role):
 	xf = directory / (selection or 'host') / (role + '.xml')
 	if not xf.exists():
 		return None, {}
 
-	with xf.open() as f:
-		xml = lxml.etree.parse(f)
+	return load_context(xf)
 
-	d = xml.xpath('/lc:libconstruct/lc:context/d:*', namespaces=xml_namespaces)[0]
-	data = libxml.Data.structure(d)
-	return xml, data
+def contexts(purpose, primary='host', fallback='static', environment=()):
+	doc, p_ctx = root_context(root_context_directory(), primary, purpose)
+	sd, static_ctx = root_context(root_context_directory(), fallback, purpose)
+
+	p = [p_ctx]
+	p.extend([load_context(libroutes.File.from_absolute(x))[1] for x in environment])
+	p.append(static_ctx)
+
+	return tuple(p)
 
 # Specifically for identifying files to be compiled and how.
 extensions = {
@@ -179,38 +345,61 @@ def simulate_composite(route):
 	global libfactor
 	pkgs, modules = route.subnodes()
 
+	if not route.exists():
+		raise ValueError(route) # module does not exist?
+
 	modules.append(route)
 	sources = [
 		x.__class__(x.container, (x.identifier,))
-		for x in [x.file() for x in modules]
+		for x in [x.file() for x in modules if x.exists()]
 		if x.extension == 'py'
 	]
 	pkgfile = route.file()
 
 	mod = types.ModuleType(str(route), "Simulated composite factor for bytecode compilation")
-	mod.__factor_type__ = 'python.extension'
+	mod.__factor_type__ = 'python'
+	mod.__factor_dynamics__ = 'extension'
 	mod.__factor_sources__ = sources
-	mod.__factor_context__ = libfactor.bytecode_triplet
+	mod.__factor_context__ = bytecode_triplet
 	mod.__file__ = str(pkgfile)
 
 	return mod, pkgs
 
-def mount(role, route, target, condition=None, ext_suffixes=importlib.machinery.EXTENSION_SUFFIXES):
-	"""
-	Mount an execution context extension module so that the constructed binary can be
-	used by the context (Python).
+def gather_simulations(contexts, packages:typing.Sequence[Import]):
+	# Get the simulations for the bytecode files.
+	next_set = packages
 
-	After extension modules have been constructed, they may not be available for use.
-	The &mount function performs the necessary filesystem modifications in order expose
-	the extension modules for use.
+	while next_set:
+		current_set = next_set
+		next_set = []
+
+		for pkg in current_set:
+			mod, adds = simulate_composite(pkg)
+			next_set.extend(adds)
+
+			mech, ctx = initialize(contexts, mod, ())
+			yield mech, ctx
+
+# The extension suffix to use for *this* Python installation.
+python_extension_suffix = importlib.machinery.EXTENSION_SUFFIXES[0]
+
+def link_extension(route, factor):
+	"""
+	Link an inducted Python extension module so that the constructed binary
+	can be used by (python:statement)`import`.
+
+	Used by &.bin.induct after copying the target's factor to the &libfactor.
+
+	[ Parameters ]
+	/route
+		The &Import selecting the composite factor to induct.
 	"""
 	# system.extension being built for this Python
 	# construct links to optimal.
 	# ece's use a special context derived from the Python install
 	# usually consistent with the triplet of the first ext suffix.
-	global python_triplet
-
-	outfile = libfactor.reduction(route, context=python_triplet, role=role)
+	src = os.readlink(str(factor / 'pf.lnk'))
+	src = factor / src
 
 	# peel until it's outside the first extensions directory.
 	pkg = route
@@ -220,26 +409,11 @@ def mount(role, route, target, condition=None, ext_suffixes=importlib.machinery.
 	pkg = pkg.container
 
 	link_target = pkg.file().container.extend(names)
-	final = link_target.suffix(ext_suffixes[0])
+	final = link_target.suffix(python_extension_suffix)
 
-	for suf in ext_suffixes[1:] + ['.pyd', '.dylib']:
-		rmf = link_target.suffix(suf)
-		if rmf.exists():
-			print('removing possible conflict', str(rmf))
-			rmf.void()
+	final.link(src)
 
-	dsym = link_target.suffix('.so.dSYM')
-	if dsym.exists():
-		print('removing', str(dsym))
-		dsym.void()
-
-	if not condition((final,), (outfile,)):
-		print('implementing', outfile, '->', final)
-		final.replace(outfile)
-
-	if link_target.suffix('.py').exists() and role != 'optimal':
-		print('[removing implement for %s role]' %(role,), str(final))
-		final.void()
+	return (final, src)
 
 def collect(module):
 	"""
@@ -258,7 +432,7 @@ def collect(module):
 			# Override for pseudo modules/factors.
 			yield v
 		else:
-			i = libroutes.Import.from_fullname(v.__name__)
+			i = Import.from_fullname(v.__name__)
 			if is_composite(i) or is_probe(v):
 				yield v
 
@@ -266,9 +440,9 @@ def traverse(working, tree, inverse, module):
 	"""
 	Invert the directed graph of dependencies from the target modules.
 
-	System object factor modules import their dependencies into their global
-	dictionary forming a directed graph. The imported system object factor
-	modules are identified as dependencies that need to manifested in order
+	System factor modules import their dependencies into their global
+	dictionary forming a directed graph. The imported factor modules are
+	identified as dependencies that need to be constructed in order
 	to process the subject module. The inverted graph is constructed to manage
 	completion signalling for processing purposes.
 	"""
@@ -451,9 +625,11 @@ def unix_compiler_collection(context, output, inputs,
 	commands for a compiler collection.
 	"""
 	get = context.get
+
+	fdyna = get('dynamics')
+	purpose = get('variants')['purpose']
 	sys = get('system')
-	typ = sys.get('type')
-	role = get('role')
+
 	command = [None, compile_flag]
 	if verbose:
 		command.append(verbose_flag)
@@ -477,7 +653,7 @@ def unix_compiler_collection(context, output, inputs,
 		command.append(format_flags)
 
 	# Compiler optimization target: -O0, -O1, ..., -Ofast, -Os, -Oz
-	co = optimizations[role]
+	co = optimizations[purpose]
 	command.append(co_flag + co)
 
 	# Include debugging symbols.
@@ -488,14 +664,14 @@ def unix_compiler_collection(context, output, inputs,
 		command.append(overflow_map[overflow_spec])
 
 	# coverage options for metrics and profile roles.
-	if role in {'metrics', 'profile'}:
+	if purpose in {'metrics', 'profile'}:
 		command.extend(('-fprofile-instr-generate', '-fcoverage-mapping'))
 
 	# Include Directories; -I option.
 	sid = list(sys.get('include.directories', ()))
 	command.extend([id_flag + str(x) for x in sid])
 
-	command.append(define_flag + 'FAULT_TYPE=' + (typ or 'unspecified'))
+	command.append(define_flag + 'FAULT_TYPE=' + (fdyna or 'unspecified'))
 
 	# -D defines.
 	sp = [define_flag + '='.join(x) for x in sys.get('source.parameters', ())]
@@ -527,14 +703,11 @@ def python_bytecode_compiler(context, output, inputs,
 	"""
 	assert language == 'python'
 	get = context.get
-	role = get('role')
-	sub = get(context['subject'])
-	typ = sub.get('type')
+	purpose = get('variants')['purpose']
 
 	inf, = inputs
 
-	command = [None, filepath(output), filepath(inf), '2' if role == 'optimal' else '0']
-
+	command = [None, filepath(output), filepath(inf), '2' if purpose == 'optimal' else '0']
 	return command
 
 def inspect_link_editor(context, output, inputs, mechanism=None, format=None, filepath=str):
@@ -542,11 +715,11 @@ def inspect_link_editor(context, output, inputs, mechanism=None, format=None, fi
 	Command constructor for Mach-O link editor provided on Apple MacOS X systems.
 	"""
 	get = context.get
-	role = get('role')
-	sub = get(context['subject'])
-	typ = sub.get('type')
+	purpose = get('variants')['purpose']
+	fdyna = context['dynamics']
+	sub = get(context['type'])
 
-	command = [None, typ, format]
+	command = [None, fdyna, format]
 	command.extend([filepath(x) for x in inputs])
 	command.append('--library.directories')
 	command.extend([filepath(x) for x in sub.get('library.directories', ())])
@@ -584,23 +757,25 @@ def macosx_link_editor(context, output, inputs,
 	"""
 	Command constructor for Mach-O link editor provided on Apple MacOS X systems.
 	"""
+	assert context['type'] == 'system'
+
 	get = context.get
 	command = [None, '-t', lto_preserve_exports, platform_version_flag, '10.11.0',]
 
-	role = get('role')
+	purpose = get('variants')['purpose']
 	sys = get('system')
-	typ = sys.get('type')
+	fdyna = context['dynamics']
 
-	loutput_type = type_map[typ]
+	loutput_type = type_map[fdyna]
 	command.append(loutput_type)
-	if typ == 'executable':
+	if fdyna == 'executable':
 		if format == 'pie':
 			command.append(pie_flag)
 
-	if typ != 'fragment':
+	if fdyna != 'fragment':
 		command.extend([libdir_flag+filepath(x) for x in sys['library.directories']])
 
-		support = context['mechanisms']['system']['objects'][typ].get(format)
+		support = mechanism['objects'][fdyna].get(format)
 		if support is not None:
 			prefix, suffix = support
 		else:
@@ -613,10 +788,10 @@ def macosx_link_editor(context, output, inputs,
 		command.append(link_flag+'System')
 
 		command.extend(suffix)
-		if role in {'metrics', 'profile'}:
-			command.append(context['mechanisms']['system']['transformations'][None]['resources']['profile'])
+		if purpose in {'metrics', 'profile'}:
+			command.append(mechanism['transformations'][None]['resources']['profile'])
 
-		command.append(context['mechanisms']['system']['transformations'][None]['resources']['builtins'])
+		command.append(mechanism['transformations'][None]['resources']['builtins'])
 	else:
 		command.extend(inputs)
 
@@ -673,15 +848,15 @@ def web_link_editor(context,
 	"""
 	get = context.get
 	sys = get('system')
-	typ = sys.get('type')
-	role = get('role')
+	fdyna = context['dynamics']
+	purpose = get('variants')['purpose']
 
 	command = ['emcc']
 
 	# emcc is not terribly brilliant; file extensions are used to determine operation.
-	if typ == 'fragment':
+	if fdyna == 'fragment':
 		suffix = '.bc'
-	elif typ == 'executable':
+	elif fdyna == 'executable':
 		suffix = '.js'
 		command.append('--emrun')
 	else:
@@ -694,18 +869,16 @@ def web_link_editor(context,
 	if verbose:
 		add(verbose_flag)
 
-	loutput_type = type_map[typ] # failure indicates bad type parameter to libfactor.load()
+	loutput_type = type_map[fdyna] # failure indicates bad type parameter to libfactor.load()
 	if loutput_type:
 		add(loutput_type)
 
-	if typ != 'fragment':
+	if fdyna != 'fragment':
 		sld = sys.get('library.directories', ())
 		libdirs = [libdir_flag + filepath(x) for x in sld]
 
 		sls = sys.get('library.set', ())
 		libs = [link_flag + filepath(x) for x in sls]
-
-		sysmech = context['mechanisms']['system']
 
 		command.extend(map(filepath, [_r_file_ext(x, '.bc') for x in inputs]))
 		command.extend(libdirs)
@@ -763,9 +936,9 @@ def unix_link_editor(context,
 		Enable or disable the verbosity of the command. Defaults to &True.
 	"""
 	get = context.get
+	fdyna = get('dynamics')
 	sys = get('system')
-	typ = sys.get('type')
-	role = get('role')
+	purpose = get('variants')['purpose']
 
 	command = [None]
 	add = command.append
@@ -774,11 +947,11 @@ def unix_link_editor(context,
 	if verbose:
 		add(verbose_flag)
 
-	loutput_type = type_map[typ] # failure indicates bad type parameter to libfactor.load()
+	loutput_type = type_map[fdyna] # failure indicates bad type parameter to libfactor.load()
 	if loutput_type:
 		add(loutput_type)
 
-	if typ != 'fragment':
+	if fdyna != 'fragment':
 		sld = sys.get('library.directories', ())
 		libdirs = [libdir_flag + filepath(x) for x in sld]
 
@@ -789,13 +962,11 @@ def unix_link_editor(context,
 		if abi is not None:
 			command.extend((soname_flag, sys['abi']))
 
-		sysmech = context['mechanisms']['system']
-
 		if allow_runpath:
 			# Enable by default, but allow
 			add(allow_runpath)
 
-		prefix, suffix = sysmech['objects'][typ][format]
+		prefix, suffix = mechanism['objects'][fdyna][format]
 
 		command.extend(prefix)
 		command.extend(map(filepath, inputs))
@@ -804,10 +975,10 @@ def unix_link_editor(context,
 		command.extend(libs)
 		command.append('-)')
 
-		if role in {'metrics', 'profile'}:
-			command.append(sysmech['transformations'][None]['resources']['profile'])
+		if purpose in {'metrics', 'profile'}:
+			command.append(mechanism['transformations'][None]['resources']['profile'])
 
-		command.append(sysmech['transformations'][None]['resources']['builtins'])
+		command.append(mechanism['transformations'][None]['resources']['builtins'])
 
 		command.extend(suffix)
 	else:
@@ -824,11 +995,12 @@ elif sys.platform in ('win32', 'win64'):
 else:
 	link_editor = unix_link_editor
 
-def reconstruct(outputs, inputs):
+def rebuild(outputs, inputs):
 	"""
 	Unconditionally report the &outputs as outdated.
 	"""
 	return False
+reconstruct = rebuild
 
 def updated(outputs, inputs, requirement=None):
 	"""
@@ -857,7 +1029,7 @@ def updated(outputs, inputs, requirement=None):
 	# object has already been updated.
 	return True
 
-def probe_report(probe, context, role, module):
+def probe_report(probe, contexts, module):
 	"""
 	Return the report data of the probe for the given &context.
 
@@ -869,43 +1041,43 @@ def probe_report(probe, context, role, module):
 
 	probe_key = getattr(probe, 'key', None)
 	if probe_key is not None:
-		key = probe_key(probe, context, role, module)
+		key = probe_key(probe, contexts, module)
 	else:
 		key = None
 
-	reports = probe_retrieve(probe, context, role)
+	reports = probe_retrieve(probe, contexts)
 	return reports.get(key, {})
 
-def probe_retrieve(probe, context=None, role=None):
+def probe_retrieve(probe, contexts=None):
 	"""
 	Retrieve the stored data collected by the sensor.
 	"""
 	import pickle
-	rf = probe_cache(probe, context, role)
+	rf = probe_cache(probe, contexts)
 	with rf.open('rb') as f:
 		try:
 			return pickle.load(f) or {}
 		except (FileNotFoundError, EOFError):
 			return {}
 
-def probe_record(probe, reports, context=None, role=None):
+def probe_record(probe, reports, contexts=None):
 	"""
 	Record the report for subsequent runs.
 	"""
-	rf = probe_cache(probe, context, role)
+	rf = probe_cache(probe, contexts)
 	rf.init('file')
 
 	import pickle
 	with rf.open('wb') as f:
 		pickle.dump(reports, f)
 
-def probe_cache(probe, context=None, role=None):
+def probe_cache(probe, contexts=None):
 	"""
 	Return the route to the probe's recorded report.
 	"""
 	f = libroutes.File.from_absolute(probe.__cached__)
 	last_dot = probe.__name__.rfind('.')
-	path = f.container / probe.__name__[last_dot+1:] / context / role
+	path = f.container / (probe.__name__[last_dot+1:] + 'pc')
 	return path
 
 def factor_defines(module_fullname):
@@ -945,123 +1117,95 @@ def execution_context_extension_defines(module_fullname, target_fullname):
 		('MODULE_PACKAGE', target_fullname[:tp]),
 	]
 
-@functools.lru_cache(8)
-def mechanism(directory, context, role):
+def type_pair(module):
+	return (
+		module.__factor_type__,
+		module.__factor_dynamics__,
+	)
+
+def initialize(contexts, module:types.ModuleType, dependents):
 	"""
-	Get the mechanism from the libconstruct directory for the given role.
-
-	This extracts the data from the XML files often generated by &.bin.configure.
-	The mechanism is the merger of the core root context and the role; where the role's
-	data is merged on top of core.
-	"""
-	global merge, root_context
-
-	core_doc, core_data = root_context(directory, context, 'core')
-	role_doc, role_data = root_context(directory, context, role)
-	merge(core_data, role_data)
-
-	return core_data
-
-def initialize(
-		selection:str, context:str, role:str,
-		module:types.ModuleType, dependents,
-		lcd=None
-	):
-	"""
-	Initialize a construction context for use by &transform and &reduce.
-
-	Given a &context name and a &role, initialize a construction context for producing the
-	target of the given &module.
+	Initialize the construction context parameters for use by &transform
+	and &reduce.
 
 	[ Parameters ]
-	/selection
-		The context that was explicitly specified.
-
-	/context
-		The cache directory subpath that reductions will be placed into.
-		For Python extension modules, `cpython-{version}-{platform}` is used.
-
-	/lcd
-		Optional directory path overriding the environment variable or the default home
-		path. Normally unused.
+	/contexts
+		The contexts to scan for mechanisms to generate factor processing instructions.
+	/module
+		The factor to be processed.
 	"""
 	global merge
 
+	ir = Import.from_fullname(module.__name__)
+	work = work_directory(ir)
+	wd = libfs.Dictionary.use(work, addressing=fpi_addressing)
+
+	ftype = module.__factor_type__
+	fdyna = module.__factor_dynamics__
+
 	# Factor dependencies stated by imports.
 	td = list(libfactor.dependencies(module))
-	ftype = module.__factor_type__
-	subject, typ = ftype.split('.')
 
-	# Categorize the module's dependencies.
-	incdirs = [libfactor.sources(libroutes.Import.from_fullname(include.__name__))]
-	includes = []
-	probes = []
-	libs = []
-	fragments = []
-	refs = []
-	index = {
-		'system.probe': probes,
-		'system.library': libs,
-		'system.fragment': fragments,
-		'system.interfaces': includes,
-	}
+	# Find a context that can process the type.
+	for x in contexts:
+		if ftype in x:
+			ctx = x
+			mech = x[ftype]
+			break
+	else:
+		raise RuntimeError("context set does not have mechanism for processing " + repr(ftype))
 
+	yield mech
+
+	variants = dict(ctx['variants'])
+	mechanisms = ctx
+
+	# Categorize the factor's dependencies.
+	index = collections.defaultdict(list)
 	for x in td:
-		index.get(x.__factor_type__, refs).append(x)
+		index[type_pair(x)].append(x)
 
-	incdirs.extend(libfactor.sources(libroutes.Import.from_fullname(x.__name__)) for x in includes)
-	work = libfactor.cache_directory(module, context, role, 'x').container
+	if ftype == 'system':
+		# fault.development.include
+		index[('system', 'interfaces')].append(include)
 
-	# context: context -> role -> purpose -> format
-	mechanisms = mechanism(lcd or root_context_directory(), selection, role)
+	includes = index[('system', 'interfaces')]
+	incdirs = [
+		libfactor.sources(Import.from_fullname(x.__name__))
+		for x in includes
+	]
 
-	ir = libroutes.Import.from_fullname(module.__name__)
-	reduction = libfactor.reduction(ir, context=context, role=role, module=module)
-	if module.__factor_type__ == 'system.fragment':
-		# fragments can have multiple reductions.
-		# in order to accommodate for its dependents,
-		# the reduction must be a directory with entries
-		# named after the format type.
-		pass
-
-	# the full context dictionary.
+	# The context parameters for rendering FPI.
 	parameters = {
-		'name': context, # context name
-		'role': role,
+		'variants': variants,
+		'irrelevant': set(),
+		'key': None,
+
 		'module': module,
 		'import': ir,
-		'subject': subject,
+		'type': ftype,
+		'dynamics': fdyna,
 
-		'probes': probes,
-		'references': refs,
+		'references': index, # Per-factor_type modules imported by target.
 
-		'locations': {
-			'sources': libfactor.sources(ir, module=module),
-			'work': work, # normally, __pycache__ subdirectory.
-			'output': libfactor.cache_directory(module, context, role, 'out'),
-			'reduction': reduction,
-			'logs': libfactor.cache_directory(module, context, role, 'log'),
-			'libraries': libfactor.cache_directory(module, context, role, 'lib'),
-		},
+		'suffix': (
+			mech['target-file-extensions'].get(fdyna) or \
+			mech['target-file-extensions'].get(None) or \
+			'.ftr'
+		),
 
-		# Mechanisms (compiler/linker) for the context+role combination.
-		'mechanisms': mechanisms,
-
-		# Context data for system subject.
-		subject: {
-			'type': typ, # Conceptual
+		# Context data for system.
+		ftype: {
+			'type': fdyna,
 			'abi': getattr(module, 'abi', None), # -soname for unix/elf.
-			'formats': set(),
-			'libraries': libs, # dependencies that are system libraries.
-			'fragments': fragments,
-			'include.directories': incdirs,
 
+			'include.directories': incdirs,
 			'library.directories': [],
 			'library.set': set(),
 
 			'source.parameters': [
-				('F_ROLE', role),
-				('F_ROLE_ID', 'F_ROLE_' + role.upper() + '_ID'),
+				('F_PURPOSE', variants['purpose']),
+				('F_PURPOSE_ID', 'F_PURPOSE_' + variants['purpose'].upper() + '_ID'),
 			],
 		}
 	}
@@ -1070,22 +1214,22 @@ def initialize(
 	# Dependents ultimately determine what this means by designating
 	# the type of link that should be used for a given role.
 
-	sys = parameters[subject]
-	typ = sys['type']
-	sysformats = mechanisms[subject]['formats'] # code types used by the object types
+	sys = parameters[ftype]
+	sysformats = mech['formats'] # code types used by the object types
 
-	if typ not in ('fragment', 'interfaces'):
+	if fdyna not in ('fragment', 'interfaces'):
 		# system/user is the dependent.
 		# Usually, PIC for extensions, PDC/PIE for executables.
-		sys['formats'].add(sysformats[typ])
+		variants['format'] = sysformats.get(fdyna) or sysformats[None]
 	else:
-		# For fragments, the dependents decide
+		# For fragments and interfaces, the dependents decide
 		# the format set to build. If no format is designated,
 		# the default code type and link is configured.
 
+		formats = set()
 		links = set()
 		for x in dependents:
-			sys['formats'].add(sysformats[x.__factor_type__.split('.')[1]])
+			formats.add(sysformats[x.__factor_dynamics__])
 
 			dparams = getattr(x, 'parameters', None)
 			if dparams is None or not dparams:
@@ -1094,6 +1238,25 @@ def initialize(
 
 			# get any dependency parameters for this target.
 			links.add(dparams.get(module))
+		# Needs modification for emitting multiple parameter sets.
+
+	if fdyna == 'extension' and libfactor.python_extension(module):
+		variants['python_implementation'] = python_triplet
+
+	wk = fpi_work_key(variants)
+	parameters['key'] = wk
+
+	sub = ftype[0].upper() + fdyna[0].upper() # Prefix hinting at factor type.
+	wd = wd.route(wk, filename=(lambda x: '%s%s'%(sub, str(x))))
+
+	parameters['locations'] = {
+		'work': wd, # normally, __pycache__ subdirectory.
+		'reduction': wd / 'ftr',
+		'output': wd / 'psd', # Processed Source Directory
+		'logs': wd / 'log',
+		'libraries': wd / 'lib',
+		'sources': libfactor.sources(ir, module=module),
+	}
 
 	# Full set of regular files in the sources location.
 	if '__factor_sources__' in module.__dict__:
@@ -1103,43 +1266,42 @@ def initialize(
 			parameters['sources'] = parameters['locations']['sources'].tree()[1]
 
 	# Local dependency set comes first.
-	parameters[subject]['library.directories'] = [parameters['locations']['libraries']]
+	parameters[ftype]['library.directories'] = [parameters['locations']['libraries']]
+
+	libs = index[('system', 'library')]
+	fragments = index[('system', 'fragment')]
 
 	libdir = parameters['locations']['libraries']
 	for lib in libs:
 		libname = identity(lib)
-		parameters[subject]['library.set'].add(libname)
+		parameters[ftype]['library.set'].add(libname)
 
 	# Add include directories from libraries and fragments.
 	for inc in itertools.chain(libs, fragments):
-		ir = libroutes.Import.from_fullname(inc.__name__)
+		ir = Import.from_fullname(inc.__name__)
 		incdir = libfactor.sources(ir).container / 'include'
 		if incdir.exists():
 			sys['include.directories'].append(incdir)
 
-	for probe in probes:
-		report = probe_report(probe, selection or 'host', role, module)
+	for probe in index[('system', 'probe')]:
+		report = probe_report(probe, contexts, module)
 		merge(parameters, report) # probe parameter merge
 
 	from .probes import libpython
-	if libpython in probes:
+
+	if libpython in index[('system', 'probe')]:
 		# Note as building a Python extension.
-		parameters['execution_context_extension'] = True
-		men = parameters['mount_point'] = libfactor.extension_access_name(module.__name__)
-		idefines = execution_context_extension_defines(module.__name__, men)
+		ean = libfactor.extension_access_name(module.__name__)
+		idefines = execution_context_extension_defines(module.__name__, ean)
 	else:
-		parameters['execution_context_extension'] = False
 		idefines = factor_defines(module.__name__)
 
-	parameters[subject]['source.parameters'].extend(idefines)
-	parameters[subject]['source.parameters'].append(
-		('PRODUCT_ARCHITECTURE', mechanisms['system']['platform'])
-	)
+	parameters[ftype]['source.parameters'].extend(idefines)
 
-	if hasattr(module, subject):
-		merge(parameters[subject], module.system)
+	if hasattr(module, ftype):
+		merge(parameters[ftype], module.system)
 
-	return parameters
+	yield parameters
 
 @functools.lru_cache(6)
 def context_interface(path):
@@ -1147,13 +1309,14 @@ def context_interface(path):
 	Resolves the construction interface for processing a source or performing
 	the final reduction (link-stage).
 	"""
-	mod, apath = libroutes.Import.from_attributes(path)
+
+	mod, apath = Import.from_attributes(path)
 	obj = importlib.import_module(str(mod))
 	for x in apath:
 		obj = getattr(obj, x)
 	return obj
 
-def transform(context, filtered=reconstruct):
+def transform(mechanism, context, filtered=reconstruct):
 	"""
 	Transform the sources using the mechanisms defined in &context.
 
@@ -1165,32 +1328,30 @@ def transform(context, filtered=reconstruct):
 	"""
 	global languages, include
 
-	subject = context['subject']
+	variants = context['variants']
+	ftype = context['type']
 
 	if 'sources' not in context:
 		return
-	if context[subject]['type'] == 'interfaces':
+	if context['dynamics'] == 'interfaces':
 		return
 
 	loc = context['locations']
-	formats = context[subject]['formats']
 
 	emitted = set([loc['output']])
 	emitted.add(loc['logs'])
 	emitted.add(loc['output'])
-	emitted.update([loc['output'] / typ for typ in formats])
 
 	for x in emitted:
 		yield ('directory', x)
 
-	mech = context['mechanisms']
-	mech = mech[subject]['transformations']
+	mech = mechanism['transformations']
 	mech_cache = {}
 
 	commands = []
 	for src in context['sources']:
 		fnx = src.extension
-		if context['name'] != 'inspect' and fnx in {'h'} or src.identifier.startswith('.'):
+		if variants['name'] != 'inspect' and fnx in {'h'} or src.identifier.startswith('.'):
 			# Ignore header files and dot-files for non-inspect contexts.
 			continue
 
@@ -1223,37 +1384,36 @@ def transform(context, filtered=reconstruct):
 
 		#depfile = libroutes.File(loc['dependencies'], src.points)
 		depfile = None
-		for fmt in formats:
-			# Iterate over formats (pic, pdc, pie).
-			obj = libroutes.File(loc['output'] / fmt, src.points)
+		fmt = context['variants']['format']
+		obj = libroutes.File(loc['output'], src.points)
 
-			if filtered((obj,), (src,)):
-				continue
+		if filtered((obj,), (src,)):
+			continue
 
-			logfile = libroutes.File(loc['logs'] / fmt, src.points)
+		logfile = libroutes.File(loc['logs'], src.points)
 
-			for x in (obj, logfile):
-				d = x.container
-				if d not in emitted:
-					emitted.add(d)
-					yield ('directory', d)
+		for x in (obj, logfile):
+			d = x.container
+			if d not in emitted:
+				emitted.add(d)
+				yield ('directory', d)
 
-			genobj = functools.partial(xf, mechanism=lmech, language=lang, format=fmt)
+		genobj = functools.partial(xf, mechanism=lmech, language=lang, format=fmt)
 
-			# compilation
-			go = {}
-			cmd = genobj(context, obj, (src,))
-			if lmech.get('method') == 'python':
-				cmd[0:1] = (sys.executable, '-m', lmech['command'])
-			else:
-				cmd[0] = lmech['command']
+		# compilation
+		go = {}
+		cmd = genobj(context, obj, (src,))
+		if lmech.get('method') == 'python':
+			cmd[0:1] = (sys.executable, '-m', lmech['command'])
+		else:
+			cmd[0] = lmech['command']
 
-			if lmech.get('redirect'):
-				yield ('execute-redirection', cmd, logfile, obj)
-			else:
-				yield ('execute', cmd, logfile)
+		if lmech.get('redirect'):
+			yield ('execute-redirection', cmd, logfile, obj)
+		else:
+			yield ('execute', cmd, logfile)
 
-def reduce(context, filtered=reconstruct, sys_platform=sys.platform):
+def reduce(mechanism, context, filtered=reconstruct, sys_platform=sys.platform):
 	"""
 	Construct the operations for reducing the object files created by &transform
 	instructions into a set of targets that can satisfy
@@ -1264,95 +1424,90 @@ def reduce(context, filtered=reconstruct, sys_platform=sys.platform):
 		The construction context created by &initialize.
 	"""
 
-	subject = context.get('subject', 'system')
-	typ = context[subject]['type']
-	if typ == 'interfaces':
+	fmt = context['variants'].get('format')
+	if fmt is None:
 		return
 
-	ctx = context['name']
-	role = context['role']
+	ftype = context['type']
+	mech = context[ftype]
+	preferred_suffix = context['suffix']
+	fdyna = context['dynamics']
+
 	# target library directory containing links to dependencies
 	locs = context['locations']
 	libdir = locs['libraries']
+	ftr = locs['reduction']
+	ir = context['import']
 
-	reductions = context['mechanisms'][subject]['reductions']
-	if typ in reductions:
-		mech = reductions[typ]
+	reductions = mechanism['reductions']
+	if fdyna in reductions:
+		mif = reductions[fdyna]
 	else:
-		mech = reductions[None]
+		mif = reductions[None]
 
-	xf = context_interface(mech['interface'])
-
-	formats = tuple(context[subject]['formats'])
+	xf = context_interface(mif['interface'])
 
 	if 'sources' not in context:
 		# Nothing to reduce.
 		return
 
+	rr = ftr / (ir.identifier + preferred_suffix)
+
+	yield ('directory', ftr)
+	yield ('link', rr, ftr / 'pf.lnk')
 	yield ('directory', libdir)
 
 	libs = []
 
-	for x in context[subject]['libraries']:
+	variants = context['variants']
+
+	for x in context['references'][('system', 'library')]:
 		# Create symbolic links inside the target's local library directory.
 		# This is done to avoid a large number of -L options in targets
 		# with a large number of dependencies.
 
 		# Explicit link of factor.
-		xir = libroutes.Import.from_fullname(x.__name__)
-		libdep = libfactor.reduction(xir, context=ctx, role=role, module=module)
+		xir = Import.from_fullname(x.__name__)
+		libdep = reduction(xir, variants)
 		li = identity(x)
 		lib = libdir / library_filename(sys_platform, li)
+
 		yield ('link', libdep, lib)
 		libs.append(li)
 
 	fragments = [
-		libfactor.reduction(libroutes.Import.from_fullname(x.__name__), context=ctx, role=role)
-		for x in context[subject]['fragments']
+		reduction(Import.from_fullname(x.__name__), variants)
+		for x in context['references'][('system', 'fragment')]
 	]
 
 	# Discover the known sources in order to identify which objects should be selected.
-	output_base = context['locations']['reduction']
-	typ = context[subject]['type']
-	if typ == 'fragment':
-		# Fragments may have multiple builds.
-		# A library may want PIC and an executable, PIE.
-		# The additional compilation allows the fragment to offer
-		# library or executable specific code as well.
-		outputs = [
-			output_base / fmt for fmt in formats
-		]
-		yield ('directory', output_base)
-	else:
-		assert len(formats) == 1
-		outputs = (output_base,)
+	fdyna = context['dynamics']
 
-	for fmt, output in zip(formats, outputs):
-		objdir = locs['output'] / fmt
-		objects = [
-			libroutes.File(objdir, x.points) for x in context['sources']
-			if x.extension not in {'h'} and not x.identifier.startswith('.')
-		]
-		if fragments:
-			objects.extend([x / fmt for x in fragments])
+	objdir = locs['output']
+	objects = [
+		libroutes.File(objdir, x.points) for x in context['sources']
+		if x.extension not in {'h'} and not x.identifier.startswith('.')
+	]
+	if fragments:
+		objects.extend([x / fmt for x in fragments])
 
-		if not filtered((output,), objects):
-			# Mechanisms with a configured root means that the
-			# transformed objects are referenced by the root file.
-			root = mech.get('root')
-			if root is not None:
-				objects = [objdir / root]
+	if not filtered((rr,), objects):
+		# Mechanisms with a configured root means that the
+		# transformed objects are referenced by the root file.
+		root = mif.get('root')
+		if root is not None:
+			objects = [objdir / root]
 
-			cmd = xf(context, output, objects, mechanism=mech, format=fmt)
-			if mech.get('method') == 'python':
-				cmd[0:1] = (sys.executable, '-m', mech['command'])
-			else:
-				cmd[0] = mech['command']
+		cmd = xf(context, rr, objects, mechanism=mechanism, format=fmt)
+		if mif.get('method') == 'python':
+			cmd[0:1] = (sys.executable, '-m', mif['command'])
+		else:
+			cmd[0] = mif['command']
 
-			if mech.get('redirect'):
-				yield ('execute-redirection', cmd, locs['logs'] / fmt / 'reduction', output)
-			else:
-				yield ('execute', cmd, locs['logs'] / fmt / 'reduction')
+		if mif.get('redirect'):
+			yield ('execute-redirection', cmd, locs['logs'] / 'Reduction', rr)
+		else:
+			yield ('execute', cmd, locs['logs'] / 'Reduction')
 
 def parse_make_dependencies(make_rule_str):
 	"""
@@ -1372,6 +1527,11 @@ class Construction(libio.Processor):
 	Construction process manager. Maintains the set of target modules to construct and
 	dispatches the work to be performed for completion in the appropriate order.
 
+	! TODO:
+		- Rewrite as a Flow.
+		- Generalize; flow accepts jobs and emits FlowControl events
+			describing the process. (rusage, memory, etc of process)
+
 	! DEVELOPER:
 		Primarily, this class traverses the directed graph constructed by imports
 		performed by the target modules being built.
@@ -1380,12 +1540,18 @@ class Construction(libio.Processor):
 		in order to leverage obstruction signalling.
 	"""
 
-	def __init__(self, context, role, modules, requirement=None, reconstruct=False, processors=4):
+	def __init__(self,
+			contexts, modules,
+			requirement=None,
+			reconstruct=False,
+			processors=4
+		):
 		self.reconstruct = reconstruct
 		self.failures = 0
-		self.cx_context = context
-		self.cx_role = role
+
+		self.contexts = contexts # series of context resources for supporting subjects
 		self.modules = modules
+
 		# Manages the dependency order.
 		self.sequence = sequence([x[1] for x in modules])
 
@@ -1411,6 +1577,7 @@ class Construction(libio.Processor):
 		try:
 			modules, deps = next(self.sequence) # WorkingSet
 		except StopIteration:
+			# Done in actuation? Empty set.
 			self.terminate()
 			return
 
@@ -1424,44 +1591,30 @@ class Construction(libio.Processor):
 		"""
 		Collect all the work to be done for building the desired targets.
 		"""
-		context = self.cx_context # [construction] context name
 		tracks = self.tracking[module]
 
-		if context is None:
-			# context was not selected, so default to the host
-			# context. In cases of Python extension, this is the triplet.
-			if libfactor.python_extension(module):
-				context = python_triplet
-			else:
-				# Default 'host' context.
-				context = module.__dict__.get('__factor_context__', 'host')
-		else:
-			# context was explicitly stated meaning
-			# extension modules are not built for mounting.
-			context = module.__dict__.get('__factor_context__', context)
-
-		if getattr(module, '__factor_type__', None) == 'system.probe':
+		if type_pair(module) == ('system', 'probe'):
 			# Needs to be transformed into a job.
 			# Probes are deployed per dependency.
 			probe_set = [('probe', module, x) for x in dependents]
 			tracks.append(probe_set)
 		else:
-			ctx = initialize(
-				self.cx_context, context, self.cx_role, module, dependents
-			)
-			xf = list(transform(ctx, filtered=self._filter))
+			mech, *sets = initialize(self.contexts, module, dependents)
 
-			# If any commands or calls are made by the transformation,
-			# reconstruct the target.
-			for x in xf:
-				if x[0] not in ('directory', 'link'):
-					f = reconstruct
-					break
-			else:
-				f = self._filter
+			for ctx in sets:
+				xf = list(transform(mech, ctx, filtered=self._filter))
 
-			rd = list(reduce(ctx, filtered=f))
-			tracks.extend((xf, rd))
+				# If any commands or calls are made by the transformation,
+				# reconstruct the target.
+				for x in xf:
+					if x[0] not in ('directory', 'link'):
+						f = reconstruct
+						break
+				else:
+					f = self._filter
+
+				rd = list(reduce(mech, ctx, filtered=f))
+				tracks.extend((xf, rd))
 
 		if tracks:
 			self.progress[module] = -1
@@ -1479,48 +1632,45 @@ class Construction(libio.Processor):
 
 		sector = self.sector
 		dep = instruction[2]
-		ctx = self.cx_context or 'host'
-		role = self.cx_role
 
 		if getattr(module, 'key', None) is not None:
-			key = module.key(module, ctx, role, dep)
+			key = module.key(module, self.contexts, dep)
 		else:
 			key = None
 
-		reports = probe_retrieve(module, ctx, role)
+		reports = probe_retrieve(module, self.contexts)
 
 		if key in reports:
 			# Needed report is cached.
 			self.progress[module] += 1
 		else:
-			t = libio.Thread()
-			t.requisite(functools.partial(self.probe_dispatch, module, ctx, role, dep, key))
+			f = lambda x: self.probe_dispatch(module, self.contexts, dep, key, x)
+			t = libio.Thread(f)
 			self.sector.dispatch(t)
 
-	def probe_dispatch(self, module, ctx, role, dep, key, tproc):
+	def probe_dispatch(self, module, contexts, dep, key, tproc):
 		# Executed in thread.
 		sector = self.controller # Allow libio.context()
 
-		report = module.deploy(module, ctx, role, dep)
+		report = module.deploy(module, contexts, dep)
 		self.ctx_enqueue_task(
 			functools.partial(
 				self.probe_exit,
 				tproc,
-				context=ctx,
-				role=role,
+				contexts=contexts,
 				module=module,
 				report=report,
 				key=key
 			),
 		)
 
-	def probe_exit(self, processor, context=None, role=None, module=None, report=None, key=None):
+	def probe_exit(self, processor, contexts=None, module=None, report=None, key=None):
 		self.progress[module] += 1
 		self.activity.add(module)
 
-		reports = probe_retrieve(module, context, role)
+		reports = probe_retrieve(module, contexts)
 		reports[key] = report
-		probe_record(module, reports, context, role)
+		probe_record(module, reports, contexts)
 
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.
@@ -1567,19 +1717,21 @@ class Construction(libio.Processor):
 		if exit_code != 0:
 			self.failures += 1
 
-		with log.open('a') as f:
-			f.write('\n[Profile]\n')
-			f.write('/factor\n\t%s\n' %(module.__name__,))
+		l = ''
+		l += ('\n[Profile]\n')
+		l += ('/factor\n\t%s\n' %(module.__name__,))
 
-			if log.points[-1] != 'reduction':
-				f.write('/subject\n\t%s\n' %('/'.join(log.points),))
-			else:
-				f.write('/subject\n\treduction\n')
+		if log.points[-1] != 'reduction':
+			l += ('/subject\n\t%s\n' %('/'.join(log.points),))
+		else:
+			l += ('/subject\n\treduction\n')
 
-			f.write('/pid\n\t%d\n' %(pid,))
-			f.write('/status\n\t%s\n' %(str(status),))
-			f.write('/start\n\t%s\n' %(start.select('iso'),))
-			f.write('/stop\n\t%s\n' %(libtime.now().select('iso'),))
+		l += ('/pid\n\t%d\n' %(pid,))
+		l += ('/status\n\t%s\n' %(str(status),))
+		l += ('/start\n\t%s\n' %(start.select('iso'),))
+		l += ('/stop\n\t%s\n' %(libtime.now().select('iso'),))
+
+		log.store(l.encode('utf-8'), mode='ba')
 
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.

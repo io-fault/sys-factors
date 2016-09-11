@@ -95,14 +95,13 @@ def executables(xset:typing.Set[str]):
 
 def prepare(
 		directory,
-		context,
+		contexts,
 		language:collections.abc.Hashable,
 		source:str,
 		libraries:typing.Sequence[str]=(),
 		library_directories:typing.Sequence[str]=(),
 		include_directories:typing.Sequence[str]=(),
 		preprocessor:typing.Sequence[str]=(),
-		ftype='system.executable',
 		compile_only:bool=False,
 		lmap={
 			'c': 'c',
@@ -131,7 +130,10 @@ def prepare(
 
 	mod = types.ModuleType("fault_probe")
 	mod.__file__ = (str(directory / '__init__.py'))
-	mod.__factor_type__ = 'system.executable'
+	mod.__factor_type__ = 'system'
+	mod.__factor_dynamics__ = 'executable'
+	mod.generated = 'probe'
+
 	mod.system = {
 		'source.parameters': list(preprocessor),
 		'library.set': set(libraries),
@@ -142,8 +144,11 @@ def prepare(
 	with fsrc.open('wb') as f:
 		f.write(source.encode('utf-8'))
 
-	return libfactor.reduction(None, context, 'debug', module=mod), \
-		libconstruct.Construction(context, 'debug', [('fault_probe', mod)])
+	fpid = cache / '.fpi'
+	wd = libconstruct.context_work_route(fpid, variants)
+
+	return wd / 'ftr' / 'pf.lnk', \
+		libconstruct.Construction(contexts, [('fault_probe', mod)])
 
 def _execute_probe(factor):
 	p = subprocess.Popen(
@@ -152,13 +157,12 @@ def _execute_probe(factor):
 		stdout=subprocess.PIPE,
 		stderr=subprocess.PIPE,
 	)
-	output = p.stdout.read()
-	errors = p.stderr.read()
-	rc = p.wait()
+	stdout, stderr = p.communicate()
+	rc = p.returncode
 
-	return output
+	return stdout
 
-def runtime(language, source, **parameters):
+def runtime(contexts, language, source, **parameters):
 	tr = None
 	cxn = None
 	exe = None
@@ -169,7 +173,7 @@ def runtime(language, source, **parameters):
 		s.subresource(unit)
 		unit.place(s, "bin", "construction")
 		unit.context.enqueue(s.actuate)
-		exe, cxn = prepare(tr, 'host', language, source, **parameters)
+		exe, cxn = prepare(tr, contexts, language, source, **parameters)
 		s.dispatch(cxn)
 
 	with libroutes.File.temporary() as tr:
@@ -203,6 +207,7 @@ def sysctl(names, route=None):
 	command += names
 
 def includes(
+		contexts,
 		language:collections.abc.Hashable,
 		includes:typing.Sequence[str],
 		requisites:typing.Sequence[str]=(),
@@ -237,4 +242,4 @@ def includes(
 		('#include <%s>\n' * len(includes)) %includes
 	])
 
-	return runtime(language, reqs+includes+main, **parameters) is not None
+	return runtime(contexts, language, reqs+includes+main, **parameters) is not None

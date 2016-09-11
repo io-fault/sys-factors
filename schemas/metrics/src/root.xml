@@ -2,7 +2,7 @@
 <!-- XML description of a language agnostic Traceback; a stack of frames !-->
 <grammar
 	xmlns="http://relaxng.org/ns/structure/1.0"
-	ns="https://fault.io/xml/metrics#profile"
+	ns="http://fault.io/xml/dev/metrics#profile"
 	datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes"
 	xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0">
 
@@ -100,14 +100,14 @@
 				<choice>
 					<ref name="libmetrics.xml.id"/>
 					<attribute>
-						<anyName ns="https://fault.io/xml/key"/>
+						<anyName ns="http://fault.io/xml/key"/>
 						<text/>
 					</attribute>
 					<attribute>
 						<anyName>
 							<except>
 								<nsName ns="http://www.w3.org/XML/1998/namespace"/>
-								<nsName ns="https://fault.io/xml/key"/>
+								<nsName ns="http://fault.io/xml/key"/>
 							</except>
 						</anyName>
 						<choice>

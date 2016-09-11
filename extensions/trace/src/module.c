@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 
-#include <fault/roles.h>
+#include <fault/libc.h>
 #include <fault/python/environ.h>
 #include <frameobject.h>
 
@@ -244,7 +244,7 @@ const char collector_doc[] = "A callable object that manages the collection of t
 PyTypeObject
 CollectorType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	QPATH("Collector"),                   /* tp_name */
+	MODULE_QPATH("Collector"),            /* tp_name */
 	sizeof(struct Collector),             /* tp_basicsize */
 	0,                                    /* tp_itemsize */
 	NULL,                                 /* tp_dealloc */

@@ -9,55 +9,38 @@ library into the appropriate package directory.
 """
 import os
 import sys
-import contextlib
-import itertools
-import functools
-import collections
 import types
 import importlib.util
 
 from .. import libconstruct
+from .. import library as libdev
+
 from ...system import libfactor
 from ...routes import library as libroutes
 
-cache_from_source=importlib.util.cache_from_source
+import_from_fullname = libroutes.Import.from_fullname
+cache_from_source = importlib.util.cache_from_source
 
-def update_cache(opt, src, implement, condition=libconstruct.updated, mkr=libroutes.File.from_path) -> bool:
+def update_cache(src, induct, condition=libconstruct.updated, mkr=libroutes.File.from_path) -> bool:
 	"""
-	Update the cached Python bytecode file with the given &opt, optimization,
-	and for the given &src, Python module file path, using the &implement as
-	the new bytecode file to use.
-
-	[ Returns ]
-	/&bool
-		Whether the cache file was updated.
+	Update the cached Python bytecode file using the inducted simulated factors.
 	"""
-	global cache_from_source
 
 	fp = str(src)
 	if not src.exists() or not fp.endswith('.py'):
 		return (False, 'source does not exist or does not end with ".py"')
 
-	# Validate that the links are installed for single pyc config.
-	off_opt = mkr(cache_from_source(fp, optimization=0))
-	one_opt = mkr(cache_from_source(fp, optimization=1))
-	two_opt = mkr(cache_from_source(fp, optimization=2))
-
 	cache_file = mkr(cache_from_source(fp, optimization=None))
-	# Update local links.
-	off_opt.link(cache_file)
-	two_opt.link(cache_file)
-	one_opt.link(cache_file)
 
-	if condition((cache_file,), (implement,)):
+	if condition((cache_file,), (induct,)):
 		return (False, 'update condition was not present')
 
-	cache_file.replace(implement)
+	cache_file.replace(induct)
 	return (True, cache_file)
 
-def main(role='optimal'):
+def main():
 	"""
-	Implement the constructed targets.
+	Induct the constructed targets.
 	"""
 	from ...io import library as libio
 
@@ -70,75 +53,57 @@ def main(role='optimal'):
 	if not env:
 		env = os.environ
 
-	context_name = env.get('libfc_CONTEXT') or None
-	role = env.get('libfc_ROLE', role) or role
+	rebuild = env.get('FPI_REBUILD', '0')
+	contexts = libconstruct.contexts(env.get('FPI_PURPOSE', 'debug'), environment=env.get('FPI_CONTEXT_DIRECTORY', ()))
 
-	reconstruct = env.get('libfc_RECONSTRUCT', '0')
-	reconstruct = bool(int(reconstruct))
-	if reconstruct:
+	rebuild = bool(int(rebuild))
+	if rebuild:
 		condition = libconstruct.reconstruct
 	else:
 		condition = libconstruct.updated
 
-	if role == 'optimal':
-		opt = 2
-	else:
-		opt = 0
-
 	# collect packages to prepare from positional parameters
-	roots = [
-		libroutes.Import.from_fullname(x)
-		for x in args
-	]
+	roots = [import_from_fullname(x) for x in args]
 
 	# Get the simulations for the bytecode files.
-	simulations = []
-	next_set = list(roots)
-	while next_set:
-		current_set = next_set
-		next_set = []
-		for pkg in current_set:
-			mod, adds = libconstruct.simulate_composite(pkg)
-			next_set.extend(adds)
+	for mech, ctx in libconstruct.gather_simulations(contexts, roots):
+		mod = ctx['module']
+		outdir = ctx['locations']['output']
 
-			outdir = libfactor.cache_directory(mod, libfactor.bytecode_triplet, role, 'out')
-			outdir = outdir / 'pyc'
-			for src in mod.__factor_sources__:
-				implement = outdir / src.identifier
-				uc_report = update_cache(opt, src, implement, condition=condition)
-				if uc_report[0]:
-					print(str(implement), '->', uc_report[1])
+		for src in mod.__factor_sources__:
+			implement = outdir / src.identifier
+			uc_report = update_cache(src, implement, condition=condition)
+			if uc_report[0]:
+				print(str(implement), '->', uc_report[1])
 
-	if role not in {'optimal', 'debug'}:
-		return
-
+	# Composites and Python Extensions
+	candidates = []
 	for route in roots:
 		if not route.exists():
 			raise RuntimeError("module does not exist in environment: " + repr(route))
 
 		packages, modules = route.tree()
+		candidates.extend(packages)
+
 		del modules
 
-		# Filter packages. Find composites.
-		root_system_modules = []
-		for target in packages:
-			tm = importlib.import_module(str(target))
-			if isinstance(tm, types.ModuleType) and libfactor.composite(target):
-				root_system_modules.append((target, tm))
+	for target in candidates:
+		tm = importlib.import_module(str(target))
 
-		exe_ctx_extensions = []
+		if isinstance(tm, types.ModuleType) and libfactor.composite(target):
+			if tm.__factor_dynamics__ == 'interfaces':
+				continue
+			mech, fp, *ignored = libconstruct.initialize(contexts, tm, list(libconstruct.collect(tm)))
+			variants = fp['variants']
 
-		# Collect extensions to be mounted into a package module.
-		for target, tm in root_system_modules:
-			for dm in tm.__dict__.values():
-				if not isinstance(dm, types.ModuleType):
-					continue
-				# scan for module.context_extension_probe == True
-				if getattr(dm, 'context_extension_probe', None):
-					exe_ctx_extensions.append((target, tm))
+			factor_dir = libfactor.inducted(target)
+			fp = libconstruct.reduction(target, variants)
 
-		for target, tm in exe_ctx_extensions:
-			libconstruct.mount(role, target, tm, condition=condition)
+			factor_dir.replace(fp)
+
+			if libfactor.python_extension(tm):
+				link, src = libconstruct.link_extension(target, factor_dir)
+				print(str(src), '->', str(link))
 
 	sector.unit.result = 0
 

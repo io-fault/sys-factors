@@ -2,14 +2,14 @@
 Metrics validation.
 """
 from ...xml import libfactor
-from ..xml import libmetrics
+from ..schemas import metrics
 
 valids = {
 	'simple':
 		"""
 			<report timestamp="2001-01-01T03:15:01.000001"
-				xmlns:key="https://fault.io/xml/key"
-				xmlns="https://fault.io/xml/metrics#profile">
+				xmlns:key="http://fault.io/xml/key"
+				xmlns="http://fault.io/xml/metrics#profile">
 				<measurements xml:id="floor" dimensions="field3.cat.name field2 field" fields="attribute names of measures">
 					<frame key:field2="value" total="" average=""/>
 				</measurements>
@@ -19,8 +19,8 @@ valids = {
 	'empty-elements-no-xml-ids':
 		"""
 			<report timestamp="2001-01-01T02:30:00"
-				xmlns:key="https://fault.io/xml/key"
-				xmlns="https://fault.io/xml/metrics#profile">
+				xmlns:key="http://fault.io/xml/key"
+				xmlns="http://fault.io/xml/metrics#profile">
 				<measurements><frame/></measurements>
 			</report>
 		""",
@@ -30,8 +30,8 @@ invalids = {
 	'bad-timestamp':
 		"""
 			<report timestamp="Fail."
-				xmlns:key="https://fault.io/xml/key"
-				xmlns="https://fault.io/xml/metrics#profile">
+				xmlns:key="http://fault.io/xml/key"
+				xmlns="http://fault.io/xml/metrics#profile">
 
 				<measurements xml:id="floor" dimensions="field3.cat.name field2 field" fields="attribute names of measures">
 					<frame key:field2="value" total="" average=""/>
@@ -42,8 +42,8 @@ invalids = {
 	'bad-dimension-name':
 		"""
 			<report timestamp="2001-01-01T02:30:00"
-				xmlns:key="https://fault.io/xml/key"
-				xmlns="https://fault.io/xml/metrics#profile">
+				xmlns:key="http://fault.io/xml/key"
+				xmlns="http://fault.io/xml/metrics#profile">
 
 				<measurements xml:id="floor" dimensions="?? ?? ??" fields="attribute names of measures">
 					<frame key:field2="value" total="" average=""/>
@@ -54,8 +54,8 @@ invalids = {
 	'bad-field-name':
 		"""
 			<report timestamp="2001-01-01T02:30:00"
-				xmlns:key="https://fault.io/xml/key"
-				xmlns="https://fault.io/xml/metrics#profile">
+				xmlns:key="http://fault.io/xml/key"
+				xmlns="http://fault.io/xml/metrics#profile">
 
 				<measurements xml:id="floor" dimensions="Correct" fields="!! !! !!">
 					<frame key:field2="value" total="" average=""/>
@@ -66,8 +66,8 @@ invalids = {
 	'invalid-element':
 		"""
 			<report timestamp="2001-01-01T02:30:00"
-				xmlns:key="https://fault.io/xml/key"
-				xmlns="https://fault.io/xml/metrics#profile">
+				xmlns:key="http://fault.io/xml/key"
+				xmlns="http://fault.io/xml/metrics#profile">
 
 				<bad.element/>
 			</report>
@@ -77,9 +77,9 @@ invalids = {
 def test_valids(test):
 	for label, x in valids.items():
 		x = libfactor.readstring(x)
-		libfactor.validate(libmetrics, x)
+		libfactor.validate(metrics, x)
 
 def test_invalids(test):
 	for label, x in invalids.items():
 		x = libfactor.readstring(x)
-		test/libfactor.validate(libmetrics, x) == False
+		test/libfactor.validate(metrics, x) == False

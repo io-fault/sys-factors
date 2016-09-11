@@ -32,14 +32,14 @@ def test_executables(test):
 
 def test_runtime(test):
 	src = "#include <stdio.h>\nint main(int ac, char *av[]) {printf(\"test\\n\");return(0);}"
-	test/b'test\n' == library.runtime('c', src, libraries=['c'])
+	test/b'test\n' == library.runtime([], 'c', src, libraries=['c'])
 
 	syntax_error = "...int i = $\n"
-	test/None == library.runtime('c', syntax_error)
+	test/None == library.runtime([], 'c', syntax_error)
 
 def test_includes(test):
-	test/library.includes("c", ("fault/roles.h",)) == True
-	test/library.includes("c", ("fault/nosuchfile.h",)) == False
+	test/library.includes([], "c", ("fault/libc.h",)) == True
+	test/library.includes([], "c", ("fault/nosuchfile.h",)) == False
 
 if __name__ == '__main__':
 	from .. import libtest; import sys

@@ -1,5 +1,5 @@
 """
-Project development interfaces for software engineers.
+Project management interfaces for dynamically defining a set of targets.
 """
 import functools
 import typing
@@ -7,45 +7,83 @@ import typing
 from ..routes import library as libroutes
 from ..xml import lxml
 from ..xml import library as libxml
+from ..system import libfactor
 
-namespaces = {
-	'xlink': 'http://www.w3.org/1999/xlink',
-	'inspect': 'https://fault.io/xml/inspect#set',
-}
+class Factor(object):
+	from ..computation import libhash
+	_hash_r = libhash.reference('fnv1a_64')
+	del libhash
 
-class Factor(tuple):
+class Unit(Factor):
 	"""
 	The abstract factor that makes up part of a product.
 	Essentially, the route and factor type with respect to construction,
 	but also higher level interfaces for supporting construction.
+
+	[Properties]
+
+	/type
+		The factor type. For composites sources, this must be set
+		to `'fraction'`.
+	/context
+		The &.libroutes.Import pointing to the root context package.
+		&None if there is no context factor containing this &Unit.
+	/project
+		The &.libroutes.Import pointing to the project package. &None
+		if there is no project.
+	/route
+		The &.libroutes.Import selecting the subject factor.
+		If the selected subject factor is the &project, then these
+		are equal. Likewise with &context.
 	"""
-	__slots__ = ()
+	type = None
+	context = None
+	project = None
+	route = None
 
-	@classmethod
-	def from_module(Class, module):
-		mt = getattr(module, '__factor_type__', 'python-module')
-		return Class((mt, libroutes.Import.from_fullname(module.__name__)))
-
-	@classmethod
-	def from_fullname(Class, path, Import=libroutes.Import.from_fullname):
-		i = Import(path)
-		module = i.module()
-		mt = getattr(module, '__factor_type__', 'python-module')
-		return Class((mt, i))
-
-	@property
-	def type(self):
-		"The module's `__factor_type__` attribute."
-		return self[0]
+	def hash(self) -> str:
+		"""
+		Calculate the hash data for the Unit.
+		"""
+		h = self._hash_r()
+		h.update(self.source.load())
+		return h.hexdigest()
 
 	@property
-	def route(self):
-		"The route to the module."
-		return self[1]
+	def is_package(self):
+		"""
+		Whether the factor is a package module.
+		"""
+		return self.route.identifier.startswith('__init__.')
+
+	@property
+	def is_composite(self):
+		"""
+		Whether the factor is a composite.
+		"""
+		return libfactor.composite(self.route)
+
+	@property
+	def is_terminal(self):
+		"""
+		Whether there are any subfactors of any kind.
+		"""
+		return self.is_package()
+
+	@classmethod
+	def from_filesystem(Class, path):
+		"""
+		Construct the &Factor from a path on the file system. All information
+		will be inferred using directory protocols and by scraping the module's source.
+		"""
+		pass
 
 	@property
 	def source_route(self):
-		return (self[1].file().container / 'src')
+		"""
+		Route to the composite's source directory.
+		"""
+		return (self.module_file.container / 'src')
 
 	@staticmethod
 	def _canonical_path(route):
@@ -54,7 +92,7 @@ class Factor(tuple):
 			m = x.module()
 			mt = getattr(m, '__factor_type__', None)
 			if mt == 'context':
-				yield getattr(m, '__canonical__', None) or x.identifier
+				yield getattr(m, '__factor_cname__', None) or x.identifier
 			else:
 				yield x.identifier
 			x = x.container
@@ -72,21 +110,89 @@ class Factor(tuple):
 		"""
 		The full set of source files of the factor.
 		"""
-		types = {'system.executable', 'system.extension', 'system.library', 'system.object'}
+		pass
 
-		if self.type in types:
-			fr = self.source_route
-			return fr.tree()[1]
-		else:
-			s = self.route.spec()
-			if s is not None and s.has_location:
-				return [libroutes.File.from_absolute(s.origin)]
-			else:
-				m = self.route.module()
-				if m.__file__:
-					return (libroutes.File.from_absolute(m.__file__),)
-				else:
-					return ()
+	def __str__(self):
+		return 'file://%s#%s' %(self.context, str(self.route))
+		#return r + '' if self.fraction is None else ('/' + '/'.join(self.fraction.points))
+
+	@classmethod
+	def from_module(Class, module):
+		"""
+		Construct a &Factor instance from an imported module.
+		"""
+		mt = getattr(module, '__factor_type__', 'python-module')
+		ir = libroutes.Import.from_fullname(module.__name__)
+
+		# Root package's ancestor directory should be the filesystem context directory.
+		rpkg = ir.root
+		ctx = rpkg.file() ** 2
+
+		mf = ir.file()
+		is_composite = libfactor.composite(ir)
+		project = ir.floor()
+		fp = ir.absolute
+		ir = libroutes.Import(project, fp[len(project.absolute):])
+
+		return Class(ctx, mt, project, ir)
+
+	@property
+	def source(self):
+		"""
+		Route to the source file of the factor.
+		"""
+		return self.route.file()
+
+	@staticmethod
+	def _scrape(route:libroutes.File, *keys):
+		"""
+		Scrape the file for the given keys. Presumes single line settings.
+		"""
+		for l in route.load(mode='r').split('\n'):
+			var, *tail = l.split('=', 1)
+			if tail:
+				k = var.strip()
+				if k in keys:
+					yield (k, tail[0].strip(" \t'" + '"'))
+
+	@classmethod
+	def _get_project_identity(Class, route:libroutes.File, key='identity'):
+		"""
+		Retrieve the project identity from the (python:module)`project`
+		module file.
+		"""
+		return dict(Class._scrape(route, key)).get(key)
+
+	@classmethod
+	def _get_factor_type(Class, route:libroutes.File, key='__factor_type__'):
+		"""
+		Retrieve the project identity from the (python:module)`project`
+		module file.
+		"""
+		return dict(Class._scrape(route, key)).get(key)
+
+	@property
+	def iri(self):
+		"""
+		Resource indicator for universal access to the factor.
+		"""
+		proj = (self.project / 'project')
+		proj_path = self.context.extend(proj.absolute).suffix('.py')
+		root_url = self._get_project_identity(proj_path)
+
+		#mod = proj.route().identity + '.' + '.'.join(self.route.points)
+		url = root_url + '.' + '.'.join(self.route.points)
+		return url
+		#return mod + '/' + '/'.join(self.fraction.points)
+
+	def __init__(self, *args):
+		self.context, self.type, self.project, self.route = args
+
+#f = Unit.from_module(libroutes)
+#print(str(f))
+#print(f.source)
+#print(f.iri)
+#print(f.hash())
 
 class Project(object):
 	"""
@@ -150,34 +256,6 @@ class Project(object):
 		"""
 		Modify the package to become a release.
 		"""
-
-def extract_inspect(xml, href='{%s}href' %(namespaces['xlink'],)):
-	"""
-	Load the factor of an inspect role run.
-
-	[Effects]
-
-	/return
-		A pair, the former being the command parameters and the latter
-		being the set of sources.
-	"""
-	global namespaces
-
-	e = xml.getroot()
-
-	# Stored parameters of the link. (library.set)
-	params = e.find("./inspect:parameters", namespaces)
-	if params is not None:
-		data, = params
-		s = libxml.Data.structure(data)
-	else:
-		s = None
-
-	# Source file.
-	sources = e.findall("./inspect:source", namespaces)
-	sources = [libroutes.File.from_absolute(x.attrib[href].replace('file://', '', 1)) for x in sources]
-
-	return s, sources
 
 class DevelopmentException(Exception):
 	"""

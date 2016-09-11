@@ -8,7 +8,7 @@
 	#define MODULE_FUNCTIONS() /* Should be defined by importer. */
 #endif
 
-#if METRICS() && __clang__
+#if FV_METRICS() && __clang__
 	void __llvm_profile_write_file(void);
 	void __llvm_profile_reset_counters(void);
 	void __llvm_profile_set_filename(const char *);
@@ -40,7 +40,7 @@
 		PYMETHOD(_instrumentation_set_path, _instr_file, METH_O, "set file path to write to" ) \
 		PYMETHOD(_instrumentation_write, _instr_flush, METH_NOARGS, "save counters to disk" ) \
 		PYMETHOD(_instrumentation_reset, _instr_clear, METH_NOARGS, "clear in memory counters" )
-#elif METRICS()
+#elif FV_METRICS()
 	#warning (metrics): No suitable instrumentation for coverage and profiling.
 	#define FAULT_MODULE_FUNCTIONS()
 #else
@@ -54,7 +54,7 @@ do { \
 	__dict__ = NULL; \
 } while(0)
 
-#if TEST() || METRICS()
+#if FV_TEST() || FV_METRICS()
 	#define DEFINE_MODULE_GLOBALS \
 		PyObj __ERRNO_RECEPTACLE__; \
 		PyObj __PYTHON_RECEPTACLE__; \

@@ -5,9 +5,10 @@ This executes sequence of executable modules to produce a snapshot for publicati
 
 	# &.bin.prepare [host:optimal]
 	# &.bin.prepare [inspect:optimal]
-	# &.bin.prepare [host:metrics]
+	# &.bin.construct [host:metrics]
 	# &.bin.measure
 	# &.factors.bin.instantiate
+	# &.bin.validate [host:optimal]
 """
 import os
 import sys
@@ -46,25 +47,28 @@ def exe(name, *args, pkg = __package__):
 	return subprocess.Popen(cmd)
 
 def main(instance, pkg):
-	ctx = os.environ.get('FAULT_CONTEXT', '') or 'host'
 	os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
+	try:
+		del os.environ['PYTHONOPTIMIZE']
+	except KeyError:
+		pass
 
 	with timing('preparing [host:optimal]'):
-		os.environ['FAULT_CONTEXT'] = ctx
-		os.environ['FAULT_ROLE'] = 'optimal'
+		os.environ['FPI_CONTEXT'] = 'host'
+		os.environ['FPI_PURPOSE'] = 'optimal'
 		exit(exe('prepare', pkg).wait())
 
-	with timing('preparing [inspect:optimal]'):
-		os.environ['FAULT_CONTEXT'] = 'inspect'
-		os.environ['FAULT_ROLE'] = 'optimal'
-		exit(exe('prepare', pkg).wait())
+	with timing('constructing [inspect:optimal]'):
+		os.environ['FPI_CONTEXT'] = 'inspect'
+		os.environ['FPI_PURPOSE'] = 'optimal'
+		exit(exe('construct', pkg).wait())
 
 	del os.environ['PYTHONDONTWRITEBYTECODE']
 
 	with timing('preparing [host:metrics]'):
-		os.environ['FAULT_CONTEXT'] = ctx
-		os.environ['FAULT_ROLE'] = 'metrics'
-		exit(exe('prepare', pkg).wait())
+		os.environ['FPI_CONTEXT'] = 'host'
+		os.environ['FPI_PURPOSE'] = 'metrics'
+		exit(exe('construct', pkg).wait())
 
 	with libroutes.File.temporary() as d:
 		m = d / 'metrics'
@@ -75,9 +79,7 @@ def main(instance, pkg):
 		with timing('instantiating snapshot'):
 			exit(exe('instantiate', instance, str(m), pkg=factors_bin.__name__).wait())
 
-	with timing('validating optimal'):
-		os.environ['FAULT_CONTEXT'] = ctx
-		os.environ['FAULT_ROLE'] = 'optimal'
+	with timing('validating'):
 		raise SystemExit(exe('validate', pkg).wait())
 
 if __name__ == '__main__':

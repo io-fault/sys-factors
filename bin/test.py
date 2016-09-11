@@ -17,6 +17,7 @@ from .. import libtest
 from .. import libtrace
 
 from .. import libharness
+from .. import libcore as devcore
 
 def color(color, text):
 	return text
@@ -29,9 +30,9 @@ def color_identity(identity):
 
 open_fate_message = color('0x1c1c1c', '|')
 close_fate_message = color('0x1c1c1c', '|')
-top_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+')
+top_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+--')
 working_fate_messages = color('0x1c1c1c', '|' + (' execute  ') + '|')
-bottom_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+')
+bottom_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+--')
 
 class Harness(libharness.Harness):
 	"""
@@ -64,8 +65,8 @@ class Harness(libharness.Harness):
 
 		if os.path.exists(corefile):
 			self.status.write("CORE: Identified, {0!r}, loading debugger.\n".format(corefile))
-			from .. import libcore as devcore
-			devcore.debug(corefile)
+			debugger = devcore.debug(corefile)
+			debugger.wait()
 			self.status.write("CORE: Removed file.\n".format(corefile))
 			os.remove(corefile)
 		else:
@@ -122,7 +123,14 @@ class Harness(libharness.Harness):
 		sys.stderr.write('\b\b\b' + str(os.getpid()))
 		sys.stderr.flush() # want to see the test being ran
 
-		test.seal()
+		try:
+			signal.signal(signal.SIGALRM, test.timeout)
+			signal.alarm(8)
+
+			test.seal()
+		finally:
+			signal.alarm(0)
+			signal.signal(signal.SIGALRM, signal.SIG_IGN)
 
 		faten = test.fate.__class__.__name__.lower()
 		parts = test.identity.split('.')

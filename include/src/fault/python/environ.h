@@ -1,6 +1,7 @@
-/*
- * Extended Python C-APIs
- */
+/**
+	Python C-API extensions for compensating for older versions
+	and for providing additional utility.
+*/
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <structmember.h>
@@ -8,7 +9,7 @@
 
 typedef PyObject * PyObj;
 
-#if TEST() || METRICS()
+#if FV_TEST() || FV_METRICS()
 	extern PyObj __ERRNO_RECEPTACLE__;
 	extern PyObj __PYTHON_RECEPTACLE__;
 #endif

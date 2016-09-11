@@ -1,20 +1,21 @@
-/*
- * Support for failure injection.
- */
-#if TEST() || METRICS()
+/**
+	Support for failure injection for coverage purposes.
+*/
+#if FV_TEST() || FV_METRICS()
 extern PyObj __ERRNO_RECEPTACLE__;
 extern PyObj __PYTHON_RECEPTACLE__;
 
-/*
- * Reclaiming the GIL is rather time consuming in some contexts,
- * so if the dictionary is zero, don't bother.
- *
- * ERRNO_RECEPTACLE(0, &r, open, ...)
- * if (r == 0)
- * {
- *
- * }
- */
+/**
+	Reclaiming the GIL is rather time consuming in some contexts,
+	so if the dictionary is zero, don't bother.
+
+	#!/pl/c
+		ERRNO_RECEPTACLE(0, &r, open, ...)
+		if (r == 0)
+		{
+
+		}
+*/
 #define ERRNO_RECEPTACLE(ERROR_STATUS, RETURN, SYSCALL, ...) \
 do { \
 	PyObj _er_entry; \
@@ -26,7 +27,7 @@ do { \
 	else \
 	{ \
 		char _er_name[256]; \
-		snprintf(_er_name, 256, "%s", __func__, #SYSCALL); \
+		snprintf(_er_name, 256, "%s.%s", __func__, #SYSCALL); \
 		_er_gs = PyGILState_Ensure(); /* need it to get the item */ \
 		_er_entry = PyDict_GetItemString(__ERRNO_RECEPTACLE__, (char *) _er_name); \
 		\

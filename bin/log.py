@@ -3,25 +3,26 @@ Executable module taking a single parameter that emits the compilation
 transcript to standard out.
 """
 import sys
+import os
 import importlib
 
 from ..probes import libpython
+from .. import libconstruct
 
 from ...system import libfactor
 from ...routes import library as libroutes
 
 if __name__ == '__main__':
-	command, module_fullname, context, role, *files = sys.argv
+	env = os.environ
+	command, module_fullname, *files = sys.argv
 
 	ir = libroutes.Import.from_fullname(module_fullname)
-	target_module = importlib.import_module(str(ir)) # import "$1"
-	if context == '-':
-		if libpython in target_module.__dict__.values():
-			from ..libconstruct import python_triplet as context
-		else:
-			context = 'inherit'
+	tm = importlib.import_module(str(ir)) # import "$1"
 
-	logdir = libfactor.cache_directory(target_module, context, role, 'log')
+	contexts = libconstruct.contexts(env.get('FPI_PURPOSE', 'debug'), environment=env.get('FPI_CONTEXT_DIRECTORY', ()))
+	mech, fp, *ignored = libconstruct.initialize(contexts, tm, list(libconstruct.collect(tm)))
+	variants = fp['variants']
+	logdir = libconstruct.reduction(ir, variants).container / 'log'
 
 	if files:
 		files = [logdir.extend(x.split('/')) for x in files]
