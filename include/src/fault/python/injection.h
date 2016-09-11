@@ -27,7 +27,7 @@ do { \
 	else \
 	{ \
 		char _er_name[256]; \
-		snprintf(_er_name, 256, "%s.%s", __func__, #SYSCALL); \
+		snprintf(_er_name, 256, "%s", __func__); \
 		_er_gs = PyGILState_Ensure(); /* need it to get the item */ \
 		_er_entry = PyDict_GetItemString(__ERRNO_RECEPTACLE__, (char *) _er_name); \
 		\

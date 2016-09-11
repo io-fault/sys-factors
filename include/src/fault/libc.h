@@ -21,26 +21,31 @@
 #define FACTOR_PATH(NAME) FACTOR_QNAME_STR "." NAME
 
 #define F_PURPOSE_STR STRING_FROM_IDENTIFIER(F_PURPOSE)
-#define F_PURPOSE_OPTIMAL_ID 1
-#define F_PURPOSE_DEBUG_ID 2
 
-#define F_PURPOSE_PROFILING_ID 4
-#define F_PURPOSE_TEST_ID 5
+#define F_PURPOSE_optimal 1
+#define F_PURPOSE_debug 2
 
-#define F_PURPOSE_COVERAGE_ID 9
-#define F_PURPOSE_METRICS_ID 10
+#define F_PURPOSE_test 5
+#define F_PURPOSE_metrics 10
+
+#define F_PURPOSE_profiling 4
+#define F_PURPOSE_coverage 9
 
 #define F_TRACE(y) 0
 
-#define FV_TEST(y) (F_PURPOSE_ID == F_PURPOSE_TEST_ID)
-#define FV_DEBUG(y) (F_PURPOSE_ID == F_PURPOSE_DEBUG_ID && SUBSCRIBE_##y)
-#define FV_OPTIMAL(y) (F_PURPOSE_ID == F_PURPOSE_OPTIMAL_ID)
-#define FV_METRICS(y) (F_PURPOSE_ID == F_PURPOSE_METRICS_ID)
+#define FV_OPTIMAL(y) (F_PURPOSE_ID == F_PURPOSE_optimal)
+#define FV_DEBUG(y) (F_PURPOSE_ID == F_PURPOSE_debug)
+
+#define FV_TEST(y) (F_PURPOSE_ID == F_PURPOSE_test)
+#define FV_METRICS(y) (F_PURPOSE_ID == F_PURPOSE_metrics)
+
+#define FV_COVERAGE(y) (F_PURPOSE_ID == F_PURPOSE_coverage)
+#define FV_PROFILING(y) (F_PURPOSE_ID == F_PURPOSE_profiling)
 
 #ifndef F_PURPOSE_ID
 	#warning Compilation driver was not given a F_PURPOSE_ID preprocessor definition
 	#warning Presuming 'optimal' build.
-	#define F_PURPOSE_ID F_PURPOSE_OPTIMAL_ID
+	#define F_PURPOSE_ID F_PURPOSE_optimal
 #endif
 
 #endif

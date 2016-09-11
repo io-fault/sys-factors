@@ -1205,7 +1205,7 @@ def initialize(contexts, module:types.ModuleType, dependents):
 
 			'source.parameters': [
 				('F_PURPOSE', variants['purpose']),
-				('F_PURPOSE_ID', 'F_PURPOSE_' + variants['purpose'].upper() + '_ID'),
+				('F_PURPOSE_ID', 'F_PURPOSE_' + variants['purpose'].lower()),
 			],
 		}
 	}

@@ -125,12 +125,12 @@ class Harness(object):
 			The variant resolution needs to be based on libconstruct.initialize.
 		"""
 
-		variants = dict(
-			name='host',
-			purpose='test',
-			format='pic',
-			python_implementation=libconstruct.python_triplet,
-		)
+		env = os.environ
+
+		tm = importlib.import_module(str(route))
+		contexts = libconstruct.contexts(env.get('FPI_PURPOSE', 'test'), environment=env.get('FPI_CONTEXT_DIRECTORY', ()))
+		mech, fp, *ignored = libconstruct.initialize(contexts, tm, list(libconstruct.collect(tm)))
+		variants = fp['variants']
 
 		dll = libconstruct.reduction(route, variants) / 'pf.lnk'
 		name = libfactor.extension_access_name(str(route))

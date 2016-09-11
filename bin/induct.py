@@ -99,6 +99,7 @@ def main():
 			factor_dir = libfactor.inducted(target)
 			fp = libconstruct.reduction(target, variants)
 
+			print(str(fp), '->', str(factor_dir))
 			factor_dir.replace(fp)
 
 			if libfactor.python_extension(tm):
