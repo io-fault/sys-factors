@@ -1,5 +1,55 @@
 [ Glossary ]
 
+Index of terms used organized into subsections describing their context.
+
+[ Glossary >> Project Structure ]
+
+/Factor
+	A part of a &Product. An addressable part of a project. Usually used
+	to refer to Composite Factors as they are of primary interest to
+	&..development.
+
+/Project
+	A Factor consisting of a set of factors making up a &Product.
+
+/Product
+	The conceptual effect of a Project. Often Project and Product can be used
+	interchangeably, but Product is usually referring to the conceptual collection
+	of factors.
+
+/Context Factor
+	A collection of &Project factors.
+
+/Fraction
+	A part of a Factor. For C/C++, this usually maps to an individual
+	translation unit. A source file inside a Composite Factor.
+
+/Factor Type
+	A string describing the abstract target.
+
+[ Glossary >> Construction ]
+
+/Construction Context
+	The set of mechanisms ultimately used to process Factors for a build.
+
+/Mechanism
+	The part of a Construction Context used to identify how to process
+	a given input into the requested Factor Type.
+
+/Factor Processing Instructions
+	The instructions used to build a factor for use. Normally conjured
+	by a Construction Context.
+
+/Inductance
+	The local (same package directory) installation of composite factors,
+	and Python bytecode.
+
+/Materialization
+	The, currently, conceptual phase of forming the Product. This is
+	an implicit step between Inductance and Installation.
+
+[ Glossary >> Testing ]
+
 /Metrics
 	The measurements collected described the effects of the tests provided by a project.
 
@@ -8,16 +58,35 @@
 	object used to manage execution of the tests. Harnesses define how and
 	what tests are executed.
 
+/Fate
+	Refers to the result of a &.libtest.Test.
+
 /Seal
-	Refers to the execution of a test: seal the fate of a test.
+	Refers to the execution of a &.libtest.Test: seal the fate of a test.
 
-/Factor
-	A part of a &Product. An addressable part of a project.
+/Validation
+	The execution of tests for the purpose of checking an inducted build.
+	Often prior to installation and potentially excluding Unit Tests.
 
-/Project
-	A set of factors making a &Product.
+[ Glossary >> Build Purposes ]
 
-/Product
-	The conceptual effect of a project. Often project and product can be used
-	interchangeably, but product is usually referring to the conceptual collection
-	of factors.
+/Optimal
+	Factors built for optimal, subjective, performance.
+
+/Debug
+	Factors constructed with debugging symbols and any additional source level
+	tools enabled by preprocessing instructions.
+
+/Test
+	Purpose used to enable injection ports and debugging that might otherwise
+	be disabled.
+
+/Metrics
+	A purpose identical to Test, but with coverage and profiling
+	instrumentation enabled for gathering measurements about a Project's tests.
+
+/Profiling
+	Purpose enabling regular profiling instrumentation.
+
+/Coverage
+	Purpose enabling regular coverage instrumentation.

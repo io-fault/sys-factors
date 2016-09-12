@@ -1,0 +1,157 @@
+Construction Contexts and the processing cycles dispatched by &..development.
+
+[ Construction Contexts ]
+
+Construction Contexts are a lens used to perceive the way in which targets
+are to be processed and used. They are selectable abstraction layers that
+allow the developer to manage the builds for each platform that a set of
+targets is being built for.
+
+By using explicit abstraction layers, the entire processing sequence can be
+modified to construct arbitrary outputs that reside alongside the usual
+builds. Notably, the declarative approach used for defining target types
+allows for context mechanisms that emit introspective information rather
+than regular executables or libraries. This allows documentation to be extracted
+without defining a custom rule for managing the extraction, and in a form
+that is consistent with the targets constructed by the package.
+
+The use of an abstraction layer allows the system to adapt to the developer,
+rather than the developer being forced to adapt to the system.
+
+================
+
+At the conceptual level, a construction context is a single unit defining an
+abstraction; in practice, there are variations that are used to manage the
+purpose of a build. These variations usually inherit the core set of
+abstractions, and define their own extensions to suite their
+purpose--implicitly or explicitly.
+
+A variant's explicit context extension is managed using a data structure that
+is merged on top of the core data defining the abstraction. Implicit extensions
+are usually an effect of the selected abstraction. That is, the rendered system
+command implementing the processing instruction interally chooses different
+options based on the variant.
+
+================
+
+The implementation of the concept in &..development is internally viewed as
+function taking a single parameter, the variants, that returns the unit
+abstraction scanned for solutions.
+
+[ Variants ]
+
+A variant is a build parameter designated by the context or by the user. It
+is separated from other build parameters as it changes the output of the
+processing instructions used to construct a factor in such a way that
+makes it desirable to separate it from other builds.
+
+Variants can ultimately be arbitrary, but the common ones should help
+illuminate the need and purpose:
+
+	/Format
+		The format of the output files that construct the target. Might
+		not be referring to the actual binary format, but how they were built.
+	/Purpose
+		The purpose of the build; debug, test, optimal. Controls
+		optimization level, debugging symbols and code sections.
+	/Context Name
+		The context name; usually used by common environments to describe
+		the origin of the context.
+	/Dependency Specific Data
+		System probes can influence the set of variants; notably,
+		the Python implementation being built against allows concurrent
+		builds to exist.
+
+[ Conceptual Sequence of Events ]
+
+Phases of the factor processing cycle:
+
+	# &[Implementation] of the Factor Set.
+	# &[Preparation] of the Factor Set.
+	# &[Construction] of the Factor Set.
+	# &[Materialization] of the Product from the Constructed Factor Set.
+	# &[Inductance] of the Materialized Product.
+	# &[Validation] of the Inducted Product.
+	# &[Installation] of the Inducted Product.
+	# &[Deployment] of an Installation.
+
+The first and last two events are not of direct interest to &..development. For
+some deployments, installation and deployment occur at inductance.
+Specifically, in that case, the product is being used in the place that
+it was built. Implementation is the engineering process itself or metaphorically,
+the process of getting the project sources in order to perform a build.
+
+[ Implementation ]
+
+This is the initial phase that is outside the scope of &.libfpi. The implementation
+of a factor is its authorship or creation. The exact meaning being irrelevant to
+&.libfpi.
+
+[ Preparation ]
+
+Preparation is the phase that is intended to occur after a set of unprocessed factors
+is retrieved from a source code repository. In cases where factors, notably Composite,
+are constructed from functions, a preparation hook can be used to generate the
+necessary files.
+
+[ Construction ]
+
+Construction is the primary phase that &.libfpi is concerned with. It uses the
+aformentioned Construction Context's to process factors for the purpose of completing
+a Product.
+
+[ Materialization ]
+
+Currently in &.libfpi, materialization is purely imaginary. It's the step that follows
+&[Construction] that may perform no operations.
+
+! DEVELOPMENT: Plans
+	Implement materialization as a step performed only after
+	successfully constructing the entire factor set. May be a reasonable
+	place to introduce post-processing of targets. (strip/isolate debugging)
+
+[ Inductance ]
+
+Inductance is the introduction of the materialized product, all of the factors, of a
+particular construction context into use. Notably, by the packages (directories)
+that define the sources of the a particular factor set.
+
+For comparison, the effects of a (python:package)`distutils`
+based build does *not* perform a function similar to inductance. Rather, a separate
+build directory is used to house the content for installation and release packaging.
+For (python:package)`distutils`, Inductance would be similar to performing a build,
+and adding the built package to (system:environment)`PYTHONPATH`. &..development
+orients this differently to aid the developer during engineering, and to maintain
+the consistency of the tree without manifest files upon installation.
+
+Inductance allows &..system.libfactor to identify the set of resources that should be
+used to facilitate the effect and function of a processed factor. It separates
+construction from use to trivialize the identification of the constructed
+factor's resources.
+
+[ Validation ]
+
+Validation is the final test. It performs the tests of a project against the inducted
+factors for validation of its functionality in the final state. The tests ran by
+validation would focus on integration testing as the interest is in whether or
+not the given build works in the given environment.
+
+[ Installation ]
+
+The phase is which the inducted product is positioned for use on the system.
+
+[ Deployment ]
+
+The phase in which the installed product is put into use for a particular application.
+
+[ Factor Processing Instructions ]
+
+Construction Contexts are used to refer to a conceptual level.
+Occasionally associated with some practical matters polluting the idea;
+Factor Processing Instructions, however, are the renderings of a particular
+context that are to be executed in order to materialize a product for
+inductance.
+
+When FPI is mentioned, it's usually in the context of an application of a construction
+context.
+
