@@ -29,6 +29,9 @@ Index of terms used organized into subsections describing their context.
 
 [ Glossary >> Construction ]
 
+/Target
+	The files constructed by a, usually, Composite Factor.
+
 /Construction Context
 	The set of mechanisms ultimately used to process Factors for a build.
 
@@ -48,10 +51,15 @@ Index of terms used organized into subsections describing their context.
 	The, currently, conceptual phase of forming the Product. This is
 	an implicit step between Inductance and Installation.
 
+/Factor Dynamics
+	The application or use of the target.
+	Executable, Library, Extension, or Fragment.
+
 [ Glossary >> Testing ]
 
 /Metrics
-	The measurements collected described the effects of the tests provided by a project.
+	The measurements collected described the effects of the tests provided
+	by a project.
 
 /Harness
 	In the context of &.libtest and &.libharness, a harness is an
