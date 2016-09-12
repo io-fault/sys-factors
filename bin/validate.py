@@ -10,6 +10,7 @@ import signal
 from ...system import library as libsys
 from ...system import libcore
 from ...routes import library as libroutes
+
 from .. import libharness
 
 # The escapes are used directly to avoid dependencies.
@@ -24,6 +25,16 @@ exits = {
 	'expire': '\x1b[38;5;202m' '!' '\x1b[0m',
 }
 
+def failure_report_file(test):
+	"""
+	Return the route to the failure report for the given test.
+	"""
+	ir, rpath = libroutes.Import.from_attributes(test.identity)
+	cd = ir.floor().file().container / '__pycache__'
+	rf = cd / 'failures' / test.identity
+
+	return rf
+
 class Harness(libharness.Harness):
 	"""
 	The collection and execution of a series of tests for the purpose
@@ -34,8 +45,8 @@ class Harness(libharness.Harness):
 	"""
 	concurrently = staticmethod(libsys.concurrently)
 
-	def __init__(self, package, status, role='optimal'):
-		super().__init__(package, role=role)
+	def __init__(self, package, status):
+		super().__init__(package)
 		self.status = status
 		self.metrics = collections.Counter() # For division.
 		self.tests = []
@@ -98,9 +109,15 @@ class Harness(libharness.Harness):
 		else:
 			fate = test.fate.__class__.__name__.lower()
 			self.status.write(exits[fate])
+			if test.fate.impact < 0:
+				fe = test.fate
+				import traceback
+				fex = traceback.format_exception(fe.__class__, fe, fe.__traceback__)
+				rf = failure_report_file(test)
+				rf.store(''.join(fex), 'w')
 			return {test.fate.impact: 1}
 
-def main(package, modules, role='optimal'):
+def main(package, modules):
 	red = lambda x: '\x1b[38;5;196m' + x + '\x1b[0m'
 	green = lambda x: '\x1b[38;5;46m' + x + '\x1b[0m'
 
@@ -119,7 +136,7 @@ def main(package, modules, role='optimal'):
 		sys.stderr.write(str(pkg) + ': ^')
 		sys.stderr.flush()
 
-		p = Harness(str(pkg), sys.stderr, role=role)
+		p = Harness(str(pkg), sys.stderr)
 		p.execute(p.root(pkg), [])
 		for x in p.tests:
 			p.complete(x)
@@ -135,6 +152,10 @@ def main(package, modules, role='optimal'):
 		sys.stderr.flush()
 
 		failures += f
+
+	if failures:
+		sys.stderr.write("\nFailure reports are placed into the project ")
+		sys.stderr.write("package's `__pycache__` directory\n")
 
 	raise SystemExit(min(failures, 201))
 
