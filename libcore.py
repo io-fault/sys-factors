@@ -1,11 +1,10 @@
 """
-Tool interfaces for extracting infomration from core file and interacting with them.
+Tool interfaces for extracting information from core file and interacting with them.
+
+! DEVELOPMENT: Flux
+	The system invocations here need to rely on configuration.
 """
 import sys
-import os
-import os.path
-import contextlib
-import functools
 import subprocess
 import shutil
 
