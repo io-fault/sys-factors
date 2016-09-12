@@ -1714,7 +1714,7 @@ class Construction(libio.Processor):
 		if typ == 'execute-redirection':
 			stdout = str(out[0])
 		else:
-			stdout = '/dev/null'
+			stdout = os.devnull
 
 		assert typ in ('execute', 'execute-redirection')
 
@@ -1727,7 +1727,7 @@ class Construction(libio.Processor):
 			f.write(b'\n\n[Standard Error]\n')
 
 			ki = libsys.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
-			with open('/dev/null', 'rb') as ci, open(stdout, 'wb') as co:
+			with open(os.devnull, 'rb') as ci, open(stdout, 'wb') as co:
 				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
 				sp = libio.Subprocess(pid)
 
