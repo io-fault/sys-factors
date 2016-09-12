@@ -53,7 +53,8 @@ Index of terms used organized into subsections describing their context.
 
 /Factor Dynamics
 	The application or use of the target.
-	Executable, Library, Extension, or Fragment.
+	Executable, Library, Extension, or Fragment. Somewhat metaphoric with
+	respect to motion and physics.
 
 [ Glossary >> Testing ]
 
