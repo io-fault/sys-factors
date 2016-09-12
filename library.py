@@ -5,8 +5,6 @@ import functools
 import typing
 
 from ..routes import library as libroutes
-from ..xml import lxml
-from ..xml import library as libxml
 from ..system import libfactor
 
 class Factor(object):
@@ -172,7 +170,7 @@ class Unit(Factor):
 		return dict(Class._scrape(route, key)).get(key)
 
 	@property
-	def iri(self):
+	def uri(self):
 		"""
 		Resource indicator for universal access to the factor.
 		"""
@@ -256,25 +254,3 @@ class Project(object):
 		"""
 		Modify the package to become a release.
 		"""
-
-class DevelopmentException(Exception):
-	"""
-	Base class for exceptions that are related to the development of software.
-
-	Development exceptions are used to classify a set of exceptions that are
-	used to define errors that are ultimately caused by the development process
-	itself.
-	"""
-
-	def __init__(self, reference, message, **paramters):
-		self.reference = reference
-		self.message = message
-		self.parameters = paramters
-
-	def __str__(self):
-		return self.message
-
-class PendingImplementationError(DevelopmentException):
-	"""
-	Raised in cases where the software does not yet exist.
-	"""
