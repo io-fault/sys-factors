@@ -1627,7 +1627,7 @@ class Construction(libio.Processor):
 			mech, *sets = initialize(self.contexts, module, dependents)
 
 			for ctx in sets:
-				if 'reductions' not in ctx:
+				if 'reductions' not in mech:
 					# For mechanisms that do not specify reductions,
 					# the transformed set is the factor.
 					# XXX: Incomplete; check if specific output is absent.
