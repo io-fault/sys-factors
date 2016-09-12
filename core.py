@@ -31,9 +31,9 @@ file_extensions = {
 	'python.wheel': ('whl',),
 	'java.jar': ('jar',),
 
-	'files.zip': ('zip',),
-	'files.tar': ('tar',),
-	'files.rar': ('rar',),
+	'resources.zip': ('zip',),
+	'resources.tar': ('tar',),
+	'resources.rar': ('rar',),
 
 	'encoding-binhex': ('hqx',),
 	'encoding-base64': ('base64','b64'),

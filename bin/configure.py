@@ -162,42 +162,36 @@ def compiler_libraries(compiler, prefix, version, executable, target):
 	else:
 		pass
 
-def python_type(paths):
+def python_bytecode_type(paths):
 	"""
 	Constructs the subject for building Python bytecode for a host context.
 
 	Currently, only builds subject for the executing Python.
 
-	! FUTURE:
+	! DEVELOPMENT: Features
 		Must provide a means for compiling with versions of
 		Python aside from the one that is running. A reasonable
 		possibility is constructing the the `-c` command.
 	"""
+	# Python library = module with preprocessed sources
+	# Python executable = python source executed in __main__
+	# Python extension = maybe python source executed in a library?
+	# Python fragment = source file
 	pyname, pycommand = select(paths, ['python3'], [])
 
 	return {
 		'target-file-extensions': {None:'.xml'},
 
 		'formats': {
-			'extension': 'pyc',
-		},
-
-		'reductions': {
-			'extension': {
-				'interface': libconstruct.__name__ + '.inspect_link_editor',
-				'command': 'fault.development.bin.il',
-				'name': 'index-linker',
-				'method': 'python',
-				'redirect': 'stdout',
-			},
+			'library': 'pyc',
 		},
 
 		'transformations': {
 			'python': {
-				'interface': libconstruct.__name__ + '.python_bytecode_compiler',
+				'method': 'internal',
+				'interface': libconstruct.__name__ + '.local_bytecode_compiler',
 				'name': 'pyc',
-				'command': 'fault.development.bin.pyc',
-				'method': 'python',
+				'command': __package__ + '.pyc',
 			},
 		}
 	}
@@ -756,7 +750,7 @@ def host(ctx, paths):
 	core = {
 		'system': host_system_type(paths),
 		# Move to static.
-		'python': python_type(paths),
+		'python.bytecode': python_bytecode_type(paths),
 	}
 
 	import pprint

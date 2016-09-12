@@ -68,7 +68,7 @@ def main():
 	# Get the simulations for the bytecode files.
 	for mech, ctx in libconstruct.gather_simulations(contexts, roots):
 		mod = ctx['module']
-		outdir = ctx['locations']['output']
+		outdir = ctx['locations']['reduction']
 
 		for src in mod.__factor_sources__:
 			implement = outdir / src.identifier

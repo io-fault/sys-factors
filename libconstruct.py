@@ -357,8 +357,8 @@ def simulate_composite(route):
 	pkgfile = route.file()
 
 	mod = types.ModuleType(str(route), "Simulated composite factor for bytecode compilation")
-	mod.__factor_type__ = 'python'
-	mod.__factor_dynamics__ = 'extension'
+	mod.__factor_type__ = 'python.bytecode'
+	mod.__factor_dynamics__ = 'library'
 	mod.__factor_sources__ = sources
 	mod.__factor_context__ = bytecode_triplet
 	mod.__file__ = str(pkgfile)
@@ -708,6 +708,23 @@ def python_bytecode_compiler(context, output, inputs,
 	inf, = inputs
 
 	command = [None, filepath(output), filepath(inf), '2' if purpose == 'optimal' else '0']
+	return command
+
+def local_bytecode_compiler(context, output, inputs,
+		mechanism=None, format=None, language='python',
+		verbose=True, filepath=str):
+	"""
+	Command constructor for compiling Python bytecode to an arbitrary file.
+	"""
+	assert language == 'python'
+	from .bin.pyc import compile_python_bytecode
+
+	get = context.get
+	purpose = get('variants')['purpose']
+
+	inf, = inputs
+
+	command = [compile_python_bytecode, filepath(output), filepath(inf), '2' if purpose == 'optimal' else '0']
 	return command
 
 def inspect_link_editor(context, output, inputs, mechanism=None, format=None, filepath=str):
@@ -1250,12 +1267,14 @@ def initialize(contexts, module:types.ModuleType, dependents):
 	wd = wd.route(wk, filename=(lambda x: '%s%s'%(sub, str(x))))
 
 	parameters['locations'] = {
+		'sources': libfactor.sources(ir, module=module),
 		'work': wd, # normally, __pycache__ subdirectory.
 		'reduction': wd / 'ftr',
-		'output': wd / 'psd', # Processed Source Directory
+
+		# Processed Source Directory; becomes ftr if no reduce.
+		'output': wd / 'psd',
 		'logs': wd / 'log',
 		'libraries': wd / 'lib',
-		'sources': libfactor.sources(ir, module=module),
 	}
 
 	# Full set of regular files in the sources location.
@@ -1403,8 +1422,12 @@ def transform(mechanism, context, filtered=reconstruct):
 		# compilation
 		go = {}
 		cmd = genobj(context, obj, (src,))
-		if lmech.get('method') == 'python':
+		method = lmech.get('method')
+		if method == 'python':
 			cmd[0:1] = (sys.executable, '-m', lmech['command'])
+		elif method == 'internal':
+			yield ('call', cmd, logfile)
+			continue
 		else:
 			cmd[0] = lmech['command']
 
@@ -1426,6 +1449,8 @@ def reduce(mechanism, context, filtered=reconstruct, sys_platform=sys.platform):
 
 	fmt = context['variants'].get('format')
 	if fmt is None:
+		return
+	if 'reductions' not in mechanism:
 		return
 
 	ftype = context['type']
@@ -1602,6 +1627,12 @@ class Construction(libio.Processor):
 			mech, *sets = initialize(self.contexts, module, dependents)
 
 			for ctx in sets:
+				if 'reductions' not in ctx:
+					# For mechanisms that do not specify reductions,
+					# the transformed set is the factor.
+					# XXX: Incomplete; check if specific output is absent.
+					ctx['locations']['output'] = ctx['locations']['reduction']
+
 				xf = list(transform(mech, ctx, filtered=self._filter))
 
 				# If any commands or calls are made by the transformation,
@@ -1815,6 +1846,19 @@ class Construction(libio.Processor):
 			elif x[0] == 'link':
 				cmd, src, dst = x
 				dst.link(src)
+				self.progress[module] += 1
+			elif x[0] == 'call':
+				try:
+					seq = x[1]
+					seq[0](*seq[1:])
+					if logfile.exists():
+						logfile.void()
+				except BaseException as err:
+					from traceback import format_exception
+					logfile = x[-1]
+					out = format_exception(err.__class__, err, err.__traceback__)
+					logfile.store('[Exception]\n#!/traceback\n\t', 'w')
+					logfile.store('\t'.join(out).encode('utf-8'), 'ba')
 				self.progress[module] += 1
 			elif x[0] == 'probe':
 				self.probe_execute(module, x)

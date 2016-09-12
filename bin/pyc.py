@@ -9,8 +9,6 @@ import sys
 import py_compile
 
 def compile_python_bytecode(outfile, infile, optimize=2):
-	global py_compile
-
 	try:
 		return py_compile.compile(
 			infile, cfile=outfile, optimize=int(optimize), doraise=True)
