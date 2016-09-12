@@ -163,7 +163,13 @@ class Harness(libharness.Harness):
 			self._print_tb(test.fate)
 			import pdb
 			# error cases chain the exception
-			pdb.post_mortem(test.fate.__cause__.__traceback__)
+			if test.fate.__cause__ is not None:
+				tb = test.fate.__cause__.__traceback__
+			else:
+				tb = None
+			if tb is None:
+				tb = test.fate.__traceback__
+			pdb.post_mortem(tb)
 
 	def execute(self, container, modules, division = None):
 		if division is None:
