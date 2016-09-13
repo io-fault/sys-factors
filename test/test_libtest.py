@@ -117,6 +117,40 @@ def test_Contention(test, partial = functools.partial):
 	t/B() / B
 	t/B() / A
 
+def test_issubclass(test):
+	class A(object):
+		pass
+
+	class B(A):
+		pass
+
+	class C(A):
+		pass
+
+	t = library.Test(None, None)
+	test/t.issubclass(A, object) == None
+	test/t.issubclass(B, A) == None
+	test/t.issubclass(C, A) == None
+	test/library.Absurdity ^ (lambda: t.issubclass(C, B))
+
+def test_isinstance(test):
+	class A(object):
+		pass
+
+	class B(A):
+		pass
+
+	class C(A):
+		pass
+
+	t = library.Test(None, None)
+
+	test/t.isinstance(A(), object) == None
+	test/t.isinstance(B(), A) == None
+	test/t.isinstance(C(), A) == None
+	test/t.isinstance(C(), C) == None
+	test/library.Absurdity ^ (lambda: t.isinstance(C(), B))
+
 if __name__ == '__main__':
 	import sys; from .. import libtest
 	libtest.execute(sys.modules['__main__'])

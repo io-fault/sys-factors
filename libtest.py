@@ -7,6 +7,7 @@ where as they tend to be significant pieces of code. However, a trivial &execute
 function is provided that, when given a module, will execute the tests therein. Exceptions
 are allowed to raise normally in order to report failures of any kind.
 """
+import builtins
 import gc
 import operator
 import functools
@@ -367,7 +368,15 @@ class Test(object):
 	def __rfloordiv__(self, object):
 		return self.Contention(self, object, True)
 
-	def seal(self, isinstance=isinstance, BaseException=BaseException, Exception=Exception, Fate=Fate):
+	def isinstance(self, *args):
+		if not builtins.isinstance(*args):
+			raise self.Absurdity("isinstance", *args, inverse=True)
+
+	def issubclass(self, *args):
+		if not builtins.issubclass(*args):
+			raise self.Absurdity("issubclass", *args, inverse=True)
+
+	def seal(self, isinstance=builtins.isinstance, BaseException=BaseException, Exception=Exception, Fate=Fate):
 		"""
 		Seal the fate of the Test by executing the subject-callable with the Test
 		instance as the only parameter.
