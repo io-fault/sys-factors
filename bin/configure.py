@@ -325,24 +325,18 @@ def xml_type(paths):
 
 	return xml
 
-def resource_type(paths):
+def source_type(paths):
 	"""
 	Initialize a (ctx:ftype)`resource` subject for inclusion in a context.
 	"""
-	subject = {
-		'target-file-extensions': {None:''}, # Resources manage their own.
+	mech = {
+		'target-file-extensions': {None:''},
 
 		'formats': {
+			'executable': 'octets',
 			'library': 'octets',
-		},
-
-		'reductions': {
-			'library': {
-				'interface': libconstruct.__name__ + '.inspect_link_editor',
-				'command': 'fault.development.bin.il',
-				'method': 'python',
-				'redirect': 'stdout',
-			},
+			'extension': 'octets',
+			'fragment': 'octets',
 		},
 
 		'transformations': {
@@ -354,7 +348,35 @@ def resource_type(paths):
 		}
 	}
 
-	return subject
+	return mech
+
+def resource_type(paths):
+	"""
+	Initialize a (ctx:ftype)`resource` subject for inclusion in a context.
+	"""
+	mech = {
+		'target-file-extensions': {None:''}, # Resources manage their own.
+
+		'formats': {
+			'library': 'octets',
+		},
+
+		'transformations': {
+			None: {
+				'interface': libconstruct.__name__ + '.transparent',
+				'type': 'transparent',
+				'command': '/bin/cp',
+			},
+			'uri': {
+				'interface': libconstruct.__name__ + '.transparent',
+				'method': 'python',
+				'command': __package__ + '.stream',
+				'redirect': 'stdout',
+			}
+		}
+	}
+
+	return mech
 
 def inspect(ctx, paths):
 	"""
@@ -585,6 +607,7 @@ def host_system_type(paths):
 		# subject data
 		'platform': target,
 		'target-file-extensions': target_file_extensions,
+		'ignore-extensions': {'h', 'hh', 'hpp'},
 
 		'reference-types': {'weak', 'lazy', 'upward', 'default'},
 
@@ -717,6 +740,7 @@ def static(ctx, paths):
 	Platform independent processing.
 	"""
 	core = {
+		'source': source_type(paths),
 		'resource': resource_type(paths),
 		'javascript': javascript_type(paths),
 		'css': css_type(paths),
@@ -750,7 +774,7 @@ def host(ctx, paths):
 	core = {
 		'system': host_system_type(paths),
 		# Move to static.
-		'python.bytecode': python_bytecode_type(paths),
+		'bytecode.python': python_bytecode_type(paths),
 	}
 
 	import pprint
@@ -804,6 +828,7 @@ def web_context(ctx, paths):
 
 			'target-file-extensions': {
 				None: '.js',
+				'fragment': '.bc',
 			},
 
 			'reference-types': {'weak', 'lazy', 'upward', 'default'},

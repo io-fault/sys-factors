@@ -11,6 +11,7 @@ import os
 import sys
 import types
 import importlib.util
+import collections
 
 from .. import libconstruct
 from .. import library as libdev
@@ -67,10 +68,10 @@ def main():
 
 	# Get the simulations for the bytecode files.
 	for mech, ctx in libconstruct.gather_simulations(contexts, roots):
-		mod = ctx['module']
+		f = ctx['factor']
 		outdir = ctx['locations']['reduction']
 
-		for src in mod.__factor_sources__:
+		for src in f.module.__factor_sources__:
 			implement = outdir / src.identifier
 			uc_report = update_cache(src, implement, condition=condition)
 			if uc_report[0]:
@@ -87,23 +88,26 @@ def main():
 
 		del modules
 
-	for target in candidates:
-		tm = importlib.import_module(str(target))
+	for route in candidates:
+		factor = libconstruct.Factor(route, None, None)
 
-		if isinstance(tm, types.ModuleType) and libfactor.composite(target):
-			if tm.__factor_dynamics__ == 'interfaces':
-				continue
-			mech, fp, *ignored = libconstruct.initialize(contexts, tm, list(libconstruct.collect(tm)))
-			variants = fp['variants']
+		if libfactor.composite(route):
+			contexts = libconstruct.contexts(env.get('FPI_PURPOSE', 'debug'), environment=env.get('FPI_CONTEXT_DIRECTORY', ()))
+			refs = list(libconstruct.collect(factor))
+			cs = collections.defaultdict(set)
+			for f in refs:
+				cs[f.pair].add(f)
 
-			factor_dir = libfactor.inducted(target)
-			fp = libconstruct.reduction(target, variants)
+			mech, fp, *ignored = libconstruct.initialize(contexts, factor, cs, [])
+
+			factor_dir = libfactor.inducted(factor.route)
+			fp = factor.reduction()
 
 			print(str(fp), '->', str(factor_dir))
 			factor_dir.replace(fp)
 
-			if libfactor.python_extension(tm):
-				link, src = libconstruct.link_extension(target, factor_dir)
+			if libfactor.python_extension(factor.module):
+				link, src = libconstruct.link_extension(factor.route, factor_dir)
 				print(str(src), '->', str(link))
 
 	sector.unit.result = 0

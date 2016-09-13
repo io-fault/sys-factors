@@ -16,9 +16,6 @@ necessary procedures for constructing a target.
 	Used by &library_filename to select the appropriate extension
 	for `system.library` and `system.extension` factors.
 
-/selected_context
-	Construction context to load from. Variant is specified after `'#'`.
-
 /selections
 	A mapping providing the selected role to use for the factor module.
 
@@ -41,7 +38,6 @@ necessary procedures for constructing a target.
 """
 import os
 import sys
-import copy
 import functools
 import itertools
 import collections
@@ -65,10 +61,9 @@ from ..xml import library as libxml
 from ..xml import lxml
 
 Import = libroutes.Import
+File = libroutes.File
 
-fpi_addressing = libfs.Hash('fnv1a_32', depth=1, length=4)
-
-selected_context = 'host#optimal'
+fpi_addressing = libfs.Hash('fnv1a_32', depth=1, length=2)
 
 library_extensions = {
 	'msw': 'dll',
@@ -81,7 +76,6 @@ def library_filename(platform, name):
 	"""
 	Construct a dynamic library filename for the given platform.
 	"""
-	global library_extensions
 	return 'lib' + name.lstrip('lib') + '.' + library_extensions.get(platform, 'so')
 
 def python_context(implementation, version_info, abiflags, platform):
@@ -134,6 +128,218 @@ def select(module, role, context=None):
 	else:
 		# exact
 		_factor_roles[module] = role
+
+class Factor(object):
+	"""
+	A Factor of a development environment; similar to "targets" in IDEs.
+
+	Initialized with the primary dependencies of most operations to avoid
+	redundancy and in order to allow simulated factors to be managed without
+	modifying or cleaning up &sys.modules.
+
+	[ Properties ]
+	/local_variants
+		Explicitly designated variants.
+	"""
+
+	default_source_directory = 'src'
+	default_cache_name = '__pycache__'
+	default_fpi_name = '.fpi'
+
+	@staticmethod
+	@functools.lru_cache(32)
+	def _directory_cache(route):
+		parent = route.container
+		if (parent.context, parent.points) != (None, ()):
+			return Factor._directory_cache(route.container) / route.identifier
+		else:
+			return route
+
+	def __init__(self, route:Import, module:types.ModuleType, module_file:File):
+		"""
+		Either &route or &module can be &None, but not both. The system's
+		&importlib will be used to resolve a module from the &route in its
+		absence, and the module's (python:attribute)`__name__` field will
+		be used to construct the &Import route given &route's absence.
+		"""
+		self.local_variants = {}
+		self.key = None
+
+		if route is None:
+			route = Import.from_fullname(module.__name__)
+		elif module is None:
+			module = importlib.import_module(str(route))
+
+		self.route = route
+		self.module = module
+
+		if module_file is None:
+			mfp = getattr(module, '__file__', None)
+			if mfp is not None:
+				# Potentially, this could be a purposeful lie.
+				module_file = File.from_absolute(mfp)
+			else:
+				# Get it from Python's loader.
+				module_file = route.file()
+
+		pkgdir = self._directory_cache(module_file.container)
+		self.package_directory = pkgdir
+		self.module_file = pkgdir / module_file.identifier
+
+	@classmethod
+	def from_fullname(Class, fullname):
+		"""
+		Create from a module's fullname that is available on &sys.path.
+		"""
+		return Class(Import.from_fullname(fullname), None, None)
+
+	@classmethod
+	def from_module(Class, module):
+		"""
+		Create from a &types.ModuleType. This constructor should be used in
+		cases where a simulated Factor was formed.
+		"""
+		if hasattr(module, '__factor__'):
+			return module.__factor__
+		return Class(None, module, None)
+
+	@property
+	@functools.lru_cache(32)
+	def fullname(self):
+		return self.route.fullname
+
+	def __str__(self):
+		struct = "factor://{0.type}.{scheme}/{0.fullname}#{0.module_file.fullpath}"
+		return struct.format(self, scheme=self.dynamics[:3])
+
+	@property
+	def type(self):
+		try:
+			return self.module.__factor_type__
+		except AttributeError:
+			# python.library
+			return 'python'
+
+	@property
+	def dynamics(self):
+		try:
+			return self.module.__factor_dynamics__
+		except AttributeError:
+			# python.library
+			return 'library'
+
+	@property
+	def pair(self):
+		return (self.type, self.dynamics)
+
+	@property
+	def latest_modification(self):
+		return scan_modification_times(self.package_directory)
+
+	@property
+	def source_directory(self):
+		"""
+		Get the factor's source directory.
+		"""
+		srcdir = self.package_directory / self.default_source_directory
+		if not srcdir.exists():
+			return self.package_directory
+		return srcdir
+
+	def sources(self):
+		"""
+		"""
+		# Full set of regular files in the sources location.
+		fs = getattr(self.module, '__factor_sources__', None)
+		if fs is not None:
+			return fs
+		else:
+			srcdir = self.source_directory
+			if srcdir.exists():
+				return [
+					srcdir.__class__(srcdir, (srcdir >> x)[1])
+					for x in srcdir.tree()[1]
+				]
+
+	@property
+	def cache_directory(self) -> File:
+		"""
+		Python cache directory to use for the factor.
+		"""
+		return self.package_directory / self.default_cache_name
+
+	@property
+	def fpi_root(self) -> File:
+		"""
+		Factor Processing Instruction root work directory for the given Factor, &self.
+		"""
+		return self.cache_directory / self.default_fpi_name
+
+	@staticmethod
+	def fpi_work_key(variants):
+		"""
+		Calculate the key from the sorted list.
+
+		Sort function is of minor importance, there is no warranty
+		of consistent accessibility across platform.
+		"""
+		return ';'.join('='.join((k,v)) for k,v in variants).encode('utf-8')
+
+	def fpi_update_key(self, variants):
+		"""
+		Update and return the dictionary key used to access the processed factor.
+		"""
+		vl = list(variants.items())
+		vl.extend(self.local_variants.items())
+		vl.sort()
+		self.key = self.fpi_work_key(vl)
+		return self.key
+
+	@property
+	@functools.lru_cache(32)
+	def fpi_set(self) -> libfs.Dictionary:
+		"""
+		&libfs.Dictionary containing the builds of different variants.
+		"""
+		fr = self.fpi_root
+		wd = libfs.Dictionary.use(fr, addressing=fpi_addressing)
+		return wd
+
+	def fpi_work(self, variants):
+		"""
+		Get the work directory of the Factor for the given variants.
+		"""
+
+		k = self.fpi_work_key(variants)
+		r = self.fpi_set.route(k)
+		return r
+
+	def fpi_reduction(self, variants):
+		"""
+		Get the reduction of the factor for a given construction context.
+		"""
+
+		self.fpi_work(variants) / 'ftr'
+		return ftr
+
+	def reduction(self, slot='factor'):
+		"""
+		Get the appropriate reduction for the Factor based on the
+		configured &key. If no key has been configured, the returned
+		route will be to the inducted factor.
+		"""
+
+		if self.key is not None:
+			r = self.fpi_set.route(self.key) / 'ftr'
+			if not r.exists():
+				r = libfactor.inducted(self.route, slot=slot)
+		else:
+			r = libfactor.inducted(self.route, slot=slot)
+
+		if not r.exists():
+			raise RuntimeError("factor reduction does not exist", r, self)
+
+		return r
 
 def scan_modification_times(factor, aggregate=max):
 	"""
@@ -244,6 +450,13 @@ def merge(parameters, source, operations = merge_operations):
 		else:
 			parameters[key] = source[key]
 
+class Contexts(object):
+	"""
+	A sequence of mechanism sets, construction contexts, that
+	can be used to supply a given build with tools for factor
+	processing.
+	"""
+
 xml_namespaces = {
 	'lc': 'http://fault.io/xml/dev/fpi',
 	'd': 'http://fault.io/xml/data',
@@ -338,7 +551,7 @@ def simulate_composite(route):
 	Given a Python package route, fabricate a composite factor in order
 	to process Python module sources.
 
-	[ Returns ]
+	[ Return ]
 
 	A pair consisting of the fabricated module and the next set of packages to process.
 	"""
@@ -357,7 +570,7 @@ def simulate_composite(route):
 	pkgfile = route.file()
 
 	mod = types.ModuleType(str(route), "Simulated composite factor for bytecode compilation")
-	mod.__factor_type__ = 'python.bytecode'
+	mod.__factor_type__ = 'bytecode.python'
 	mod.__factor_dynamics__ = 'library'
 	mod.__factor_sources__ = sources
 	mod.__factor_context__ = bytecode_triplet
@@ -375,9 +588,10 @@ def gather_simulations(contexts, packages:typing.Sequence[Import]):
 
 		for pkg in current_set:
 			mod, adds = simulate_composite(pkg)
+			f = Factor(Import.from_fullname(mod.__name__), mod, None)
 			next_set.extend(adds)
 
-			mech, ctx = initialize(contexts, mod, ())
+			mech, ctx = initialize(contexts, f, collections.defaultdict(set), ())
 			yield mech, ctx
 
 # The extension suffix to use for *this* Python installation.
@@ -415,28 +629,22 @@ def link_extension(route, factor):
 
 	return (final, src)
 
-def collect(module):
+def collect(factor):
 	"""
-	Return the set of dependencies that the given module has.
+	Return the set of dependencies that the given factor has.
 	"""
 	global libfactor, libroutes, types
 	is_composite = libfactor.composite
 	is_probe = libfactor.probe
 
 	ModuleType = types.ModuleType
-	for v in module.__dict__.values():
+	for v in factor.module.__dict__.values():
 		if not isinstance(v, ModuleType) or not hasattr(v, '__factor_type__'):
 			continue
 
-		if getattr(v, '__factor_composite__', None):
-			# Override for pseudo modules/factors.
-			yield v
-		else:
-			i = Import.from_fullname(v.__name__)
-			if is_composite(i) or is_probe(v):
-				yield v
+		yield Factor(None, v, None)
 
-def traverse(working, tree, inverse, module):
+def traverse(working, tree, inverse, factor):
 	"""
 	Invert the directed graph of dependencies from the target modules.
 
@@ -448,23 +656,26 @@ def traverse(working, tree, inverse, module):
 	"""
 	global collect
 
-	deps = set(collect(module))
+	deps = set(collect(factor))
+
 	if not deps:
 		# No dependencies, add to working set and return.
-		working.add(module)
+		working.add(factor)
 		return
-	elif module in tree:
+	elif factor in tree:
 		# It's already been traversed in a previous run.
 		return
 
 	# dependencies present, assign them inside the tree.
-	tree[module] = deps
+	tree[factor] = deps
 
 	for x in deps:
-		inverse[x].add(module)
+		# Note the factor as depending on &x and build
+		# its tree.
+		inverse[x].add(factor)
 		traverse(working, tree, inverse, x)
 
-def sequence(modules):
+def sequence(factors):
 	"""
 	Generator maintaining the state of sequencing a traversed factor depedency
 	graph. This generator emits factors as they are ready to be processed and receives
@@ -478,31 +689,46 @@ def sequence(modules):
 	completion and its effects; it merely communicates what can now be processed based
 	completion state.
 	"""
-	global collections
 
-	tree = dict()
+	refs = dict()
+	tree = dict() # dependency tree; F -> {DF1, DF2, ..., DFN}
 	inverse = collections.defaultdict(set)
 	working = set()
-	for factor in modules:
+	for factor in factors:
 		traverse(working, tree, inverse, factor)
 
 	new = working
+	# Copy tree.
+	for x, y in tree.items():
+		cs = refs[x] = collections.defaultdict(set)
+		for f in y:
+			cs[f.pair].add(f)
+
+	yield None
 
 	while working:
-		completion = (yield tuple(new), {x: tuple(inverse[x]) for x in new if inverse[x]})
+		# Build categorized dependency set for use by mechanisms.
+		for x in new:
+			if x not in refs:
+				refs[x] = collections.defaultdict(set)
+
+		completion = (yield tuple(new), refs, {x: tuple(inverse[x]) for x in new if inverse[x]})
+		for x in new:
+			refs.pop(x, None)
 		new = set() # &completion triggers new additions to &working
 
-		for module in (completion or ()):
+		for factor in (completion or ()):
 			# completed.
-			working.discard(module)
+			working.discard(factor)
 
-			for deps in inverse[module]:
-				tree[deps].discard(module)
+			for deps in inverse[factor]:
+				tree[deps].discard(factor)
 				if not tree[deps]:
 					# Add to both; new is the set reported to caller,
 					# and working tracks when the graph has been fully sequenced.
 					new.add(deps)
 					working.add(deps)
+
 					del tree[deps]
 
 def identity(module):
@@ -626,7 +852,8 @@ def unix_compiler_collection(context, output, inputs,
 	"""
 	get = context.get
 
-	fdyna = get('dynamics')
+	f = get('factor')
+	fdyna = f.dynamics
 	purpose = get('variants')['purpose']
 	sys = get('system')
 
@@ -669,6 +896,12 @@ def unix_compiler_collection(context, output, inputs,
 
 	# Include Directories; -I option.
 	sid = list(sys.get('include.directories', ()))
+
+	# Get the source libraries referenced by the module.
+	srclib = context['references'].get(('source', 'library'), ())
+	for x in srclib:
+		sid.append(x.reduction())
+
 	command.extend([id_flag + str(x) for x in sid])
 
 	command.append(define_flag + 'FAULT_TYPE=' + (fdyna or 'unspecified'))
@@ -733,8 +966,9 @@ def inspect_link_editor(context, output, inputs, mechanism=None, format=None, fi
 	"""
 	get = context.get
 	purpose = get('variants')['purpose']
-	fdyna = context['dynamics']
-	sub = get(context['type'])
+	f = context['factor']
+	fdyna = f.dynamics
+	sub = get(f.type)
 
 	command = [None, fdyna, format]
 	command.extend([filepath(x) for x in inputs])
@@ -774,14 +1008,15 @@ def macosx_link_editor(context, output, inputs,
 	"""
 	Command constructor for Mach-O link editor provided on Apple MacOS X systems.
 	"""
-	assert context['type'] == 'system'
+	f = context['factor']
+	assert f.type == 'system'
 
 	get = context.get
 	command = [None, '-t', lto_preserve_exports, platform_version_flag, '10.11.0',]
 
 	purpose = get('variants')['purpose']
 	sys = get('system')
-	fdyna = context['dynamics']
+	fdyna = f.dynamics
 
 	loutput_type = type_map[fdyna]
 	command.append(loutput_type)
@@ -864,21 +1099,16 @@ def web_link_editor(context,
 		Enable or disable the verbosity of the command. Defaults to &True.
 	"""
 	get = context.get
+	f = get('factor')
 	sys = get('system')
-	fdyna = context['dynamics']
+	fdyna = f.dynamics
 	purpose = get('variants')['purpose']
 
 	command = ['emcc']
 
 	# emcc is not terribly brilliant; file extensions are used to determine operation.
-	if fdyna == 'fragment':
-		suffix = '.bc'
-	elif fdyna == 'executable':
-		suffix = '.js'
+	if fdyna == 'executable':
 		command.append('--emrun')
-	else:
-		suffix = '.js'
-	output = output.suffix(suffix)
 
 	add = command.append
 	iadd = command.extend
@@ -953,7 +1183,8 @@ def unix_link_editor(context,
 		Enable or disable the verbosity of the command. Defaults to &True.
 	"""
 	get = context.get
-	fdyna = get('dynamics')
+	f = get('factor')
+	fdyna = f.dynamics
 	sys = get('system')
 	purpose = get('variants')['purpose']
 
@@ -1035,7 +1266,7 @@ def updated(outputs, inputs, requirement=None):
 		olm = min(lm, olm or lm)
 
 	if requirement is not None and olm < requirement:
-		# Age requirement not meant, reconstruct.
+		# Age requirement not meant, rebuild.
 		return False
 
 	for x in inputs:
@@ -1046,7 +1277,7 @@ def updated(outputs, inputs, requirement=None):
 	# object has already been updated.
 	return True
 
-def probe_report(probe, contexts, module):
+def probe_report(probe, contexts, factor):
 	"""
 	Return the report data of the probe for the given &context.
 
@@ -1056,9 +1287,9 @@ def probe_report(probe, contexts, module):
 	"""
 	global probe_retrieve
 
-	probe_key = getattr(probe, 'key', None)
+	probe_key = getattr(probe.module, 'key', None)
 	if probe_key is not None:
-		key = probe_key(probe, contexts, module)
+		key = probe_key(probe, contexts, factor)
 	else:
 		key = None
 
@@ -1092,10 +1323,7 @@ def probe_cache(probe, contexts=None):
 	"""
 	Return the route to the probe's recorded report.
 	"""
-	f = libroutes.File.from_absolute(probe.__cached__)
-	last_dot = probe.__name__.rfind('.')
-	path = f.container / (probe.__name__[last_dot+1:] + 'pc')
-	return path
+	return probe.cache_directory / (probe.route.identifier + '.pc')
 
 def factor_defines(module_fullname):
 	"""
@@ -1126,10 +1354,6 @@ def execution_context_extension_defines(module_fullname, target_fullname):
 	tp = target_fullname.rfind('.')
 
 	return [
-		('FACTOR_QNAME', module_fullname),
-		('FACTOR_BASENAME', module_fullname[mp+1:]),
-		('FACTOR_PACKAGE', module_fullname[:mp]),
-
 		('MODULE_QNAME', target_fullname),
 		('MODULE_PACKAGE', target_fullname[:tp]),
 	]
@@ -1140,7 +1364,7 @@ def type_pair(module):
 		module.__factor_dynamics__,
 	)
 
-def initialize(contexts, module:types.ModuleType, dependents):
+def initialize(contexts, factor:Factor, refs, dependents):
 	"""
 	Initialize the construction context parameters for use by &transform
 	and &reduce.
@@ -1148,20 +1372,22 @@ def initialize(contexts, module:types.ModuleType, dependents):
 	[ Parameters ]
 	/contexts
 		The contexts to scan for mechanisms to generate factor processing instructions.
-	/module
-		The factor to be processed.
+	/factor
+		The Factor to be processed.
+	/refs
+		The dependencies, composite factors, specified by imports.
+	/dependents
+		The list of Factors depending on this target.
 	"""
-	global merge
 
-	ir = Import.from_fullname(module.__name__)
-	work = work_directory(ir)
-	wd = libfs.Dictionary.use(work, addressing=fpi_addressing)
+	f = factor
+	module = f.module
+	ir = f.route
+	work = f.fpi_root
+	wd = f.fpi_set
 
-	ftype = module.__factor_type__
-	fdyna = module.__factor_dynamics__
-
-	# Factor dependencies stated by imports.
-	td = list(libfactor.dependencies(module))
+	ftype = f.type
+	fdyna = f.dynamics
 
 	# Find a context that can process the type.
 	for x in contexts:
@@ -1177,67 +1403,47 @@ def initialize(contexts, module:types.ModuleType, dependents):
 	variants = dict(ctx['variants'])
 	mechanisms = ctx
 
-	# Categorize the factor's dependencies.
-	index = collections.defaultdict(list)
-	for x in td:
-		index[type_pair(x)].append(x)
-
-	if ftype == 'system':
-		# fault.development.include
-		index[('system', 'interfaces')].append(include)
-
-	includes = index[('system', 'interfaces')]
-	incdirs = [
-		libfactor.sources(Import.from_fullname(x.__name__))
-		for x in includes
-	]
+	suffix = (
+		mech['target-file-extensions'].get(fdyna) or \
+		mech['target-file-extensions'].get(None) or \
+		'.ftr'
+	)
 
 	# The context parameters for rendering FPI.
 	parameters = {
+		'factor': f,
+		'suffix': suffix,
+		'references': refs, # Per-factor_type modules imported by target.
 		'variants': variants,
 		'irrelevant': set(),
 		'key': None,
-
-		'module': module,
-		'import': ir,
-		'type': ftype,
-		'dynamics': fdyna,
-
-		'references': index, # Per-factor_type modules imported by target.
-
-		'suffix': (
-			mech['target-file-extensions'].get(fdyna) or \
-			mech['target-file-extensions'].get(None) or \
-			'.ftr'
-		),
-
-		# Context data for system.
-		ftype: {
-			'type': fdyna,
-			'abi': getattr(module, 'abi', None), # -soname for unix/elf.
-
-			'include.directories': incdirs,
-			'library.directories': [],
-			'library.set': set(),
-
-			'source.parameters': [
-				('F_PURPOSE', variants['purpose']),
-				('F_PURPOSE_ID', 'F_PURPOSE_' + variants['purpose'].lower()),
-			],
-		}
 	}
+
+	mechp = {
+		'abi': getattr(module, 'abi', None), # -soname for unix/elf.
+
+		'include.directories': [],
+		'library.directories': [],
+		'library.set': set(),
+
+		'source.parameters': [
+			('F_PURPOSE', variants['purpose']),
+			('F_PURPOSE_ID', 'F_PURPOSE_' + variants['purpose'].lower()),
+		],
+	}
+
+	parameters[ftype] = mechp
 
 	# The code formats and necessary reductions need to be identified.
 	# Dependents ultimately determine what this means by designating
 	# the type of link that should be used for a given role.
 
-	sys = parameters[ftype]
-	sysformats = mech['formats'] # code types used by the object types
+	fformats = mech['formats'] # code types used by the object types
 
 	if fdyna not in ('fragment', 'interfaces'):
 		# system/user is the dependent.
 		# Usually, PIC for extensions, PDC/PIE for executables.
-		variants['format'] = sysformats.get(fdyna) or sysformats[None]
+		variants['format'] = fformats.get(fdyna) or fformats[None]
 	else:
 		# For fragments and interfaces, the dependents decide
 		# the format set to build. If no format is designated,
@@ -1246,7 +1452,7 @@ def initialize(contexts, module:types.ModuleType, dependents):
 		formats = set()
 		links = set()
 		for x in dependents:
-			formats.add(sysformats[x.__factor_dynamics__])
+			formats.add(fformats[x.dynamics])
 
 			dparams = getattr(x, 'parameters', None)
 			if dparams is None or not dparams:
@@ -1260,14 +1466,12 @@ def initialize(contexts, module:types.ModuleType, dependents):
 	if fdyna == 'extension' and libfactor.python_extension(module):
 		variants['python_implementation'] = python_triplet
 
-	wk = fpi_work_key(variants)
+	wk = f.fpi_update_key(variants)
 	parameters['key'] = wk
+	wd = wd.route(wk, filename=str)
 
-	sub = ftype[0].upper() + fdyna[0].upper() # Prefix hinting at factor type.
-	wd = wd.route(wk, filename=(lambda x: '%s%s'%(sub, str(x))))
-
-	parameters['locations'] = {
-		'sources': libfactor.sources(ir, module=module),
+	locations = {
+		'sources': f.source_directory,
 		'work': wd, # normally, __pycache__ subdirectory.
 		'reduction': wd / 'ftr',
 
@@ -1277,45 +1481,33 @@ def initialize(contexts, module:types.ModuleType, dependents):
 		'libraries': wd / 'lib',
 	}
 
-	# Full set of regular files in the sources location.
-	if '__factor_sources__' in module.__dict__:
-		parameters['sources'] = module.__factor_sources__
-	else:
-		if parameters['locations']['sources'].exists():
-			parameters['sources'] = parameters['locations']['sources'].tree()[1]
+	parameters['locations'] = locations
+	parameters['sources'] = f.sources() # Potentially the filter point.
 
 	# Local dependency set comes first.
-	parameters[ftype]['library.directories'] = [parameters['locations']['libraries']]
+	mechp['library.directories'] = [locations['libraries']]
 
-	libs = index[('system', 'library')]
-	fragments = index[('system', 'fragment')]
+	libs = refs[('system', 'library')]
+	fragments = refs[('system', 'fragment')]
 
-	libdir = parameters['locations']['libraries']
+	libdir = locations['libraries']
 	for lib in libs:
 		libname = identity(lib)
-		parameters[ftype]['library.set'].add(libname)
+		mechp['library.set'].add(libname)
 
-	# Add include directories from libraries and fragments.
-	for inc in itertools.chain(libs, fragments):
-		ir = Import.from_fullname(inc.__name__)
-		incdir = libfactor.sources(ir).container / 'include'
-		if incdir.exists():
-			sys['include.directories'].append(incdir)
+	from .probes import libpython # import here due to libprobe -> libconstruct
 
-	for probe in index[('system', 'probe')]:
-		report = probe_report(probe, contexts, module)
+	idefines = factor_defines(module.__name__)
+
+	for probe in refs[('system', 'probe')]:
+		report = probe_report(probe, contexts, factor)
 		merge(parameters, report) # probe parameter merge
 
-	from .probes import libpython
+		if probe.module.__name__ == libpython.__name__:
+			ean = libfactor.extension_access_name(module.__name__)
+			idefines.extend(execution_context_extension_defines(module.__name__, ean))
 
-	if libpython in index[('system', 'probe')]:
-		# Note as building a Python extension.
-		ean = libfactor.extension_access_name(module.__name__)
-		idefines = execution_context_extension_defines(module.__name__, ean)
-	else:
-		idefines = factor_defines(module.__name__)
-
-	parameters[ftype]['source.parameters'].extend(idefines)
+	mechp['source.parameters'].extend(idefines)
 
 	if hasattr(module, ftype):
 		merge(parameters[ftype], module.system)
@@ -1335,7 +1527,7 @@ def context_interface(path):
 		obj = getattr(obj, x)
 	return obj
 
-def transform(mechanism, context, filtered=reconstruct):
+def transform(mechanism, context, filtered=rebuild):
 	"""
 	Transform the sources using the mechanisms defined in &context.
 
@@ -1347,12 +1539,13 @@ def transform(mechanism, context, filtered=reconstruct):
 	"""
 	global languages, include
 
+	f = context['factor']
 	variants = context['variants']
-	ftype = context['type']
+	ftype = f.type
 
 	if 'sources' not in context:
 		return
-	if context['dynamics'] == 'interfaces':
+	if f.dynamics == 'interfaces':
 		return
 
 	loc = context['locations']
@@ -1364,13 +1557,14 @@ def transform(mechanism, context, filtered=reconstruct):
 	for x in emitted:
 		yield ('directory', x)
 
+	ignores = mechanism.get('ignore-extensions', ())
 	mech = mechanism['transformations']
 	mech_cache = {}
 
 	commands = []
 	for src in context['sources']:
 		fnx = src.extension
-		if variants['name'] != 'inspect' and fnx in {'h'} or src.identifier.startswith('.'):
+		if variants['name'] != 'inspect' and fnx in ignores or src.identifier.startswith('.'):
 			# Ignore header files and dot-files for non-inspect contexts.
 			continue
 
@@ -1436,7 +1630,7 @@ def transform(mechanism, context, filtered=reconstruct):
 		else:
 			yield ('execute', cmd, logfile)
 
-def reduce(mechanism, context, filtered=reconstruct, sys_platform=sys.platform):
+def reduce(mechanism, context, filtered=rebuild, sys_platform=sys.platform):
 	"""
 	Construct the operations for reducing the object files created by &transform
 	instructions into a set of targets that can satisfy
@@ -1453,16 +1647,18 @@ def reduce(mechanism, context, filtered=reconstruct, sys_platform=sys.platform):
 	if 'reductions' not in mechanism:
 		return
 
-	ftype = context['type']
+	f = context['factor']
+	ftype = f.type
 	mech = context[ftype]
 	preferred_suffix = context['suffix']
-	fdyna = context['dynamics']
+	fdyna = f.dynamics
 
 	# target library directory containing links to dependencies
 	locs = context['locations']
 	libdir = locs['libraries']
 	ftr = locs['reduction']
-	ir = context['import']
+	f = context['factor']
+	ir = f.route
 
 	reductions = mechanism['reductions']
 	if fdyna in reductions:
@@ -1506,7 +1702,6 @@ def reduce(mechanism, context, filtered=reconstruct, sys_platform=sys.platform):
 	]
 
 	# Discover the known sources in order to identify which objects should be selected.
-	fdyna = context['dynamics']
 
 	objdir = locs['output']
 	objects = [
@@ -1566,7 +1761,7 @@ class Construction(libio.Processor):
 	"""
 
 	def __init__(self,
-			contexts, modules,
+			contexts, factors,
 			requirement=None,
 			reconstruct=False,
 			processors=4
@@ -1575,10 +1770,10 @@ class Construction(libio.Processor):
 		self.failures = 0
 
 		self.contexts = contexts # series of context resources for supporting subjects
-		self.modules = modules
+		self.factors = factors
 
 		# Manages the dependency order.
-		self.sequence = sequence([x[1] for x in modules])
+		self.sequence = sequence(factors)
 
 		self.tracking = collections.defaultdict(list) # module -> sequence of sets of tasks
 		self.progress = collections.Counter()
@@ -1590,118 +1785,132 @@ class Construction(libio.Processor):
 		self.continued = False
 		self.activity = set()
 		self.requirement = requirement # outputs must be newer.
+		self.include_factor = Factor(None, include, None)
 
 		super().__init__()
 
 	def actuate(self):
 		if self.reconstruct:
-			self._filter = reconstruct
+			self._filter = rebuild
 		else:
 			self._filter = functools.partial(updated, requirement=self.requirement)
 
-		try:
-			modules, deps = next(self.sequence) # WorkingSet
-		except StopIteration:
-			# Done in actuation? Empty set.
-			self.terminate()
-			return
-
-		for x in modules:
-			self.collect(x, deps.get(x, ()))
-
+		next(self.sequence) # generator init
+		self.finish(())
 		self.drain_process_queue()
+
 		return super().actuate()
 
-	def collect(self, module, dependents=()):
+	def finish(self, factors):
 		"""
-		Collect all the work to be done for building the desired targets.
+		Called when a set of factors have been completed.
 		"""
-		tracks = self.tracking[module]
+		try:
+			for x in factors:
+				del self.progress[x]
+				del self.tracking[x]
 
-		if type_pair(module) == ('system', 'probe'):
+			work, refs, deps = self.sequence.send(factors)
+			for x in work:
+				if x.module.__name__ != include.__name__:
+					# Add the standard include module.
+					refs[x][('source','library')].add(self.include_factor)
+
+				self.collect(x, refs, deps.get(x, ()))
+		except StopIteration:
+			self.terminate()
+
+	def collect(self, factor, references, dependents=()):
+		"""
+		Collect all the work to be done for processing the factor.
+		"""
+		tracks = self.tracking[factor]
+
+		if factor.pair == ('system', 'probe'):
 			# Needs to be transformed into a job.
 			# Probes are deployed per dependency.
-			probe_set = [('probe', module, x) for x in dependents]
+			probe_set = [('probe', factor, x) for x in dependents]
 			tracks.append(probe_set)
 		else:
-			mech, *sets = initialize(self.contexts, module, dependents)
+			mech, *formats = initialize(self.contexts, factor, references[factor], dependents)
 
-			for ctx in sets:
+			for fmt in formats:
 				if 'reductions' not in mech:
 					# For mechanisms that do not specify reductions,
 					# the transformed set is the factor.
 					# XXX: Incomplete; check if specific output is absent.
-					ctx['locations']['output'] = ctx['locations']['reduction']
+					fmt['locations']['output'] = fmt['locations']['reduction']
 
-				xf = list(transform(mech, ctx, filtered=self._filter))
+				xf = list(transform(mech, fmt, filtered=self._filter))
 
 				# If any commands or calls are made by the transformation,
-				# reconstruct the target.
+				# rebuild the target.
 				for x in xf:
 					if x[0] not in ('directory', 'link'):
-						f = reconstruct
+						f = rebuild
 						break
 				else:
 					f = self._filter
 
-				rd = list(reduce(mech, ctx, filtered=f))
+				rd = list(reduce(mech, fmt, filtered=f))
 				tracks.extend((xf, rd))
 
 		if tracks:
-			self.progress[module] = -1
-			self.dispatch(module)
+			self.progress[factor] = -1
+			self.dispatch(factor)
 		else:
-			self.activity.add(module)
+			self.activity.add(factor)
 
 			if self.continued is False:
 				# Consolidate loading of the next set of processors.
 				self.continued = True
 				self.ctx_enqueue_task(self.continuation)
 
-	def probe_execute(self, module, instruction):
+	def probe_execute(self, factor, instruction):
 		assert instruction[0] == 'probe'
 
 		sector = self.sector
 		dep = instruction[2]
+		module = factor.module
 
 		if getattr(module, 'key', None) is not None:
-			key = module.key(module, self.contexts, dep)
+			key = module.key(factor, self.contexts, dep)
 		else:
 			key = None
 
-		reports = probe_retrieve(module, self.contexts)
+		reports = probe_retrieve(factor, self.contexts)
 
 		if key in reports:
 			# Needed report is cached.
-			self.progress[module] += 1
+			self.progress[factor] += 1
 		else:
-			f = lambda x: self.probe_dispatch(module, self.contexts, dep, key, x)
+			f = lambda x: self.probe_dispatch(factor, self.contexts, dep, key, x)
 			t = libio.Thread(f)
 			self.sector.dispatch(t)
 
-	def probe_dispatch(self, module, contexts, dep, key, tproc):
+	def probe_dispatch(self, factor, contexts, dep, key, tproc):
 		# Executed in thread.
 		sector = self.controller # Allow libio.context()
 
-		report = module.deploy(module, contexts, dep)
+		report = factor.module.deploy(factor, contexts, dep)
 		self.ctx_enqueue_task(
 			functools.partial(
 				self.probe_exit,
 				tproc,
 				contexts=contexts,
-				module=module,
+				factor=factor,
 				report=report,
 				key=key
 			),
 		)
 
-	def probe_exit(self, processor, contexts=None, module=None, report=None, key=None):
-		self.progress[module] += 1
-		self.activity.add(module)
+	def probe_exit(self, processor, contexts=None, factor=None, report=None, key=None):
+		self.progress[factor] += 1
+		self.activity.add(factor)
 
-		reports = probe_retrieve(module, contexts)
+		reports = probe_retrieve(factor, contexts)
 		reports[key] = report
-		probe_record(module, reports, contexts)
+		probe_record(factor, reports, contexts)
 
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.
@@ -1709,7 +1918,7 @@ class Construction(libio.Processor):
 			self.ctx_enqueue_task(self.continuation)
 
 	def process_execute(self, instruction):
-		module, ins = instruction
+		factor, ins = instruction
 		typ, cmd, log, *out = ins
 		if typ == 'execute-redirection':
 			stdout = str(out[0])
@@ -1733,14 +1942,14 @@ class Construction(libio.Processor):
 
 		print(' '.join(strcmd) + ' #' + str(pid))
 		self.sector.dispatch(sp)
-		sp.atexit(functools.partial(self.process_exit, start=libtime.now(), descriptor=(typ, cmd, log), module=module))
+		sp.atexit(functools.partial(self.process_exit, start=libtime.now(), descriptor=(typ, cmd, log), factor=factor))
 
-	def process_exit(self, processor, start=None, module=None, descriptor=None):
-		assert module is not None
+	def process_exit(self, processor, start=None, factor=None, descriptor=None):
+		assert factor is not None
 		assert descriptor is not None
-		self.progress[module] += 1
+		self.progress[factor] += 1
 		self.process_count -= 1
-		self.activity.add(module)
+		self.activity.add(factor)
 
 		typ, cmd, log = descriptor
 		pid, status = processor.only
@@ -1750,7 +1959,7 @@ class Construction(libio.Processor):
 
 		l = ''
 		l += ('\n[Profile]\n')
-		l += ('/factor\n\t%s\n' %(module.__name__,))
+		l += ('/factor\n\t%s\n' %(factor,))
 
 		if log.points[-1] != 'reduction':
 			l += ('/subject\n\t%s\n' %('/'.join(log.points),))
@@ -1796,12 +2005,12 @@ class Construction(libio.Processor):
 		"""
 		# Reset continuation
 		self.continued = False
-		modules = list(self.activity)
+		factors = list(self.activity)
 		self.activity.clear()
 
 		completions = set()
 
-		for x in modules:
+		for x in factors:
 			tracking = self.tracking[x]
 			if not tracking:
 				# Empty tracking sets.
@@ -1829,24 +2038,24 @@ class Construction(libio.Processor):
 
 		self.drain_process_queue()
 
-	def dispatch(self, module):
+	def dispatch(self, factor):
 		"""
-		Process the collected work for the module.
+		Process the collected work for the factor.
 		"""
-		assert self.progress[module] == -1
-		self.progress[module] = 0
+		assert self.progress[factor] == -1
+		self.progress[factor] = 0
 
-		for x in self.tracking[module][0]:
+		for x in self.tracking[factor][0]:
 			if x[0] in ('execute', 'execute-redirection'):
-				self.command_queue.append((module, x))
+				self.command_queue.append((factor, x))
 			elif x[0] == 'directory':
 				for y in x[1:]:
 					y.init('directory')
-				self.progress[module] += 1
+				self.progress[factor] += 1
 			elif x[0] == 'link':
 				cmd, src, dst = x
 				dst.link(src)
-				self.progress[module] += 1
+				self.progress[factor] += 1
 			elif x[0] == 'call':
 				try:
 					seq = x[1]
@@ -1859,30 +2068,18 @@ class Construction(libio.Processor):
 					out = format_exception(err.__class__, err, err.__traceback__)
 					logfile.store('[Exception]\n#!/traceback\n\t', 'w')
 					logfile.store('\t'.join(out).encode('utf-8'), 'ba')
-				self.progress[module] += 1
+				self.progress[factor] += 1
 			elif x[0] == 'probe':
-				self.probe_execute(module, x)
+				self.probe_execute(factor, x)
 			else:
 				print('unknown instruction', x)
 
-		if self.progress[module] >= len(self.tracking[module][0]):
-			self.activity.add(module)
+		if self.progress[factor] >= len(self.tracking[factor][0]):
+			self.activity.add(factor)
 
 			if self.continued is False:
 				self.continued = True
 				self.ctx_enqueue_task(self.continuation)
-
-	def finish(self, modules):
-		try:
-			for x in modules:
-				del self.progress[x]
-				del self.tracking[x]
-
-			new, deps = self.sequence.send(modules)
-			for x in new:
-				self.collect(x, deps.get(x, ()))
-		except StopIteration:
-			self.terminate()
 
 	def terminate(self, by=None):
 		# Manages the dispatching of processes,

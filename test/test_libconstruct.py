@@ -1,6 +1,29 @@
+import os.path
 import types
 from .. import libconstruct as library
 from ...routes import library as libroutes
+
+def test_Factor(test):
+	"""
+	Check the Construction Factor features.
+	"""
+	f = library.Factor.from_fullname(__name__)
+	test.isinstance(f.module, types.ModuleType)
+	test.isinstance(f.route, libroutes.Import)
+	test.isinstance(f.module_file, libroutes.File)
+
+	# Check cache directory.
+	pkgdir = os.path.dirname(__file__)
+	pkgcache = os.path.join(pkgdir, '__pycache__')
+	test/str(f.cache_directory) == pkgcache
+
+	# Defaults.
+	test/f.type == 'python'
+	test/f.dynamics == 'library'
+	test/str(f.source_directory) == str(pkgdir)
+
+	fpir = os.path.join(pkgcache, library.Factor.default_fpi_name)
+	test/str(f.fpi_root) == str(fpir)
 
 def test_unix_compiler_collection(test):
 	m = {
@@ -117,27 +140,28 @@ def test_unix_compiler_collection(test):
 	test/cmd == stdhead[0:3] + ['-x', 'c', '-std=c99'] + stdhead[3:] + ['-o', 'out.o', 'input.c']
 
 def test_updated(test):
-	import time
-	with libroutes.File.temporary() as tr:
-		of = tr / 'obj'
-		sf = tr / 'src'
-		test/library.updated([of], [sf], None) == False
+	tr = test.exits.enter_context(libroutes.File.temporary())
 
-		# object older than source
-		of.init('file')
-		sf.init('file')
-		of.set_last_modified(sf.last_modified().rollback(second=10))
-		test/library.updated([of], [sf], None) == False
+	of = tr / 'obj'
+	sf = tr / 'src'
+	test/library.updated([of], [sf], None) == False
 
-		of.void()
-		of.init('file')
-		of.set_last_modified(sf.last_modified().elapse(second=10))
-		test/library.updated([of], [sf], None) == True
+	# object older than source
+	of.init('file')
+	sf.init('file')
+	of.set_last_modified(sf.last_modified().rollback(second=10))
+	test/library.updated([of], [sf], None) == False
+
+	of.void()
+	of.init('file')
+	of.set_last_modified(sf.last_modified().elapse(second=10))
+	test/library.updated([of], [sf], None) == True
 
 def test_sequence(test):
 	"""
 	Check the sequencing of a traversed Sources graph.
 	"""
+	tr = test.exits.enter_context(libroutes.File.temporary())
 	m = [
 		types.ModuleType("M1"),
 		types.ModuleType("M2"),
@@ -149,28 +173,40 @@ def test_sequence(test):
 		types.ModuleType("N3"),
 	]
 	for x in m+n:
-		x.__factor_type__ = 'system.library'
+		x.__factor_type__ = 'system'
+		x.__factor_dynamics__ = 'library'
 		x.__factor_composite__ = True
+		x.__file__ = str(tr / (x.__name__ + '.py'))
 
 	# M1.m2 = M2
 	m[0].m2 = m[1]
-	ms = library.sequence(m)
-	proc = next(ms)[0]
-	test/set(proc) == set((m[1], m[2]))
+
+	factors = [library.Factor(None, x, None) for x in m+n]
+	fd = {f.module: f for f in factors}
+	ms = library.sequence(factors)
+	test/next(ms) == None
+
+	proc = ms.send(())[0]
+	test/set(proc) == set((fd[m[1]], fd[m[2]]))
 
 	proc = ms.send(proc)[0]
-	test/set(proc) == set((m[0],))
+	test/set(proc) == set((fd[m[0]],))
 
 	# M3 -> N1 -> N2 -> N3
 	n[0].n2 = n[1]
 	n[1].n3 = n[2]
 	m[2].n1 = n[0]
-	ms = library.sequence(m+n)
-	proc = next(ms)[0]
-	test/set(proc) == set([n[2], m[1]])
+
+	factors = [library.Factor(None, x, None) for x in m+n]
+	fd = {f.module: f for f in factors}
+	ms = library.sequence(factors)
+	test/next(ms) == None
+
+	proc = ms.send(())[0]
+	test/set(proc) == set([fd[n[2]], fd[m[1]]])
 	test/set(ms.send(())[0]) == set() # no op
-	test/set(ms.send([n[2]])[0]) == set((n[1],)) # triggers n[1]
-	test/set(ms.send([m[1]])[0]) == set((m[0],)) # triggers m[0]
+	test/set(ms.send([fd[n[2]]])[0]) == set((fd[n[1]],)) # triggers n[1]
+	test/set(ms.send([fd[m[1]]])[0]) == set((fd[m[0]],)) # triggers m[0]
 
 def test_identity(test):
 	import types
@@ -201,33 +237,34 @@ def test_construction_sequence(test):
 	! WARNING:
 		Performs no tests aside from execution.
 	"""
+	tr = test.exits.enter_context(libroutes.File.temporary())
 	import builtins
+	import sys
+	import collections
 
 	mt = types.ModuleType("pkg.exe", "docstring")
 	mt.__factor_type__ = 'system'
 	mt.__factor_dynamics__ = 'executable'
 	mt.__builtins__ = builtins
 
-	with libroutes.File.temporary() as tr:
-		import sys
-		sys.path.append(str(tr))
-		(tr / 'pkg' / '__init__.py').init('file')
-		(tr / 'pkg' / 'exe' / '__init__.py').init('file')
+	sys.path.append(str(tr))
+	(tr / 'pkg' / '__init__.py').init('file')
+	(tr / 'pkg' / 'exe' / '__init__.py').init('file')
 
-		pkgdir = tr / 'pkg' / 'exe'
-		py = pkgdir / '__init__.py'
-		src = pkgdir / 'src'
-		src.init('directory')
+	pkgdir = tr / 'pkg' / 'exe'
+	py = pkgdir / '__init__.py'
+	src = pkgdir / 'src'
+	src.init('directory')
 
-		m = src / 'main.c'
-		m.init('file')
+	m = src / 'main.c'
+	m.init('file')
 
-		mt.__file__ = str(py)
-		mt.__package__ = 'pkg.exe'
+	mt.__file__ = str(py)
+	mt.__package__ = 'pkg.exe'
 
-		mech, ctx = library.initialize([], mt, ())
-		xf = list(library.transform(ctx, mt))
-		rd = list(library.reduce(ctx, mt))
+	mech, ctx = library.initialize([], library.Factor(None, mt, None), collections.defaultdict(set), ())
+	xf = list(library.transform(ctx, mt))
+	rd = list(library.reduce(ctx, mt))
 
 if __name__ == '__main__':
 	from .. import libtest; import sys

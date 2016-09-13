@@ -37,7 +37,7 @@ def main():
 	if not env:
 		env = os.environ
 
-	reconstruct = env.get('FPI_REBUILD') == '1'
+	rebuild = env.get('FPI_REBUILD') == '1'
 	purpose = env.get('FPI_PURPOSE', 'debug')
 	ctxname = env.get('FPI_CONTEXT', 'host')
 
@@ -53,7 +53,7 @@ def main():
 		for pkg in current_set:
 			mod, adds = libconstruct.simulate_composite(pkg)
 			next_set.extend(adds)
-			simulations.append((pkg, mod))
+			simulations.append(libconstruct.Factor(pkg, mod, None))
 
 	for route, ref in zip(roots, args):
 		if not route.exists():
@@ -64,11 +64,12 @@ def main():
 
 		# Identify all system modules in project/context package.
 		root_system_modules = []
+		packages.append(route)
 
 		for target in packages:
 			tm = importlib.import_module(str(target))
 			if isinstance(tm, types.ModuleType) and libfactor.composite(target):
-				root_system_modules.append((target, tm))
+				root_system_modules.append(libconstruct.Factor(target, tm, None))
 
 		# Controls process execution queue.
 		ncpu = 2
@@ -83,7 +84,7 @@ def main():
 			libconstruct.contexts(purpose, primary=ctxname),
 			simulations + root_system_modules,
 			processors = max(4, ncpu),
-			reconstruct = reconstruct,
+			reconstruct = rebuild,
 			# Age requirement based on global includes.
 			requirement = libconstruct.scan_modification_times(ii),
 		)

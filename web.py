@@ -80,6 +80,8 @@ def javascript_uglify(context, output, inputs,
 	"""
 	Command constructor for (system:command)`uglifyjs`.
 	"""
+	basename = context['factor'].route.identifier
+
 	js = context['javascript']
 	typ = js.get('type', 'library')
 	output = filepath(output)
@@ -91,12 +93,11 @@ def javascript_uglify(context, output, inputs,
 	command.extend(('--source-map', output+'.map'))
 	command.extend(('--prefix', 'relative', '-c', '-m'))
 
-	mapurl = context['import'].identifier + '.map'
+	mapurl = basename + '.map'
 	command.extend(('--source-map-url', mapurl))
 
 	if typ == 'library':
-		n = context['module'].__name__.split('.')[-1]
-		command.extend(('--wrap', n, '--export-all'))
+		command.extend(('--wrap', basename, '--export-all'))
 
 	if js.get('source.parameters') is not None:
 		command.append('--define')

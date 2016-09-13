@@ -120,16 +120,14 @@ class Harness(object):
 		Used by the harness to import extensions that are being tested in a fashion
 		that allows for coverage and profile data to be collected and for injection
 		dependent tests.
-
-		! DEVELOPMENT: Warning
-			The variant resolution needs to be based on libconstruct.initialize.
 		"""
 
 		env = os.environ
 
-		tm = importlib.import_module(str(route))
+		f = libconstruct.Factor(route, None, None)
 		contexts = libconstruct.contexts(env.get('FPI_PURPOSE', 'test'), environment=env.get('FPI_CONTEXT_DIRECTORY', ()))
-		mech, fp, *ignored = libconstruct.initialize(contexts, tm, list(libconstruct.collect(tm)))
+
+		mech, fp, *ignored = libconstruct.initialize(contexts, f, collections.defaultdict(set), list(libconstruct.collect(f)))
 		variants = fp['variants']
 
 		dll = libconstruct.reduction(route, variants) / 'pf.lnk'

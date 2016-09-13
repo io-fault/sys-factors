@@ -5,6 +5,7 @@ transcript to standard out.
 import sys
 import os
 import importlib
+import collections
 
 from ..probes import libpython
 from .. import libconstruct
@@ -16,13 +17,16 @@ if __name__ == '__main__':
 	env = os.environ
 	command, module_fullname, *files = sys.argv
 
-	ir = libroutes.Import.from_fullname(module_fullname)
-	tm = importlib.import_module(str(ir)) # import "$1"
+	factor = libconstruct.Factor(libroutes.Import.from_fullname(module_fullname), None, None)
 
 	contexts = libconstruct.contexts(env.get('FPI_PURPOSE', 'debug'), environment=env.get('FPI_CONTEXT_DIRECTORY', ()))
-	mech, fp, *ignored = libconstruct.initialize(contexts, tm, list(libconstruct.collect(tm)))
-	variants = fp['variants']
-	logdir = libconstruct.reduction(ir, variants).container / 'log'
+	refs = list(libconstruct.collect(factor))
+	cs = collections.defaultdict(set)
+	for f in refs:
+		cs[f.pair].add(f)
+
+	mech, fp, *ignored = libconstruct.initialize(contexts, factor, cs, [])
+	logdir = factor.reduction().container / 'log'
 
 	if files:
 		files = [logdir.extend(x.split('/')) for x in files]
