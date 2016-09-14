@@ -906,9 +906,6 @@ def web_context(ctx, paths):
 	purposes(corefile)
 
 def main(name, args, paths=None):
-	global libroutes
-	import os
-
 	if args:
 		libconstruct_dir, = args
 	else:
@@ -921,6 +918,16 @@ def main(name, args, paths=None):
 	static(init(libconstruct_dir / 'static'), paths)
 	inspect(init(libconstruct_dir / 'inspect'), paths)
 	web_context(init(libconstruct_dir / 'web'), paths)
+
+	i = libroutes.Import.from_fullname(__package__) ** 2
+	ctxdir = (i / 'context').file().container
+	devsh = ctxdir / 'dev.sh'
+	dev_script = devsh.load()
+
+	fbin = libconstruct_dir.container / 'env' / 'bin'
+	devexe = fbin / 'dev'
+	devexe.store(dev_script)
+	os.chmod(str(devexe), 0o711)
 
 if __name__ == '__main__':
 	import sys
