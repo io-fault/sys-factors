@@ -126,7 +126,7 @@ class Harness(object):
 
 		f = libconstruct.Factor(route, None, None)
 		contexts = libconstruct.contexts(env.get('FPI_PURPOSE', 'test'), environment=env.get('FPI_CONTEXT_DIRECTORY', ()))
-		mech, fp, *ignored = libconstruct.initialize(contexts, f, collections.defaultdict(set), list(libconstruct.collect(f)))
+		mech, fp, *ignored = libconstruct.initialize(contexts, f, collections.defaultdict(set), list(f.dependencies()))
 
 		dll = f.reduction() / 'pf.lnk'
 		name = libfactor.extension_access_name(str(route))

@@ -8,10 +8,6 @@ necessary procedures for constructing a target.
 
 [ Properties ]
 
-/variants
-	Dictionary of construction roles used by libconstruct to manage different
-	transformations of &libdev.Sources modules.
-
 /library_extensions
 	Used by &library_filename to select the appropriate extension
 	for `system.library` and `system.extension` factors.
@@ -26,15 +22,6 @@ necessary procedures for constructing a target.
 /bytecode_triplet
 	The `-` separated strings representing the bytecode used by the executing Python
 	context.
-
-[ Environment ]
-
-/libfpi_context
-	Construction Context to build with. Absolute path to XML or a relative
-	path designating the variant-set pair.
-
-/libfpi_directory
-	Path to the collection of construction context sets.
 """
 import os
 import sys
@@ -341,6 +328,27 @@ class Factor(object):
 
 		return r
 
+	def dependencies(factor):
+		"""
+		Return the set of dependencies that the given factor has.
+		"""
+
+		is_composite = libfactor.composite
+		is_probe = libfactor.probe
+		ModuleType = types.ModuleType
+
+		for v in factor.module.__dict__.values():
+			if not isinstance(v, ModuleType):
+				continue
+			if not hasattr(v, '__factor_type__'):
+				continue
+			if not hasattr(v, '__factor_dynamics__'):
+				# Factor, but no dynamics means that
+				# it has no transformation to perform.
+				continue
+
+			yield Factor(None, v, None)
+
 def scan_modification_times(factor, aggregate=max):
 	"""
 	Scan the factor's sources for the latest modification time.
@@ -350,74 +358,6 @@ def scan_modification_times(factor, aggregate=max):
 
 	glm = libroutes.File.get_last_modified
 	return aggregate(x for x in map(glm, files))
-
-def variant(module, role='optimal', context=None):
-	"""
-	Get the configured role for the given module path.
-	"""
-	global _factor_roles, _factor_role_patterns
-
-	path = str(module)
-
-	if _factor_roles is None:
-		return role
-
-	if path in _factor_roles:
-		return _factor_roles[path]
-
-	if _factor_role_patterns is not None:
-		# check for pattern
-		path = _factor_role_patterns.get(tuple(path.split('.')))
-		return _factor_roles['.'.join(path)]
-
-	return default_role
-
-def work_directory(import_route:Import, cache='__pycache__', name='.fpi'):
-	"""
-	Get the relevant work directory inside the associated
-	(system:relpath)`__pycache__/.fpi` directory.
-	"""
-
-	# Get a route to the FPI build set in __pycache__.
-	return import_route.file().container / '__pycache__' / name
-
-def fpi_work_key(variants):
-	"""
-	Calculate the key from the sorted list.
-
-	Sort function is of minor importance, there is no warranty
-	of consistent accessibility across platform.
-	"""
-	vl = list(variants.items())
-	vl.sort()
-	return ';'.join('='.join((k,v)) for k,v in vl).encode('utf-8')
-
-def context_work_route(fpi, variants):
-	"""
-	Get the work directory of the factor.
-	"""
-
-	wd = libfs.Dictionary.use(fpi, addressing=fpi_addressing)
-	k = fpi_work_key(variants)
-	r = wd.route(k)
-
-	return r
-
-def context_work(import_route, variants):
-	"""
-	Get the work directory of the factor.
-	"""
-
-	fpi = work_directory(import_route)
-	return context_work_route(fpi, variants)
-
-def reduction(import_route, variants):
-	"""
-	Get the reduction for a construction context.
-	"""
-
-	ftr = context_work(import_route, variants) / 'ftr'
-	return ftr
 
 merge_operations = {
 	set: set.update,
@@ -629,21 +569,6 @@ def link_extension(route, factor):
 
 	return (final, src)
 
-def collect(factor):
-	"""
-	Return the set of dependencies that the given factor has.
-	"""
-	global libfactor, libroutes, types
-	is_composite = libfactor.composite
-	is_probe = libfactor.probe
-
-	ModuleType = types.ModuleType
-	for v in factor.module.__dict__.values():
-		if not isinstance(v, ModuleType) or not hasattr(v, '__factor_type__'):
-			continue
-
-		yield Factor(None, v, None)
-
 def traverse(working, tree, inverse, factor):
 	"""
 	Invert the directed graph of dependencies from the target modules.
@@ -654,9 +579,8 @@ def traverse(working, tree, inverse, factor):
 	to process the subject module. The inverted graph is constructed to manage
 	completion signalling for processing purposes.
 	"""
-	global collect
 
-	deps = set(collect(factor))
+	deps = set(factor.dependencies())
 
 	if not deps:
 		# No dependencies, add to working set and return.
@@ -1440,7 +1364,7 @@ def initialize(contexts, factor:Factor, refs, dependents):
 
 	fformats = mech['formats'] # code types used by the object types
 
-	if fdyna not in ('fragment', 'interfaces'):
+	if fdyna != 'fragment':
 		# system/user is the dependent.
 		# Usually, PIC for extensions, PDC/PIE for executables.
 		variants['format'] = fformats.get(fdyna) or fformats[None]

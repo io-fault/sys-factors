@@ -19,8 +19,8 @@ if __name__ == '__main__':
 
 	factor = libconstruct.Factor(libroutes.Import.from_fullname(module_fullname), None, None)
 
-	contexts = libconstruct.contexts(env.get('FPI_PURPOSE', 'debug'), environment=env.get('FPI_CONTEXT_DIRECTORY', ()))
-	refs = list(libconstruct.collect(factor))
+	contexts = libconstruct.contexts(env.get('FPI_PURPOSE', 'debug'), environment=env.get('DEV_CONTEXT_DIRECTORY', ()))
+	refs = list(factor.dependencies())
 	cs = collections.defaultdict(set)
 	for f in refs:
 		cs[f.pair].add(f)

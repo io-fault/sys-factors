@@ -93,7 +93,7 @@ def main():
 
 		if libfactor.composite(route):
 			contexts = libconstruct.contexts(env.get('FPI_PURPOSE', 'debug'), environment=env.get('FPI_CONTEXT_DIRECTORY', ()))
-			refs = list(libconstruct.collect(factor))
+			refs = list(factor.dependencies())
 			cs = collections.defaultdict(set)
 			for f in refs:
 				cs[f.pair].add(f)
