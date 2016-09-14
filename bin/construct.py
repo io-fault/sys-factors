@@ -38,8 +38,7 @@ def main():
 		env = os.environ
 
 	rebuild = env.get('FPI_REBUILD') == '1'
-	purpose = env.get('FPI_PURPOSE', 'debug')
-	ctxname = env.get('FPI_CONTEXT', 'host')
+	mechs = libconstruct.Mechanisms.from_environment()
 
 	# collect packages to prepare from positional parameters
 	roots = [import_from_fullname(x) for x in args]
@@ -81,8 +80,7 @@ def main():
 
 		ii = import_from_module(include)
 		cxn = libconstruct.Construction(
-			libconstruct.contexts(purpose, primary=ctxname),
-			simulations + root_system_modules,
+			mechs, simulations + root_system_modules,
 			processors = max(4, ncpu),
 			reconstruct = rebuild,
 			# Age requirement based on global includes.

@@ -19,13 +19,13 @@ if __name__ == '__main__':
 
 	factor = libconstruct.Factor(libroutes.Import.from_fullname(module_fullname), None, None)
 
-	contexts = libconstruct.contexts(env.get('FPI_PURPOSE', 'debug'), environment=env.get('DEV_CONTEXT_DIRECTORY', ()))
+	mechs = libconstruct.Mechanisms.from_environment()
 	refs = list(factor.dependencies())
 	cs = collections.defaultdict(set)
 	for f in refs:
 		cs[f.pair].add(f)
 
-	mech, fp, *ignored = libconstruct.initialize(contexts, factor, cs, [])
+	mech, fp, *ignored = libconstruct.initialize(mechs, factor, cs, [])
 	logdir = factor.reduction().container / 'log'
 
 	if files:

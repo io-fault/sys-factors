@@ -55,7 +55,7 @@ def main():
 		env = os.environ
 
 	rebuild = env.get('FPI_REBUILD', '0')
-	contexts = libconstruct.contexts(env.get('FPI_PURPOSE', 'debug'), environment=env.get('FPI_CONTEXT_DIRECTORY', ()))
+	mechs = libconstruct.Mechanisms.from_environment()
 
 	rebuild = bool(int(rebuild))
 	if rebuild:
@@ -67,7 +67,7 @@ def main():
 	roots = [import_from_fullname(x) for x in args]
 
 	# Get the simulations for the bytecode files.
-	for mech, ctx in libconstruct.gather_simulations(contexts, roots):
+	for mech, ctx in libconstruct.gather_simulations(mechs, roots):
 		f = ctx['factor']
 		outdir = ctx['locations']['reduction']
 
@@ -92,14 +92,12 @@ def main():
 		factor = libconstruct.Factor(route, None, None)
 
 		if libfactor.composite(route):
-			contexts = libconstruct.contexts(env.get('FPI_PURPOSE', 'debug'), environment=env.get('FPI_CONTEXT_DIRECTORY', ()))
 			refs = list(factor.dependencies())
 			cs = collections.defaultdict(set)
 			for f in refs:
 				cs[f.pair].add(f)
 
-			mech, fp, *ignored = libconstruct.initialize(contexts, factor, cs, [])
-
+			mech, fp, *ignored = libconstruct.initialize(mechs, factor, cs, [])
 			factor_dir = libfactor.inducted(factor.route)
 			fp = factor.reduction()
 

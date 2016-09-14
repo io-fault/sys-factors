@@ -117,18 +117,21 @@ class Harness(libharness.Harness):
 				rf.store(''.join(fex), 'w')
 			return {test.fate.impact: 1}
 
-def main(package, modules):
+def main(packages):
 	red = lambda x: '\x1b[38;5;196m' + x + '\x1b[0m'
 	green = lambda x: '\x1b[38;5;46m' + x + '\x1b[0m'
 
 	sys.dont_write_bytecode = True
-	root = libroutes.Import.from_fullname(package)
+	pkgset = []
+	for package in packages:
+		root = libroutes.Import.from_fullname(package)
 
-	if getattr(root.module(), '__factor_type__', None) == 'context':
-		pkgset = root.subnodes()[0]
-		pkgset.sort()
-	else:
-		pkgset = [root]
+		ft = getattr(root.module(), '__factor_type__', None)
+		if ft == 'context':
+			pkgset.extend(root.subnodes()[0])
+		else:
+			pkgset.append(root)
+	pkgset.sort()
 
 	failures = 0
 
@@ -160,7 +163,7 @@ def main(package, modules):
 	raise SystemExit(min(failures, 201))
 
 if __name__ == '__main__':
-	command, package, *modules = sys.argv
+	command, *packages = sys.argv
 	try:
 		os.nice(10)
 	except:
@@ -168,4 +171,4 @@ if __name__ == '__main__':
 		pass
 
 	with libcore.constraint():
-		libsys.control(main, package, modules)
+		libsys.control(main, packages)

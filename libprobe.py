@@ -95,7 +95,7 @@ def executables(xset:typing.Set[str]):
 
 def prepare(
 		directory,
-		contexts,
+		mechanisms,
 		language:collections.abc.Hashable,
 		source:str,
 		libraries:typing.Sequence[str]=(),
@@ -148,7 +148,7 @@ def prepare(
 	wd = libconstruct.context_work_route(fpid, variants)
 
 	return wd / 'ftr' / 'pf.lnk', \
-		libconstruct.Construction(contexts, [('fault_probe', mod)])
+		libconstruct.Construction(mechanisms, [('fault_probe', mod)])
 
 def _execute_probe(factor):
 	p = subprocess.Popen(
@@ -162,7 +162,7 @@ def _execute_probe(factor):
 
 	return stdout
 
-def runtime(contexts, language, source, **parameters):
+def runtime(mechanisms, language, source, **parameters):
 	tr = None
 	cxn = None
 	exe = None
@@ -173,7 +173,7 @@ def runtime(contexts, language, source, **parameters):
 		s.subresource(unit)
 		unit.place(s, "bin", "construction")
 		unit.context.enqueue(s.actuate)
-		exe, cxn = prepare(tr, contexts, language, source, **parameters)
+		exe, cxn = prepare(tr, mechanisms, language, source, **parameters)
 		s.dispatch(cxn)
 
 	with libroutes.File.temporary() as tr:
@@ -207,7 +207,7 @@ def sysctl(names, route=None):
 	command += names
 
 def includes(
-		contexts,
+		mechanisms,
 		language:collections.abc.Hashable,
 		includes:typing.Sequence[str],
 		requisites:typing.Sequence[str]=(),
@@ -242,4 +242,4 @@ def includes(
 		('#include <%s>\n' * len(includes)) %includes
 	])
 
-	return runtime(contexts, language, reqs+includes+main, **parameters) is not None
+	return runtime(mechanisms, language, reqs+includes+main, **parameters) is not None

@@ -390,79 +390,62 @@ def merge(parameters, source, operations = merge_operations):
 		else:
 			parameters[key] = source[key]
 
-class Contexts(object):
-	"""
-	A sequence of mechanism sets, construction contexts, that
-	can be used to supply a given build with tools for factor
-	processing.
-	"""
-
 xml_namespaces = {
 	'lc': 'http://fault.io/xml/dev/fpi',
 	'd': 'http://fault.io/xml/data',
 }
 
-def root_context_directory(env='FPI_DIRECTORY'):
+class Mechanisms(object):
 	"""
-	Return the &libroutes.File instance to the root context.
-	By default, this is (fs:path)`~/.fault/fpi`, but can
-	be overridden by the (system:environment)`FPI_DIRECTORY` variable.
-
-	The result of this should only be cached in order to maintain a consistent
-	perspective; this function polls the environment for the appropriate version.
-
-	[ Parameters ]
-	/env
-		The environment variable name to use when looking for an override
-		of the user's home.
-	"""
-	global os
-	if env in os.environ:
-		return libroutes.File.from_absolute(os.environ[env])
-
-	return libroutes.File.home() / '.fault' / 'fpi'
-
-def load_context(route:libroutes.File):
-	"""
-	Load the context selected by &route and process the 
+	A sequence of mechanism sets, Construction Context, that
+	can be used to supply a given build with tools for factor
+	processing.
 	"""
 
-	with route.open('r') as f:
-		xml = lxml.etree.parse(f)
+	def __init__(self, sequence):
+		self.sequence = sequence
 
-	variants = {}
-	context = {}
+	def find(self, ftype):
+		for x in self.sequence:
+			if ftype in x:
+				return x, x[ftype]
 
-	# XInclude is how imports/refs to other contexts are managed.
-	xml.xinclude()
-	d = xml.xpath('/lc:libconstruct/lc:context', namespaces=xml_namespaces)
+	@staticmethod
+	def load_xml(route:libroutes.File):
+		"""
+		Load the XML context designated by the &route.
+		"""
 
-	# Merge context data in the order they appear.
-	for x in d:
-		# Attributes on the context element define the variant.
-		variants.update(x.attrib)
-		data = libxml.Data.structure(list(x)[0])
-		merge(context, data)
+		with route.open('r') as f:
+			xml = lxml.etree.parse(f)
 
-	context['variants'] = variants
-	return xml, context
+		variants = {}
+		context = {}
 
-def root_context(directory, selection, role):
-	xf = directory / (selection or 'host') / (role + '.xml')
-	if not xf.exists():
-		return None, {}
+		# XInclude is how imports/refs to other contexts are managed.
+		xml.xinclude()
+		d = xml.xpath('/lc:libconstruct/lc:context', namespaces=xml_namespaces)
 
-	return load_context(xf)
+		# Merge context data in the order they appear.
+		for x in d:
+			# Attributes on the context element define the variant.
+			variants.update(x.attrib)
+			data = libxml.Data.structure(list(x)[0])
+			merge(context, data)
 
-def contexts(purpose, primary='host', fallback='static', environment=()):
-	doc, p_ctx = root_context(root_context_directory(), primary, purpose)
-	sd, static_ctx = root_context(root_context_directory(), fallback, purpose)
+		context['variants'] = variants
 
-	p = [p_ctx]
-	p.extend([load_context(libroutes.File.from_absolute(x))[1] for x in environment])
-	p.append(static_ctx)
+		return xml, context
 
-	return tuple(p)
+	@classmethod
+	def from_environment(Class, envvar="FPI_MECHANISMS"):
+		mech_refs = os.environ[envvar].split(os.pathsep)
+		seq = []
+		for mech in mech_refs:
+			xml, ctx = Class.load_xml(File.from_absolute(mech))
+			seq.append(ctx)
+
+		return Class(seq)
 
 # Specifically for identifying files to be compiled and how.
 extensions = {
@@ -518,7 +501,7 @@ def simulate_composite(route):
 
 	return mod, pkgs
 
-def gather_simulations(contexts, packages:typing.Sequence[Import]):
+def gather_simulations(mechanisms, packages:typing.Sequence[Import]):
 	# Get the simulations for the bytecode files.
 	next_set = packages
 
@@ -531,7 +514,7 @@ def gather_simulations(contexts, packages:typing.Sequence[Import]):
 			f = Factor(Import.from_fullname(mod.__name__), mod, None)
 			next_set.extend(adds)
 
-			mech, ctx = initialize(contexts, f, collections.defaultdict(set), ())
+			mech, ctx = initialize(mechanisms, f, collections.defaultdict(set), ())
 			yield mech, ctx
 
 # The extension suffix to use for *this* Python installation.
@@ -1288,13 +1271,13 @@ def type_pair(module):
 		module.__factor_dynamics__,
 	)
 
-def initialize(contexts, factor:Factor, refs, dependents):
+def initialize(mechanisms, factor:Factor, refs, dependents):
 	"""
 	Initialize the construction context parameters for use by &transform
 	and &reduce.
 
 	[ Parameters ]
-	/contexts
+	/mechanisms
 		The contexts to scan for mechanisms to generate factor processing instructions.
 	/factor
 		The Factor to be processed.
@@ -1314,14 +1297,7 @@ def initialize(contexts, factor:Factor, refs, dependents):
 	fdyna = f.dynamics
 
 	# Find a context that can process the type.
-	for x in contexts:
-		if ftype in x:
-			ctx = x
-			mech = x[ftype]
-			break
-	else:
-		raise RuntimeError("context set does not have mechanism for processing " + repr(ftype))
-
+	ctx, mech = mechanisms.find(ftype)
 	yield mech
 
 	variants = dict(ctx['variants'])
@@ -1424,7 +1400,7 @@ def initialize(contexts, factor:Factor, refs, dependents):
 	idefines = factor_defines(module.__name__)
 
 	for probe in refs[('system', 'probe')]:
-		report = probe_report(probe, contexts, factor)
+		report = probe_report(probe, mechanisms, factor)
 		merge(parameters, report) # probe parameter merge
 
 		if probe.module.__name__ == libpython.__name__:
@@ -1685,7 +1661,7 @@ class Construction(libio.Processor):
 	"""
 
 	def __init__(self,
-			contexts, factors,
+			mechanisms, factors,
 			requirement=None,
 			reconstruct=False,
 			processors=4
@@ -1693,7 +1669,7 @@ class Construction(libio.Processor):
 		self.reconstruct = reconstruct
 		self.failures = 0
 
-		self.contexts = contexts # series of context resources for supporting subjects
+		self.mechanisms = mechanisms # series of context resources for supporting subjects
 		self.factors = factors
 
 		# Manages the dependency order.
@@ -1756,7 +1732,7 @@ class Construction(libio.Processor):
 			probe_set = [('probe', factor, x) for x in dependents]
 			tracks.append(probe_set)
 		else:
-			mech, *formats = initialize(self.contexts, factor, references[factor], dependents)
+			mech, *formats = initialize(self.mechanisms, factor, references[factor], dependents)
 
 			for fmt in formats:
 				if 'reductions' not in mech:
@@ -1798,43 +1774,43 @@ class Construction(libio.Processor):
 		module = factor.module
 
 		if getattr(module, 'key', None) is not None:
-			key = module.key(factor, self.contexts, dep)
+			key = module.key(factor, self.mechanisms, dep)
 		else:
 			key = None
 
-		reports = probe_retrieve(factor, self.contexts)
+		reports = probe_retrieve(factor, self.mechanisms)
 
 		if key in reports:
 			# Needed report is cached.
 			self.progress[factor] += 1
 		else:
-			f = lambda x: self.probe_dispatch(factor, self.contexts, dep, key, x)
+			f = lambda x: self.probe_dispatch(factor, self.mechanisms, dep, key, x)
 			t = libio.Thread(f)
 			self.sector.dispatch(t)
 
-	def probe_dispatch(self, factor, contexts, dep, key, tproc):
+	def probe_dispatch(self, factor, mechanisms, dep, key, tproc):
 		# Executed in thread.
 		sector = self.controller # Allow libio.context()
 
-		report = factor.module.deploy(factor, contexts, dep)
+		report = factor.module.deploy(factor, mechanisms, dep)
 		self.ctx_enqueue_task(
 			functools.partial(
 				self.probe_exit,
 				tproc,
-				contexts=contexts,
+				mechanisms=mechanisms,
 				factor=factor,
 				report=report,
 				key=key
 			),
 		)
 
-	def probe_exit(self, processor, contexts=None, factor=None, report=None, key=None):
+	def probe_exit(self, processor, mechanisms=None, factor=None, report=None, key=None):
 		self.progress[factor] += 1
 		self.activity.add(factor)
 
-		reports = probe_retrieve(factor, contexts)
+		reports = probe_retrieve(factor, mechanisms)
 		reports[key] = report
-		probe_record(factor, reports, contexts)
+		probe_record(factor, reports, mechanisms)
 
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.

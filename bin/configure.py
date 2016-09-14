@@ -907,9 +907,13 @@ def web_context(ctx, paths):
 
 def main(name, args, paths=None):
 	if args:
-		libconstruct_dir, = args
+		libconstruct_dir = libroutes.File.from_path(args[0])
 	else:
-		libconstruct_dir = libconstruct.root_context_directory()
+		if 'FAULT_DIRECTORY' in os.environ:
+			fd = os.environ['FAULT_DIRECTORY']
+			libconstruct_dir = libroutes.File.from_absolute(fd) / 'fpi'
+		else:
+			libconstruct_dir = libroutes.File.home() / '.fault' / 'fpi'
 
 	if paths is None:
 		paths = libprobe.environ_paths()
@@ -927,7 +931,7 @@ def main(name, args, paths=None):
 	fbin = libconstruct_dir.container / 'env' / 'bin'
 	devexe = fbin / 'dev'
 	devexe.store(dev_script)
-	os.chmod(str(devexe), 0o711)
+	os.chmod(str(devexe), 0o722)
 
 if __name__ == '__main__':
 	import sys
