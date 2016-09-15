@@ -7,6 +7,7 @@
 #define _CPP_QUOTE(x) #x
 #define STRING_FROM_IDENTIFIER(X) _CPP_QUOTE(X)
 #define CONCAT_IDENTIFIER(X, Y) X##Y
+#define CONCAT_REFERENCES(X, Y) CONCAT_IDENTIFIER(X,Y)
 
 #define PRODUCT_ARCHITECTURE_STR STRING_FROM_IDENTIFIER(PRODUCT_ARCHITECTURE)
 
@@ -20,6 +21,12 @@
 #define FACTOR_PACKAGE_STR STRING_FROM_IDENTIFIER(FACTOR_PACKAGE)
 #define FACTOR_PATH(NAME) FACTOR_QNAME_STR "." NAME
 
+#ifndef F_PURPOSE
+	#warning Compilation driver was not given a F_PURPOSE preprocessor definition
+	#warning Presuming 'optimal' build.
+	#define F_PURPOSE optimal
+#endif
+
 #define F_PURPOSE_STR STRING_FROM_IDENTIFIER(F_PURPOSE)
 
 #define F_PURPOSE_optimal 1
@@ -31,6 +38,11 @@
 #define F_PURPOSE_profiling 4
 #define F_PURPOSE_coverage 9
 
+#define _F_PURPOSE_PREFIX() F_PURPOSE_
+#define _F_PURPOSE_REF() F_PURPOSE
+#undef F_PURPOSE_ID
+#define F_PURPOSE_ID CONCAT_REFERENCES(_F_PURPOSE_PREFIX(),_F_PURPOSE_REF())
+
 #define F_TRACE(y) 0
 
 #define FV_OPTIMAL(y) (F_PURPOSE_ID == F_PURPOSE_optimal)
@@ -41,11 +53,5 @@
 
 #define FV_COVERAGE(y) (F_PURPOSE_ID == F_PURPOSE_coverage)
 #define FV_PROFILING(y) (F_PURPOSE_ID == F_PURPOSE_profiling)
-
-#ifndef F_PURPOSE_ID
-	#warning Compilation driver was not given a F_PURPOSE_ID preprocessor definition
-	#warning Presuming 'optimal' build.
-	#define F_PURPOSE_ID F_PURPOSE_optimal
-#endif
 
 #endif
