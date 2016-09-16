@@ -8,7 +8,7 @@ import importlib
 import collections
 
 from ..probes import libpython
-from .. import libconstruct
+from .. import library as libdev
 
 from ...system import libfactor
 from ...routes import library as libroutes
@@ -17,9 +17,9 @@ if __name__ == '__main__':
 	env = os.environ
 	command, module_fullname, *files = sys.argv
 
-	factor = libconstruct.Factor(libroutes.Import.from_fullname(module_fullname), None, None)
+	factor = libdev.Factor(libroutes.Import.from_fullname(module_fullname), None, None)
 
-	mechs = libconstruct.Mechanisms.from_environment()
+	mechs = libdev.Mechanisms.from_environment()
 	refs = list(factor.dependencies())
 	cs = collections.defaultdict(set)
 	for f in refs:

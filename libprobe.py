@@ -13,8 +13,8 @@ import collections.abc
 import typing
 import types
 
-from . import libconstruct
-libfactor = libconstruct.libfactor
+from . import library as libdev
+libfactor = libdev.libfactor
 
 from ..routes import library as libroutes
 from ..io import library as libio
@@ -95,7 +95,6 @@ def executables(xset:typing.Set[str]):
 
 def prepare(
 		directory,
-		mechanisms,
 		language:collections.abc.Hashable,
 		source:str,
 		libraries:typing.Sequence[str]=(),
@@ -108,19 +107,21 @@ def prepare(
 			'c++': 'cxx',
 			'objective-c': 'm',
 		}
-	) -> typing.Tuple[libroutes.File, libconstruct.Construction]:
+	) -> typing.Tuple[libroutes.File, libdev.Construction]:
 	"""
 	Prepare a probe by initializing the given &directory as a composite factor
 	containing a single source file whose content is defined by &source. Often, &directory
 	is a temporary directory created by &..routes.library.File.temporary.
 
 	The reduction of the composite (executable file) with respect to the &context and the
-	&libconstruct.Construction instance are returned in a &tuple. After construction is
+	&libdev.Construction instance are returned in a &tuple. After construction is
 	complete, the executable reduction should be executed in order to retrieve the data
 	collected by the sensors.
 	"""
 
 	output = None
+
+	r = libroutes.Import.from_fullname('fault.development.probe') # fake composite.
 
 	src = directory/'src'
 	exe = directory/'fault_probe_runtime_check.exe'
@@ -141,18 +142,14 @@ def prepare(
 		'include.directories': list(include_directories),
 	}
 
-	with fsrc.open('wb') as f:
-		f.write(source.encode('utf-8'))
+	f = libdev.Factor(r, mod, None)
+	fsrc.store(source.encode('utf-8'))
 
-	fpid = cache / '.fpi'
-	wd = libconstruct.context_work_route(fpid, variants)
-
-	return wd / 'int' / 'pf.lnk', \
-		libconstruct.Construction(mechanisms, [('fault_probe', mod)])
+	return f
 
 def _execute_probe(factor):
 	p = subprocess.Popen(
-		[str(factor)],
+		[str(factor.integral() / 'pf.lnk')],
 		stdin=None,
 		stdout=subprocess.PIPE,
 		stderr=subprocess.PIPE,
@@ -164,27 +161,23 @@ def _execute_probe(factor):
 
 def runtime(mechanisms, language, source, **parameters):
 	tr = None
-	cxn = None
-	exe = None
+	f = None
 
 	def init(unit):
-		nonlocal tr, cxn, exe
+		nonlocal tr, f
 		s = libio.Sector()
 		s.subresource(unit)
 		unit.place(s, "bin", "construction")
 		unit.context.enqueue(s.actuate)
-		exe, cxn = prepare(tr, mechanisms, language, source, **parameters)
-		s.dispatch(cxn)
+		f = prepare(tr, language, source, **parameters)
+		cc = libdev.Construction(mechanisms, [f])
+		s.dispatch(cc)
 
 	with libroutes.File.temporary() as tr:
 		with libio.parallel(init) as u:
 			pass
 
-		if os.path.exists(str(exe)):
-			out = _execute_probe(exe)
-		else:
-			out = None
-
+		out = _execute_probe(f)
 	return out
 
 def sysctl(names, route=None):
@@ -197,6 +190,7 @@ def sysctl(names, route=None):
 	/names
 		The settings to get.
 	"""
+
 	if route is None:
 		found, missing = executables({'sysctl'})
 		if missing:

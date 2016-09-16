@@ -13,7 +13,6 @@ import types
 import importlib.util
 import collections
 
-from .. import libconstruct
 from .. import library as libdev
 
 from ...system import libfactor
@@ -36,25 +35,25 @@ def main():
 		env = os.environ
 
 	rebuild = env.get('FPI_REBUILD', '0')
-	mechs = libconstruct.Mechanisms.from_environment()
+	mechs = libdev.Mechanisms.from_environment()
 
 	rebuild = bool(int(rebuild))
 	if rebuild:
-		condition = libconstruct.rebuild
+		condition = libdev.rebuild
 	else:
-		condition = libconstruct.updated
+		condition = libdev.updated
 
 	# collect packages to prepare from positional parameters
 	roots = [import_from_fullname(x) for x in args]
 
 	# Get the simulations for the bytecode files.
-	for mech, ctx in libconstruct.gather_simulations(mechs, roots):
+	for mech, ctx in libdev.gather_simulations(mechs, roots):
 		f = ctx['factor']
 		outdir = f.locations['integral']
 
 		for src in f.sources():
 			induct = outdir / src.identifier
-			perform, cf = libconstruct.update_bytecode_cache(src, induct, condition)
+			perform, cf = libdev.update_bytecode_cache(src, induct, condition)
 			if perform:
 				cf.replace(induct)
 				print(str(induct), '->', cf)
@@ -71,7 +70,7 @@ def main():
 		del modules
 
 	for route in candidates:
-		factor = libconstruct.Factor(route, None, None)
+		factor = libdev.Factor(route, None, None)
 
 		if libfactor.composite(route):
 			refs = list(factor.dependencies())
@@ -87,7 +86,7 @@ def main():
 			factor_dir.replace(fp)
 
 			if libfactor.python_extension(factor.module):
-				link, src = libconstruct.link_extension(factor.route, factor_dir)
+				link, src = libdev.link_extension(factor.route, factor_dir)
 				print(str(src), '->', str(link))
 
 	sector.unit.result = 0

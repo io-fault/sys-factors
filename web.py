@@ -1,7 +1,7 @@
 """
-Web context support for &..development.libconstruct.
+Web context support for &.library.
 
-Provides command constructors for the (libconstruct:context)`web` context.
+Provides command constructors for the (dev:context)`web` context.
 
 [Index]
 /&<https://www.npmjs.com/package/uglify-js>

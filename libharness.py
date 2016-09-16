@@ -22,7 +22,7 @@ import collections
 from ..routes.library import Import
 from ..system import libfactor
 
-from . import libconstruct
+from . import library as libdev
 
 class Harness(object):
 	"""
@@ -124,8 +124,8 @@ class Harness(object):
 
 		env = os.environ
 
-		f = libconstruct.Factor(route, None, None)
-		mechs = libconstruct.Mechanisms.from_environment()
+		f = libdev.Factor(route, None, None)
+		mechs = libdev.Mechanisms.from_environment()
 		mech, fp, *ignored = f.link(mechs, collections.defaultdict(set), list(f.dependencies()))
 
 		dll = f.integral() / 'pf.lnk'

@@ -9,7 +9,7 @@ import subprocess
 from ...routes import library as libroutes
 from ...xml import library as libxml
 from .. import libprobe
-from .. import libconstruct
+from .. import library as libdev
 from .. import web
 
 from itertools import product
@@ -194,7 +194,7 @@ def python_bytecode_type(paths):
 		'transformations': {
 			'python': {
 				'method': 'internal',
-				'interface': libconstruct.__name__ + '.local_bytecode_compiler',
+				'interface': libdev.__name__ + '.local_bytecode_compiler',
 				'name': 'pyc',
 				'command': __package__ + '.pyc',
 			},
@@ -230,7 +230,7 @@ def javascript_type(paths):
 
 		'transformations': {
 			'javascript': {
-				'interface': libconstruct.__name__ + '.transparent',
+				'interface': libdev.__name__ + '.transparent',
 				'type': 'transparent',
 				'command': '/bin/cp',
 			},
@@ -263,7 +263,7 @@ def css_type(paths):
 
 		'transformations': {
 			'css': {
-				'interface': libconstruct.__name__ + '.transparent',
+				'interface': libdev.__name__ + '.transparent',
 				'type': 'transparent',
 				'command': '/bin/cp',
 			},
@@ -321,7 +321,7 @@ def xml_type(paths):
 
 		'transformations': {
 			'xml': {
-				'interface': libconstruct.__name__ + '.transparent',
+				'interface': libdev.__name__ + '.transparent',
 				'type': 'transparent',
 				'command': '/bin/cp',
 			},
@@ -346,7 +346,7 @@ def source_type(paths):
 
 		'transformations': {
 			None: {
-				'interface': libconstruct.__name__ + '.transparent',
+				'interface': libdev.__name__ + '.transparent',
 				'type': 'transparent',
 				'command': '/bin/cp',
 			},
@@ -368,12 +368,12 @@ def resource_type(paths):
 
 		'transformations': {
 			None: {
-				'interface': libconstruct.__name__ + '.transparent',
+				'interface': libdev.__name__ + '.transparent',
 				'type': 'transparent',
 				'command': '/bin/cp',
 			},
 			'uri': {
-				'interface': libconstruct.__name__ + '.transparent',
+				'interface': libdev.__name__ + '.transparent',
 				'method': 'python',
 				'command': __package__ + '.stream',
 				'redirect': 'stdout',
@@ -385,16 +385,16 @@ def resource_type(paths):
 
 def inspect(reqs, ctx, paths):
 	"""
-	Initialize a (libconstruct:context)`inspect` context.
+	Initialize a (libdev:context)`inspect` context.
 	"""
 	iempty = {
 		'command': 'fault.development.bin.empty_introspection',
-		'interface': libconstruct.__name__ + '.empty',
+		'interface': libdev.__name__ + '.empty',
 		'method': 'python',
 		'redirect': 'stdout',
 	}
 	il = {
-		'interface': libconstruct.__name__ + '.inspect_link_editor',
+		'interface': libdev.__name__ + '.inspect_link_editor',
 		'command': 'fault.development.bin.il',
 		'method': 'python',
 		'redirect': 'stdout',
@@ -439,7 +439,7 @@ def inspect(reqs, ctx, paths):
 			'platform': 'xml-inspect-' + sys.platform,
 			'reductions': {
 				None: {
-					'interface': libconstruct.__name__ + '.inspect_link_editor',
+					'interface': libdev.__name__ + '.inspect_link_editor',
 					'command': 'fault.development.bin.il',
 					'method': 'python',
 					'redirect': 'stdout',
@@ -448,25 +448,25 @@ def inspect(reqs, ctx, paths):
 			'transformations': {
 				None: {
 					'command': 'fault.development.bin.empty_introspection',
-					'interface': libconstruct.__name__ + '.empty',
+					'interface': libdev.__name__ + '.empty',
 					'method': 'python',
 					'redirect': 'stdout',
 				},
 				'objective-c': {
 					'command': 'fault.llvm.bin.inspect',
-					'interface': libconstruct.__name__ + '.compiler_collection',
+					'interface': libdev.__name__ + '.compiler_collection',
 					'method': 'python',
 					'redirect': 'stdout',
 				},
 				'c++': {
 					'command': 'fault.llvm.bin.inspect',
-					'interface': libconstruct.__name__ + '.compiler_collection',
+					'interface': libdev.__name__ + '.compiler_collection',
 					'method': 'python',
 					'redirect': 'stdout',
 				},
 				'c': {
 					'command': 'fault.llvm.bin.inspect',
-					'interface': libconstruct.__name__ + '.compiler_collection',
+					'interface': libdev.__name__ + '.compiler_collection',
 					'method': 'python',
 					'redirect': 'stdout',
 				},
@@ -665,7 +665,7 @@ def host_system_type(reqs, paths):
 		# subject interfaces.
 		'reductions': {
 			None: {
-				'interface': libconstruct.__name__ + '.link_editor',
+				'interface': libdev.__name__ + '.link_editor',
 				'type': 'linker',
 				'name': ldname,
 				'command': str(ld),
@@ -675,7 +675,7 @@ def host_system_type(reqs, paths):
 
 		'transformations': {
 			None: {
-				'interface': libconstruct.__name__ + '.compiler_collection',
+				'interface': libdev.__name__ + '.compiler_collection',
 				'type': 'collection',
 				'name': ccname,
 				'implementation': cctype,
@@ -788,7 +788,7 @@ def static(reqs, ctx, paths):
 
 def host(reqs, ctx, paths):
 	"""
-	Initialize a (libconstruct:context)`host` context.
+	Initialize a (libdev:context)`host` context.
 	"""
 	core = {
 		'system': host_system_type(reqs, paths),
@@ -880,7 +880,7 @@ def web_context(reqs, ctx, paths):
 			# subject interfaces.
 			'reductions': {
 				None: {
-					'interface': libconstruct.__name__ + '.web_link_editor',
+					'interface': libdev.__name__ + '.web_link_editor',
 					'type': 'linker',
 					'name': 'emcc',
 					'command': str(cc),
@@ -890,7 +890,7 @@ def web_context(reqs, ctx, paths):
 
 			'transformations': {
 				None: {
-					'interface': libconstruct.__name__ + '.web_compiler_collection',
+					'interface': libdev.__name__ + '.web_compiler_collection',
 					'type': 'collection',
 					'name': 'emcc',
 					'command': str(cc),
@@ -929,24 +929,24 @@ def main(name, args, paths=None):
 
 	if 'FAULT_DIRECTORY' in os.environ:
 		fd = os.environ['FAULT_DIRECTORY']
-		libconstruct_dir = libroutes.File.from_absolute(fd) / 'fpi'
+		fpi = libroutes.File.from_absolute(fd) / 'fpi'
 	else:
-		libconstruct_dir = libroutes.File.home() / '.fault' / 'fpi'
+		fpi = libroutes.File.home() / '.fault' / 'fpi'
 
 	if paths is None:
 		paths = libprobe.environ_paths()
 
-	host(reqs, init(libconstruct_dir / 'host'), paths)
-	static(reqs, init(libconstruct_dir / 'static'), paths)
-	inspect(reqs, init(libconstruct_dir / 'inspect'), paths)
-	web_context(reqs, init(libconstruct_dir / 'web'), paths)
+	host(reqs, init(fpi / 'host'), paths)
+	static(reqs, init(fpi / 'static'), paths)
+	inspect(reqs, init(fpi / 'inspect'), paths)
+	web_context(reqs, init(fpi / 'web'), paths)
 
 	i = libroutes.Import.from_fullname(__package__) ** 2
 	ctxdir = (i / 'context').file().container
 	devsh = ctxdir / 'dev.sh'
 	dev_script = devsh.load()
 
-	fbin = libconstruct_dir.container / 'env' / 'bin'
+	fbin = fpi.container / 'env' / 'bin'
 	devexe = fbin / 'dev'
 	devexe.store(dev_script)
 	os.chmod(str(devexe), 0o722)

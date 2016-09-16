@@ -2,7 +2,7 @@
 System executable access to the Python bytecode compiler.
 
 Exposes the ability to designate the output bytecode file so
-libconstruct can manage Python bytecode in the same fashion as
+factor processing can manage Python bytecode in the same fashion as
 other targets.
 """
 import sys
