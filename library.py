@@ -26,7 +26,6 @@ import collections
 import contextlib
 import importlib
 import importlib.machinery
-import importlib.util
 import types
 import typing
 
@@ -145,8 +144,28 @@ def updated(outputs, inputs, requirement=None):
 	# object has already been updated.
 	return True
 
+# Resolve cache_from_source.
+try:
+	import importlib.util
+	cache_from_source = importlib.util.cache_from_source
+except (ImportError, AttributeError):
+	try:
+		import imp
+		cache_from_source = imp.cache_from_source
+		del imp
+	except (ImportError, AttributeError):
+		# Make a guess preferring the cache directory.
+		def cache_from_source(filepath):
+			return os.path.join(
+				os.path.dirname(filepath),
+				'__pycache__',
+				os.path.basename(filepath) + 'c'
+			)
+finally:
+	pass
+
 def update_bytecode_cache(src, induct, condition,
-		cache_from_source=importlib.util.cache_from_source,
+		cache_from_source=cache_from_source,
 		mkr=libroutes.File.from_path
 	) -> typing.Tuple[bool, str]:
 	"""
@@ -852,18 +871,46 @@ class Mechanisms(object):
 
 # Specifically for identifying files to be compiled and how.
 extensions = {
-	'c': ('c','h'),
+	'c': ('c',),
 	'c++': ('c++', 'cxx', 'cpp', 'hh'),
 	'objective-c': ('m',),
 	'ada': ('ads', 'ada'),
 	'assembly': ('asm',),
 	'bitcode': ('bc',), # clang
 	'haskell': ('hs', 'hsc'),
+	'd': ('d',),
+	'rust': ('rs',),
+	'header': ('h',), # Purposefully ambiguous. (Can be C/C++/Obj-C)
+	'c++.header': ('H', 'hpp', 'hxx'),
+
 	'python': ('py',),
+	'bytecode.python': ('pyo', 'pyc',),
+	'pyrex.python': ('pyx',),
 
 	'javascript': ('json', 'javascript', 'js'),
 	'css': ('css',),
-	'xml': ('xml', 'xsl', 'rdf', 'rng'),
+	'xml': ('xml', 'xsl', 'rdf', 'rng', 'htm', 'html'),
+	'archive.system': ('a',),
+	'library.system': ('dll', 'so', 'lib'),
+	'jar.java': ('jar',),
+	'wheel.python': ('whl',),
+	'egg.python': ('egg',),
+
+	'awk': ('awk',),
+	'sed': ('sed',),
+	'c-shell': ('csh',),
+	'korn-shell': ('ksh',),
+	'bourne-shell': ('sh',),
+
+	'perl': ('pl',),
+	'ruby': ('ruby',),
+	'php': ('php',),
+	'lisp': ('lisp',),
+	'lua': ('lua',),
+	'io': ('io',),
+	'java': ('java',),
+	'ocaml': ('ml',),
+	'ada': ('ads', 'ada'),
 }
 
 languages = {}
