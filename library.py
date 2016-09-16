@@ -1580,10 +1580,12 @@ def unix_link_editor(context,
 		command.extend(libs)
 		command.append('-)')
 
-		if purpose in {'metrics', 'profile'}:
-			command.append(mechanism['transformations'][None]['resources']['profile'])
+		resources = mechanism['transformations'][None]['resources']
 
-		command.append(mechanism['transformations'][None]['resources']['builtins'])
+		if purpose in {'metrics', 'profile'}:
+			command.append(resources['profile'])
+
+		command.append(resources['builtins'] or '-lgcc')
 
 		command.extend(suffix)
 	else:
