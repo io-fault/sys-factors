@@ -1,5 +1,5 @@
 """
-Configure the initialization of the construction context.
+Formulate the developer construction contexts.
 """
 import os
 import sys
@@ -12,6 +12,7 @@ from .. import libprobe
 from .. import libconstruct
 from .. import web
 
+from itertools import product
 from itertools import chain
 chain = chain.from_iterable
 
@@ -27,7 +28,8 @@ web_linker_preference = ('emcc',)
 
 compiler_collections = {
 	'clang': (
-		'c', 'c++', 'objective-c', 'objective-c++',
+		'c', 'c++',
+		'objective-c', 'objective-c++',
 		'fortran', 'ada', # via dragonegg
 	),
 	'gcc': (
@@ -44,7 +46,7 @@ compiler_collections = {
 	),
 }
 
-compiler_collection_preference = ('clang', 'gcc', 'icc', 'cl.exe')
+compiler_collection_preference = ['clang', 'gcc', 'icc', 'cl.exe']
 
 linkers = {
 	'lld': (
@@ -112,7 +114,10 @@ def select(paths, possibilities, preferences):
 	"""
 	global libprobe
 
-	found, missing = libprobe.search(paths, tuple(possibilities))
+	# Override for particular version
+	possible = set(possibilities)
+
+	found, missing = libprobe.search(paths, tuple(possible))
 	if not found:
 		return None
 	else:
@@ -137,10 +142,10 @@ runtime_objects = set([
 	'gcrt1.o',
 	'crt1S.o', # Not sure how this is used.
 
-	'crtbeginT.o', # Apparently used for statically linked executables.
+	'crtbeginT.o', # Statically linked executables.
 	'crtend.o',
 
-	'crtbeginS.o',
+	'crtbeginS.o', # Shared libraries.
 	'crtendS.o',
 
 	'crti.o',
@@ -378,7 +383,7 @@ def resource_type(paths):
 
 	return mech
 
-def inspect(ctx, paths):
+def inspect(reqs, ctx, paths):
 	"""
 	Initialize a (libconstruct:context)`inspect` context.
 	"""
@@ -485,7 +490,7 @@ def inspect(ctx, paths):
 
 	purposes(corefile)
 
-def host_system_type(paths):
+def host_system_type(reqs, paths):
 	target_file_extensions = {
 		'executable': '.exe',
 		'library': '.so',
@@ -493,6 +498,7 @@ def host_system_type(paths):
 		'fragment': '.fo',
 		None: '.so',
 	}
+	root = libroutes.File.from_absolute('/')
 
 	if platform in {'darwin', 'macos'}:
 		target_file_extensions['library'] = '.dylib'
@@ -502,20 +508,36 @@ def host_system_type(paths):
 		target_file_extensions['extension'] = '.dll'
 
 	# default command
-	if 'CC' in os.environ:
+	if 'cc' in reqs:
+		cc = libroutes.File.from_path(reqs['cc'])
+		ccname = cc.identifier
+	elif 'CC' in os.environ:
 		cc = libroutes.File.from_absolute(os.environ['CC'])
 		ccname = cc.identifier
 	else:
-		ccname, cc = select(paths, compiler_collections, compiler_collection_preference)
+		ccname, cc = select(paths,
+			compiler_collections, compiler_collection_preference)
 	ldname, ld = select(paths, linkers, linker_preference)
 
 	bindir = cc.container
 	ccprefix = bindir.container
+	profile_lib = None
 
 	# gather compiler information.
 	p = subprocess.Popen([str(cc), '--version'],
 		stderr=subprocess.STDOUT, stdout=subprocess.PIPE, stdin=None)
 	data = p.communicate(None)[0].decode('utf-8').split('\n')
+
+	# Analyze the library search directories.
+	# Primarily interested in finding the crt*.o files for linkage.
+	p = subprocess.Popen([str(cc), '-print-search-dirs'],
+		stderr=subprocess.STDOUT, stdout=subprocess.PIPE, stdin=None)
+	search_dirs_data = p.communicate(None)[0].decode('utf-8').split('\n')
+	search_dirs_data = [x.split(':', 1) for x in search_dirs_data if x]
+	search_dirs_data = dict([
+		(k.strip(' =:').lower(), list((x.strip(' =') for x in v.split(':'))))
+		for k, v in search_dirs_data
+	])
 
 	version_line = data[0]
 	cctype, version_spec = version_line.split(' version ')
@@ -524,7 +546,7 @@ def host_system_type(paths):
 	version = version_info.strip()
 	version_info = version.split('.', 3)
 
-	if cctype == 'Apple LLVM':
+	if cctype == 'Apple LLVM' or 'clang' in ccname:
 		# rename to clang.
 		ccname = 'clang'
 
@@ -545,24 +567,32 @@ def host_system_type(paths):
 	# First field of the target string.
 	arch = target[:target.find('-')]
 	arch_alt = arch.replace('_', '-')
+	h_archs = [arch, arch_alt, platform]
+	if platform == 'darwin':
+		h_archs.append('osx')
+		h_archs.append('macos')
 
 	cclib = compiler_libraries(ccname, ccprefix, '.'.join(version_info), cc, target)
+	builtins = None
+	if cclib is None:
+		cclib = libroutes.File.from_relative(root, search_dirs_data['libraries'][0])
+		cclib = cclib / 'lib' / platform
 
 	if ccname == 'gcc':
 		profile_lib = cclib / 'libgcov.a'
 		builtins = cclib / 'libgcc.a'
-	elif ccname == 'clang':
+	elif ccname == 'clang' and cclib is not None:
 		files = cclib.subnodes()[1]
 		profile_libs = [x for x in files if 'profile' in x.identifier]
 
 		if len(profile_libs) == 1:
+			# Presume target of interest.
 			profile_lib = profile_libs[0]
 		else:
 			# Scan for library with matching architecture.
-			for x in profile_libs:
-				x = str(x)
-				if arch in x or arch_alt in x:
-					profile_lib = x
+			for x, a in product(profile_libs, h_archs):
+				if a in x.identifier:
+					profile_lib = str(x)
 					break
 			else:
 				profile_lib = None
@@ -577,26 +607,15 @@ def host_system_type(paths):
 				builtins = str(cclibs[0])
 			else:
 				# Scan for library with matching architecture.
-				for x in cclibs:
-					x = str(x)
-					if arch in x or arch_alt in x:
-						builtins = x
+				for x, a in product(cclibs, h_archs):
+					if a in x.identifier:
+						builtins = str(x)
 						break
 				else:
 					# clang, but no libclang_rt.
-					builtins = '-lcompiler_rt.a'
+					builtins = None
 
-	# Analyze the library search directories.
-	# Primarily interested in finding the crt*.o files for linkage.
-	p = subprocess.Popen([str(cc), '-print-search-dirs'],
-		stderr=subprocess.STDOUT, stdout=subprocess.PIPE, stdin=None)
-	data = p.communicate(None)[0].decode('utf-8').split('\n')
-
-	data = [x.split(':', 1) for x in data if x]
-	data = dict([(k.strip(' =:'), v.split(':')) for k, v in data])
-	root = libroutes.File.from_absolute('/')
-
-	libdirs = [libroutes.File.from_relative(root, str(x).strip('/')) for x in data['libraries']]
+	libdirs = [libroutes.File.from_relative(root, str(x).strip('/')) for x in search_dirs_data['libraries']]
 	libdirs.extend(map(libroutes.File.from_absolute,
 		('/lib', '/usr/lib',))) # Make sure likely directories are included.
 
@@ -735,7 +754,7 @@ def purposes(corefile):
 		)
 		ctxfile.store(xml)
 
-def static(ctx, paths):
+def static(reqs, ctx, paths):
 	"""
 	Platform independent processing.
 	"""
@@ -767,12 +786,12 @@ def static(ctx, paths):
 
 	purposes(corefile)
 
-def host(ctx, paths):
+def host(reqs, ctx, paths):
 	"""
 	Initialize a (libconstruct:context)`host` context.
 	"""
 	core = {
-		'system': host_system_type(paths),
+		'system': host_system_type(reqs, paths),
 		# Move to static.
 		'bytecode.python': python_bytecode_type(paths),
 	}
@@ -796,7 +815,7 @@ def host(ctx, paths):
 
 	purposes(corefile)
 
-def web_context(ctx, paths):
+def web_context(reqs, ctx, paths):
 	# default command
 	webcc = select(paths, ['emcc'], web_compiler_collection_preference)
 	if webcc is None:
@@ -906,22 +925,21 @@ def web_context(ctx, paths):
 	purposes(corefile)
 
 def main(name, args, paths=None):
-	if args:
-		libconstruct_dir = libroutes.File.from_path(args[0])
+	reqs = dict(zip(args[0::2], args[1::2]))
+
+	if 'FAULT_DIRECTORY' in os.environ:
+		fd = os.environ['FAULT_DIRECTORY']
+		libconstruct_dir = libroutes.File.from_absolute(fd) / 'fpi'
 	else:
-		if 'FAULT_DIRECTORY' in os.environ:
-			fd = os.environ['FAULT_DIRECTORY']
-			libconstruct_dir = libroutes.File.from_absolute(fd) / 'fpi'
-		else:
-			libconstruct_dir = libroutes.File.home() / '.fault' / 'fpi'
+		libconstruct_dir = libroutes.File.home() / '.fault' / 'fpi'
 
 	if paths is None:
 		paths = libprobe.environ_paths()
 
-	host(init(libconstruct_dir / 'host'), paths)
-	static(init(libconstruct_dir / 'static'), paths)
-	inspect(init(libconstruct_dir / 'inspect'), paths)
-	web_context(init(libconstruct_dir / 'web'), paths)
+	host(reqs, init(libconstruct_dir / 'host'), paths)
+	static(reqs, init(libconstruct_dir / 'static'), paths)
+	inspect(reqs, init(libconstruct_dir / 'inspect'), paths)
+	web_context(reqs, init(libconstruct_dir / 'web'), paths)
 
 	i = libroutes.Import.from_fullname(__package__) ** 2
 	ctxdir = (i / 'context').file().container
