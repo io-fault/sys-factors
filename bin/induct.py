@@ -18,32 +18,13 @@ from .. import library as libdev
 
 from ...system import libfactor
 from ...routes import library as libroutes
-
-import_from_fullname = libroutes.Import.from_fullname
-cache_from_source = importlib.util.cache_from_source
-
-def update_cache(src, induct, condition=libconstruct.updated, mkr=libroutes.File.from_path) -> bool:
-	"""
-	Update the cached Python bytecode file using the inducted simulated factors.
-	"""
-
-	fp = str(src)
-	if not src.exists() or not fp.endswith('.py'):
-		return (False, 'source does not exist or does not end with ".py"')
-
-	cache_file = mkr(cache_from_source(fp, optimization=None))
-
-	if condition((cache_file,), (induct,)):
-		return (False, 'update condition was not present')
-
-	cache_file.replace(induct)
-	return (True, cache_file)
+from ...io import library as libio
 
 def main():
 	"""
 	Induct the constructed targets.
 	"""
-	from ...io import library as libio
+	import_from_fullname = libroutes.Import.from_fullname
 
 	call = libio.context()
 	sector = call.sector
@@ -59,7 +40,7 @@ def main():
 
 	rebuild = bool(int(rebuild))
 	if rebuild:
-		condition = libconstruct.reconstruct
+		condition = libconstruct.rebuild
 	else:
 		condition = libconstruct.updated
 
@@ -69,13 +50,14 @@ def main():
 	# Get the simulations for the bytecode files.
 	for mech, ctx in libconstruct.gather_simulations(mechs, roots):
 		f = ctx['factor']
-		outdir = ctx['locations']['reduction']
+		outdir = f.locations['integral']
 
-		for src in f.module.__factor_sources__:
-			implement = outdir / src.identifier
-			uc_report = update_cache(src, implement, condition=condition)
-			if uc_report[0]:
-				print(str(implement), '->', uc_report[1])
+		for src in f.sources():
+			induct = outdir / src.identifier
+			perform, cf = libconstruct.update_bytecode_cache(src, induct, condition)
+			if perform:
+				cf.replace(induct)
+				print(str(induct), '->', cf)
 
 	# Composites and Python Extensions
 	candidates = []
@@ -97,9 +79,9 @@ def main():
 			for f in refs:
 				cs[f.pair].add(f)
 
-			mech, fp, *ignored = libconstruct.initialize(mechs, factor, cs, [])
+			mech, fp, *ignored = factor.link(mechs, cs, [])
 			factor_dir = libfactor.inducted(factor.route)
-			fp = factor.reduction()
+			fp = factor.integral()
 
 			print(str(fp), '->', str(factor_dir))
 			factor_dir.replace(fp)

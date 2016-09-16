@@ -147,7 +147,7 @@ def prepare(
 	fpid = cache / '.fpi'
 	wd = libconstruct.context_work_route(fpid, variants)
 
-	return wd / 'ftr' / 'pf.lnk', \
+	return wd / 'int' / 'pf.lnk', \
 		libconstruct.Construction(mechanisms, [('fault_probe', mod)])
 
 def _execute_probe(factor):

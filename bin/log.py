@@ -25,8 +25,8 @@ if __name__ == '__main__':
 	for f in refs:
 		cs[f.pair].add(f)
 
-	mech, fp, *ignored = libconstruct.initialize(mechs, factor, cs, [])
-	logdir = factor.reduction().container / 'log'
+	mech, fp, *ignored = factor.link(mechs, cs, [])
+	logdir = factor.integral().container / 'log'
 
 	if files:
 		files = [logdir.extend(x.split('/')) for x in files]

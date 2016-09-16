@@ -60,9 +60,9 @@ def main(target_dir, packages):
 		module = ci.module()
 
 		if libfactor.python_extension(module):
-			so = libfactor.reduction(ci, libfactor.python_triplet, 'metrics')
+			so = libfactor.inducted(ci)
 		else:
-			so = libfactor.reduction(ci, 'host', 'metrics')
+			so = libfactor.inducted(ci)
 
 		xc = dict(instr.extract_counters(str(so), str(x)))
 		xz = dict(instr.extract_zero_counters(str(so), str(x)))

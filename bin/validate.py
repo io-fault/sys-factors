@@ -30,7 +30,7 @@ def failure_report_file(test):
 	Return the route to the failure report for the given test.
 	"""
 	ir, rpath = libroutes.Import.from_attributes(test.identity)
-	cd = ir.floor().file().container / '__pycache__'
+	cd = ir.floor().directory() / '__pycache__'
 	rf = cd / 'failures' / test.identity
 
 	return rf
@@ -136,6 +136,10 @@ def main(packages):
 	failures = 0
 
 	for pkg in pkgset:
+		cdr = pkg.directory() / '__pycache__' / 'failures'
+		if cdr.exists():
+			cdr.void()
+
 		sys.stderr.write(str(pkg) + ': ^')
 		sys.stderr.flush()
 
@@ -158,7 +162,9 @@ def main(packages):
 
 	if failures:
 		sys.stderr.write("\nFailure reports are placed into the project ")
-		sys.stderr.write("package's `__pycache__` directory\n")
+		sys.stderr.write("package's `__pycache__` directory.\n")
+		sys.stderr.write("Subsequent runs will overwrite past reports.\n")
+		sys.stderr.write("`dev report` for quick pager based access.\n")
 
 	raise SystemExit(min(failures, 201))
 
