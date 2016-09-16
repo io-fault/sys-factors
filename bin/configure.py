@@ -685,8 +685,8 @@ def host_system_type(reqs, paths):
 				'command': str(cc),
 				'defaults': {},
 				'resources': {
-					'profile': str(profile_lib),
-					'builtins': str(builtins),
+					'profile': str(profile_lib) if profile_lib else None,
+					'builtins': str(builtins) if builtins else None,
 				},
 			},
 		},
