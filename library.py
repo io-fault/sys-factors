@@ -1552,9 +1552,9 @@ def unix_link_editor(context,
 	if mechanism['reductions'][None].get('name') == 'lld':
 		add('-flavor')
 		add('gnu')
-
-	if verbose:
-		add(verbose_flag)
+	else:
+		if verbose:
+			add(verbose_flag)
 
 	loutput_type = type_map[fdyna] # failure indicates bad type parameter to libfactor.load()
 	if loutput_type:
