@@ -162,6 +162,9 @@ def compiler_libraries(compiler, prefix, version, executable, target):
 		syslib = lib / platform # Naturally, not always consistent.
 		if syslib.exists():
 			return syslib
+		syslib = prefix / 'lib' / platform
+		if syslib.exists():
+			return syslib
 	elif compiler == 'gcc':
 		return prefix / 'lib' / 'gcc' / target / version
 	else:
