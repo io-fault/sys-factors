@@ -1549,6 +1549,10 @@ def unix_link_editor(context,
 	add = command.append
 	iadd = command.extend
 
+	if mechanism.get('name') == 'lld':
+		add('-flavor')
+		add('gnu')
+
 	if verbose:
 		add(verbose_flag)
 
