@@ -1549,7 +1549,7 @@ def unix_link_editor(context,
 	add = command.append
 	iadd = command.extend
 
-	if mechanism.get('name') == 'lld':
+	if mechanism['reductions'][None].get('name') == 'lld':
 		add('-flavor')
 		add('gnu')
 
