@@ -10,10 +10,10 @@ import itertools
 import typing
 
 from ..chronometry import library as libtime
-from ..xml import library as libxml
+from ..xml import libschema
 from . import schemas
 
-namespaces = libxml.index_namespace_labels(schemas)
+namespaces = libschema.index_namespace_labels(schemas)
 
 def map_coverage_data(measures):
 	# Coverage data is a mapping of line numbers to counts.
@@ -28,7 +28,7 @@ def map_coverage_data(measures):
 			for line, count in measure.items():
 				yield (('line', line),), (('count', count),)
 
-class Metrics(typing.Final):
+class Metrics(libschema.Interface):
 	"""
 	System invocation descriptor.
 	"""
@@ -95,7 +95,7 @@ class Metrics(typing.Final):
 			('xmlns:key', 'https://fault.io/xml/key'),
 		)
 
-class Test(typing.Final):
+class Test(libschema.Interface):
 	def serialize(serialization, report, timestamp=None,
 			chain=itertools.chain.from_iterable
 		):
