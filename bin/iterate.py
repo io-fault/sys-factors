@@ -3,8 +3,8 @@ Perform the full procedure for constructing an inspectable snapshot of a product
 
 This executes sequence of executable modules to produce a snapshot for publication.
 
-	# &.bin.prepare [host:optimal]
-	# &.bin.prepare [inspect:optimal]
+	# &.bin.construct [host:optimal]
+	# &.bin.construct [inspect:metrics]
 	# &.bin.construct [host:metrics]
 	# &.bin.measure
 	# &.factors.bin.instantiate

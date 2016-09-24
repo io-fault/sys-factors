@@ -35,7 +35,8 @@ def main():
 		env = os.environ
 
 	rebuild = env.get('FPI_REBUILD', '0')
-	mechs = libdev.Mechanisms.from_environment()
+	ctx = libdev.Context.from_environment()
+	variants, mech = ctx.select('bytecode.python')
 
 	rebuild = bool(int(rebuild))
 	if rebuild:
@@ -47,9 +48,10 @@ def main():
 	roots = [import_from_fullname(x) for x in args]
 
 	# Get the simulations for the bytecode files.
-	for mech, ctx in libdev.gather_simulations(mechs, roots):
-		f = ctx['factor']
-		outdir = f.locations['integral']
+	for f in libdev.gather_simulations(roots):
+		refs = libdev.references(f.dependencies())
+		(sp, (fvariants, key, locations)), = f.link(variants, ctx, mech, refs, [])
+		outdir = locations['integral']
 
 		for src in f.sources():
 			induct = outdir / src.identifier
@@ -71,23 +73,27 @@ def main():
 
 	for route in candidates:
 		factor = libdev.Factor(route, None, None)
+		m = ctx.select(factor.type)
+		if m is None:
+			print('ignoring[unknown type]', str(factor))
+			continue
+		tvars, tmech = m
 
 		if libfactor.composite(route):
-			refs = list(factor.dependencies())
-			cs = collections.defaultdict(set)
-			for f in refs:
-				cs[f.pair].add(f)
+			# Primarily need the probe to select the proper build.
+			refs = libdev.references(factor.dependencies())
 
-			mech, fp, *ignored = factor.link(mechs, cs, [])
-			factor_dir = libfactor.inducted(factor.route)
-			fp = factor.integral()
+			for sp, l in factor.link(tvars, ctx, tmech, refs, []):
+				vars, key, locations = l
+				factor_dir = libfactor.inducted(factor.route)
+				fp = factor.integral(key=key)
 
-			print(str(fp), '->', str(factor_dir))
-			factor_dir.replace(fp)
+				print(str(fp), '->', str(factor_dir))
+				factor_dir.replace(fp)
 
-			if libfactor.python_extension(factor.module):
-				link, src = libdev.link_extension(factor.route, factor_dir)
-				print(str(src), '->', str(link))
+				if libfactor.python_extension(factor.module):
+					link, src = libdev.link_extension(factor.route, factor_dir)
+					print(str(src), '->', str(link))
 
 	sector.unit.result = 0
 

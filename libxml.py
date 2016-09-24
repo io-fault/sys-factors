@@ -62,7 +62,7 @@ class Metrics(typing.Final):
 			('xmlns', namespace),
 			('xmlns:key', 'https://fault.io/xml/key'),
 		)
-	
+
 	@staticmethod
 	def serialize_coverage(serialization, report,
 			timestamp=None, keys=None, prefix='',

@@ -19,30 +19,29 @@ if __name__ == '__main__':
 
 	factor = libdev.Factor(libroutes.Import.from_fullname(module_fullname), None, None)
 
-	mechs = libdev.Mechanisms.from_environment()
+	ctx = libdev.Context.from_environment()
+	variants, mech = ctx.select(factor.type)
+
 	refs = list(factor.dependencies())
 	cs = collections.defaultdict(set)
 	for f in refs:
 		cs[f.pair].add(f)
 
-	mech, fp, *ignored = factor.link(mechs, cs, [])
-	logdir = factor.integral().container / 'log'
+	vset = factor.link(variants, ctx, mech, cs, [])
+	for src_params, (vl, key, locations) in vset:
+		logs = locations['log']
 
-	if files:
-		files = [logdir.extend(x.split('/')) for x in files]
-	else:
-		files = logdir.tree()[1]
+		files = logs.tree()[1]
+		for logfile in files:
+			sys.stdout.write('[' + str(logfile) + ']\n')
+			if not logfile.exists():
+				sys.stdout.write('! ERROR: File does not exist.\n')
+				continue
 
-	for logfile in files:
-		sys.stdout.write('[' + str(logfile) + ']\n')
-		if not logfile.exists():
-			sys.stdout.write('! ERROR: File does not exist.\n')
-			continue
-
-		with logfile.open('rb') as f:
-			log = f.read()
-			if log:
-				sys.stdout.buffer.write(log)
-				sys.stdout.write("\n")
-			else:
-				sys.stdout.write('! NOTE: Empty logfile.\n')
+			with logfile.open('rb') as f:
+				log = f.read()
+				if log:
+					sys.stdout.buffer.write(log)
+					sys.stdout.write("\n")
+				else:
+					sys.stdout.write('! NOTE: Empty logfile.\n')

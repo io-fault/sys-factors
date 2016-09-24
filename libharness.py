@@ -115,7 +115,7 @@ class Harness(object):
 	def preload_extension(self, test_id, route:Import):
 		"""
 		Given an extension route, &route, import the module using
-		the configured &role. 
+		the configured &role.
 
 		Used by the harness to import extensions that are being tested in a fashion
 		that allows for coverage and profile data to be collected and for injection
@@ -125,10 +125,17 @@ class Harness(object):
 		env = os.environ
 
 		f = libdev.Factor(route, None, None)
-		mechs = libdev.Mechanisms.from_environment()
-		mech, fp, *ignored = f.link(mechs, collections.defaultdict(set), list(f.dependencies()))
+		ctx = libdev.Context.from_environment()
+		if ctx:
+			vars, mech = ctx.select(f.type)
+			refs = libdev.references(f.dependencies())
+			(sp, (vl, key, loc)), = f.link(dict(vars), ctx, mech, refs, ())
 
-		dll = f.integral() / 'pf.lnk'
+			dll = loc['integral'] / 'pf.lnk'
+		else:
+			# The context was empty, so fallback to inducted DLL.
+			dll = f.integral(key=None) / 'pf.lnk'
+
 		name = libfactor.extension_access_name(str(route))
 
 		# Get the loader for the extension file.

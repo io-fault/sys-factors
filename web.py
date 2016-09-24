@@ -15,10 +15,10 @@ Provides command constructors for the (dev:context)`web` context.
 """
 import operator
 
-def xinclude(context, output, inputs,
-		mechanism=None,
-		language=None,
-		format=None,
+def xinclude(
+		build, adapter,
+		o_type, output, i_type, inputs,
+		fragments, libraries,
 		verbose=None,
 		filepath=str,
 		module=None
@@ -26,28 +26,29 @@ def xinclude(context, output, inputs,
 	"""
 	Command constructor for (system:command)`xmllint` based XInclude processing.
 	"""
-	cmd = ['xmllint', '--nsclean', '--xmlout', '--noblanks', '--xinclude',]
-	return cmd + [filepath(inputs[0])]
 
-def lessc(context, output, inputs,
-		mechanism=None,
-		language=None,
-		format=None,
-		verbose=None,
-		filepath=str,
+	input, = inputs
+	cmd = ['xmllint', '--nsclean', '--xmlout', '--noblanks', '--xinclude',]
+	cmd.append(filepath(input))
+
+	return cmd
+
+def lessc(
+		build, adapter, o_type, output, i_type, inputs,
+		verbose=None, filepath=str,
 		source_map_root=None, module=None
 	):
 	"""
 	Command constructor for (system:command)`lessc`.
 	"""
+
 	cmd = ['https://www.npmjs.com/package/less', '--source-map']
 	cmd.extend((filepath(inputs[0]), filepath(output)))
 	return cmd
 
-def css_cleancss(context, output, inputs,
-		mechanism=None,
-		language=None,
-		format=None,
+def css_cleancss(
+		build, adapter, o_type, output, i_type, inputs,
+		fragments, libraries,
 		verbose=None,
 		filepath=str,
 		source_map_root=None, module=None
@@ -55,11 +56,12 @@ def css_cleancss(context, output, inputs,
 	"""
 	Command constructor for (system:command)`cleancss`.
 	"""
-	css = context['css']
-	typ = css.get('type', 'library')
+
+	assert build.factor.dynamics == 'library'
 	output = filepath(output)
 
 	command = ['cleancss',]
+
 	# cleancss strips the imports entirely, so this is not currently usable.
 	#command.extend(('--skip-import-from', 'remote'))
 	command.append('--source-map')
@@ -69,10 +71,9 @@ def css_cleancss(context, output, inputs,
 
 	return command
 
-def javascript_uglify(context, output, inputs,
-		mechanism=None,
-		language=None,
-		format=None,
+def javascript_uglify(
+		build, adapter, o_type, output, i_type, inputs,
+		fragments, libraries,
 		verbose=None,
 		filepath=str,
 		source_map_root=None, module=None
@@ -80,33 +81,35 @@ def javascript_uglify(context, output, inputs,
 	"""
 	Command constructor for (system:command)`uglifyjs`.
 	"""
-	basename = context['factor'].route.identifier
+	factor = build.factor
+	basename = factor.route.identifier
 
-	js = context['javascript']
-	typ = js.get('type', 'library')
+	typ = factor.type
 	output = filepath(output)
 
 	command = ['uglifyjs']
+	extend = command.extend
+	append = command.append
 
-	command.extend(map(filepath, sorted(inputs, key=operator.attrgetter('identifier'))))
-	command.extend(('-o', output))
-	command.extend(('--source-map', output+'.map'))
-	command.extend(('--prefix', 'relative', '-c', '-m'))
+	extend(map(filepath, sorted(inputs, key=operator.attrgetter('identifier'))))
+	extend(('-o', output))
+	extend(('--source-map', output+'.map'))
+	extend(('--prefix', 'relative', '-c', '-m'))
 
 	mapurl = basename + '.map'
-	command.extend(('--source-map-url', mapurl))
+	extend(('--source-map-url', mapurl))
 
 	if typ == 'library':
-		command.extend(('--wrap', basename, '--export-all'))
+		extend(('--wrap', basename, '--export-all'))
 
-	if js.get('source.parameters') is not None:
-		command.append('--define')
-		command.append(','.join([
-			'='.join((k,v)) for k, v in js.get('source.parameters', ())
+	if build.parameters:
+		append('--define')
+		append(','.join([
+			'='.join((k,v)) for k, v in build.parameters
 		]))
 
 	if source_map_root:
-		command.extend(('--source-map-root', source_map_root))
+		extend(('--source-map-root', source_map_root))
 
 	if verbose:
 		command.append('-v')

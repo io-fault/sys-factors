@@ -185,10 +185,11 @@ def python_bytecode_type(paths):
 	# Python executable = python source executed in __main__
 	# Python extension = maybe python source executed in a library?
 	# Python fragment = source file
-	pyname, pycommand = select(paths, ['python3'], [])
+	pyexe = select(paths, ['python3', 'python3.4', 'python3.5', 'python3.6'], ['python3'])
+	pyname, pycommand = pyexe
 
 	return {
-		'target-file-extensions': {None:'.xml'},
+		'target-file-extensions': {},
 
 		'formats': {
 			'library': 'pyc',
@@ -211,7 +212,10 @@ def javascript_type(paths):
 	This primarily means "minification" and mere concatenation, but languages
 	targeting JavaScript can be added.
 	"""
-	jscname, jsc = select(paths, ['uglifyjs'], javascript_combiners_preference)
+	jscat = select(paths, ['uglifyjs'], javascript_combiners_preference)
+	if jscat is None:
+		return None
+	jscname, jsc = jscat
 
 	return {
 		'encoding': 'utf-8',
@@ -222,7 +226,7 @@ def javascript_type(paths):
 			'fragment': 'js',
 		},
 
-		'reductions': {
+		'integrations': {
 			'library': {
 				'interface': web.__name__ + '.javascript_uglify',
 				'type': 'linker',
@@ -245,6 +249,8 @@ def css_type(paths):
 	Initialize the CSS subject for CSS compilation.
 	"""
 	css_combine = select(paths, ['cleancss', 'cat'], ('cleancss', 'cat',))
+	if css_combine is None:
+		return None
 	cssname, cssc = css_combine
 
 	css = {
@@ -255,7 +261,7 @@ def css_type(paths):
 			'library': 'css',
 		},
 
-		'reductions': {
+		'integrations': {
 			'library': {
 				'interface': web.__name__ + '.css_cleancss',
 				'type': 'minify',
@@ -291,7 +297,10 @@ def xml_type(paths):
 	"""
 	Construct the subject for XML files.
 	"""
-	xmlname, xmlc = select(paths, ['xmllint'], ('xmllint',))
+	xmllint = select(paths, ['xmllint'], ('xmllint',))
+	if xmllint is None:
+		return None
+	xmlname, xmlc = xmllint
 
 	xml = {
 		'encoding': 'ascii',
@@ -302,7 +311,7 @@ def xml_type(paths):
 			'library': 'xml',
 		},
 
-		'reductions': {
+		'integrations': {
 			'executable': {
 				'interface': web.__name__ + '.xinclude',
 				'type': 'xinclude',
@@ -396,12 +405,6 @@ def inspect(reqs, ctx, paths):
 		'method': 'python',
 		'redirect': 'stdout',
 	}
-	il = {
-		'interface': libdev.__name__ + '.inspect_link_editor',
-		'command': 'fault.development.bin.il',
-		'method': 'python',
-		'redirect': 'stdout',
-	}
 	formats = {
 		'library': 'xml',
 		'executable': 'xml',
@@ -413,41 +416,18 @@ def inspect(reqs, ctx, paths):
 	unsupported = {
 		'target-file-extensions': {None:'.void'},
 		'formats': formats,
-		'reductions': {
-			'library': il,
-			'executable': il,
-			'extension': il,
-			'fragmnt': il,
-			None: il,
-		},
-
 		'transformations': {
 			None: iempty,
-			'javascript': iempty,
-			'css': iempty,
-			'less': iempty,
 		},
 	}
 
 	core = {
-		'javascript': unsupported,
-		'xml': unsupported,
-		'css': unsupported,
-		'resource': unsupported,
-		'python': unsupported,
+		'[trap]': unsupported,
 
 		'system': {
 			'formats': formats,
 			'target-file-extensions': {None:'.xml'},
 			'platform': 'xml-inspect-' + sys.platform,
-			'reductions': {
-				None: {
-					'interface': libdev.__name__ + '.inspect_link_editor',
-					'command': 'fault.development.bin.il',
-					'method': 'python',
-					'redirect': 'stdout',
-				},
-			},
 			'transformations': {
 				None: {
 					'command': 'fault.development.bin.empty_introspection',
@@ -456,6 +436,12 @@ def inspect(reqs, ctx, paths):
 					'redirect': 'stdout',
 				},
 				'objective-c': {
+					'command': 'fault.llvm.bin.inspect',
+					'interface': libdev.__name__ + '.compiler_collection',
+					'method': 'python',
+					'redirect': 'stdout',
+				},
+				'c++[rtti exceptions]': {
 					'command': 'fault.llvm.bin.inspect',
 					'interface': libdev.__name__ + '.compiler_collection',
 					'method': 'python',
@@ -666,7 +652,7 @@ def host_system_type(reqs, paths):
 		},
 
 		# subject interfaces.
-		'reductions': {
+		'integrations': {
 			None: {
 				'interface': libdev.__name__ + '.link_editor',
 				'type': 'linker',
@@ -692,6 +678,16 @@ def host_system_type(reqs, paths):
 					'builtins': str(builtins) if builtins else None,
 				},
 			},
+
+			# -fno-rtti -fno-exceptions
+			'c++[rtti exceptions]': {
+				'inherit': None,
+				'language': 'c++',
+				'options': (
+					'-fno-exceptions',
+					'-fno-rtti',
+				)
+			}
 		},
 	}
 
@@ -881,7 +877,7 @@ def web_context(reqs, ctx, paths):
 			},
 
 			# subject interfaces.
-			'reductions': {
+			'integrations': {
 				None: {
 					'interface': libdev.__name__ + '.web_link_editor',
 					'type': 'linker',
