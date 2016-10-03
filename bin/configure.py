@@ -297,11 +297,6 @@ def xml_type(paths):
 	"""
 	Construct the subject for XML files.
 	"""
-	xmllint = select(paths, ['xmllint'], ('xmllint',))
-	if xmllint is None:
-		return None
-	xmlname, xmlc = xmllint
-
 	xml = {
 		'encoding': 'ascii',
 		'target-file-extensions': {None:'.xml'},
@@ -313,29 +308,28 @@ def xml_type(paths):
 
 		'integrations': {
 			'executable': {
-				'interface': web.__name__ + '.xinclude',
-				'type': 'xinclude',
-				'name': xmlname,
-				'command': str(xmlc),
-				'redirect': 'stdout',
+				'interface': web.__name__ + '.xml',
+				'name': 'integrate',
+				'command': __package__ + '.xml',
 				'root': 'root.xml',
+				'method': 'python',
 			},
 
 			'library': {
-				'interface': web.__name__ + '.xinclude',
-				'type': 'xinclude',
-				'name': xmlname,
-				'command': str(xmlc),
-				'redirect': 'stdout',
+				'interface': web.__name__ + '.xml',
+				'name': 'integrate',
+				'command': __package__ + '.xml',
 				'root': 'root.xml',
+				'method': 'python',
 			},
 		},
 
 		'transformations': {
 			'xml': {
-				'interface': libdev.__name__ + '.transparent',
-				'type': 'transparent',
-				'command': '/bin/cp',
+				'interface': web.__name__ + '.xml',
+				'name': 'transform',
+				'method': 'python',
+				'command': __package__ + '.xml',
 			},
 		}
 	}

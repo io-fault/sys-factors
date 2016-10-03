@@ -14,10 +14,10 @@ Provides command constructors for the (dev:context)`web` context.
 	&xinclude
 """
 import operator
+import itertools
 
 def xinclude(
-		build, adapter,
-		o_type, output, i_type, inputs,
+		build, adapter, o_type, output, i_type, inputs,
 		fragments, libraries,
 		verbose=None,
 		filepath=str,
@@ -30,6 +30,23 @@ def xinclude(
 	input, = inputs
 	cmd = ['xmllint', '--nsclean', '--xmlout', '--noblanks', '--xinclude',]
 	cmd.append(filepath(input))
+
+	return cmd
+
+def xml(
+		build, adapter, o_type, output, i_type, inputs, *factors,
+		verbose=None,
+		filepath=str,
+		module=None
+	):
+	"""
+	&..xml based processor for XML targets.
+	"""
+	vars = list(build.variants.items())
+	vars.sort()
+
+	cmd = ['xml', adapter['name'], filepath(output), filepath(inputs[0])]
+	cmd.extend(itertools.chain.from_iterable(vars))
 
 	return cmd
 
