@@ -34,7 +34,9 @@ def xinclude(
 	return cmd
 
 def xml(
-		build, adapter, o_type, output, i_type, inputs, *factors,
+		build, adapter,
+		o_type, output, i_type, inputs,
+		*factors,
 		verbose=None,
 		filepath=str,
 		module=None
