@@ -36,10 +36,11 @@ if __name__ == '__main__':
 
 	if cmd == 'integrate':
 		integrate(document)
+		with open(str(out), 'wb') as f:
+			document.write_c14n(f, with_comments=False)
 	elif cmd == 'transform':
 		transform(document, vd)
-
-	with open(str(out), 'wb') as f:
-		document.write_c14n(f, with_comments=False)
+		with open(str(out), 'wb') as f:
+			document.write(f)
 
 	raise SystemExit(0)
