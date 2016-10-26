@@ -1,6 +1,6 @@
 import os.path
 import types
-from .. import libconstruct as library
+from .. import library
 from ...routes import library as libroutes
 
 def test_Factor(test):
