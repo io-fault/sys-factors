@@ -2136,4 +2136,4 @@ class Construction(libio.Processor):
 		# so termination is immediate.
 		self.terminating = False
 		self.terminated = True
-		self.controller.exited(self)
+		self.exit()
