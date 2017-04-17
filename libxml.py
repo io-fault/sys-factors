@@ -60,7 +60,7 @@ class Metrics(libschema.Interface):
 			]),
 			('timestamp', (timestamp or libtime.now()).select('iso')),
 			('xmlns', namespace),
-			('xmlns:key', 'https://fault.io/xml/key'),
+			('xmlns:key', 'http://fault.io/xml/key'),
 		)
 
 	@staticmethod
@@ -92,7 +92,7 @@ class Metrics(libschema.Interface):
 			]),
 			('timestamp', (timestamp or libtime.now()).select('iso')),
 			('xmlns', namespace),
-			('xmlns:key', 'https://fault.io/xml/key'),
+			('xmlns:key', 'http://fault.io/xml/key'),
 		)
 
 class Test(libschema.Interface):

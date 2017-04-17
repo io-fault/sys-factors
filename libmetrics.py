@@ -593,7 +593,7 @@ class Harness(libharness.Harness):
 			from ..xml import libpython
 			xml = libpython.Serialization(xml_prefix='py:', xml_encoding='ascii')
 			error = list(xml.exception(test.fate, attributes=[
-					('xmlns:py', 'https://fault.io/xml/python')
+					('xmlns:py', 'http://fault.io/xml/python')
 				], traversed=set((id(test.fate), id(events), id(xml), id(test), id(view), id(self))))
 			)
 		else:
