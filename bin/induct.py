@@ -56,7 +56,7 @@ def main():
 		for src in f.sources():
 			induct = outdir / src.identifier
 			perform, cf = libdev.update_bytecode_cache(src, induct, condition)
-			if perform:
+			if perform and cf.exists():
 				cf.replace(induct)
 				print(str(induct), '->', cf)
 
