@@ -1,8 +1,8 @@
 """
-System feature probes for executables and the runtime environment.
+# System feature probes for executables and the runtime environment.
 
-&.libprobe provides a set of system queries for detecting executables,
-compiler collections, headers, and libraries.
+# &.libprobe provides a set of system queries for detecting executables,
+# compiler collections, headers, and libraries.
 """
 import os
 import subprocess
@@ -21,30 +21,30 @@ from ..io import library as libio
 
 def fs_routes(i:typing.Iterator[str]) -> typing.Sequence[libroutes.File]:
 	"""
-	Construct a &list of &libroutes.File instances from the given
-	iterator of strings.
+	# Construct a &list of &libroutes.File instances from the given
+	# iterator of strings.
 	"""
 	global libroutes
 	return list(map(libroutes.File.from_absolute, i))
 
 def environ_paths(env='PATH', sep=os.pathsep):
 	"""
-	Construct a sequence of &libroutes.File instances to the paths stored
-	in an environment variable. &os.environ is referred to upon
-	each invocation, no caching is performed so each call represents
-	the latest version.
+	# Construct a sequence of &libroutes.File instances to the paths stored
+	# in an environment variable. &os.environ is referred to upon
+	# each invocation, no caching is performed so each call represents
+	# the latest version.
 
-	Defaults to `PATH`, &environ_paths can select an arbitrary environment variable
-	to structure using the &env keyword parameter.
+	# Defaults to `PATH`, &environ_paths can select an arbitrary environment variable
+	# to structure using the &env keyword parameter.
 
-	This function exists to support &search as `search(environ_paths(), {...})` is
-	the most common use case.
+	# This function exists to support &search as `search(environ_paths(), {...})` is
+	# the most common use case.
 
-	[ Parameters ]
-	/env
-		The environment variable containing absolute paths.
-	/sep
-		The path separator to split the environment variable on.
+	# [ Parameters ]
+	# /env
+		# The environment variable containing absolute paths.
+	# /sep
+		# The path separator to split the environment variable on.
 	"""
 	global os
 	global fs_routes
@@ -57,11 +57,11 @@ def environ_paths(env='PATH', sep=os.pathsep):
 def search(search_paths:typing.Sequence[str], xset:typing.Set[str]
 	) -> typing.Tuple[typing.Mapping[str, libroutes.File], typing.Set[str]]:
 	"""
-	Query the sequence of search paths for the given set of files.
+	# Query the sequence of search paths for the given set of files.
 
-	All paths will be scanned for each requested identifier in &xset. When an identifier
-	is found to exist, it is removed from the set that is being scanned for causing
-	the first path match to be the one returned.
+	# All paths will be scanned for each requested identifier in &xset. When an identifier
+	# is found to exist, it is removed from the set that is being scanned for causing
+	# the first path match to be the one returned.
 	"""
 
 	ws = set(xset)
@@ -86,9 +86,9 @@ def search(search_paths:typing.Sequence[str], xset:typing.Set[str]
 
 def executables(xset:typing.Set[str]):
 	"""
-	Query the (env)`PATH` for executables with the exact name.
-	Returns a pair whose first item is the matches that currently exist,
-	and the second is the set of executables that were not found in the path.
+	# Query the (env)`PATH` for executables with the exact name.
+	# Returns a pair whose first item is the matches that currently exist,
+	# and the second is the set of executables that were not found in the path.
 	"""
 	global search, environ_paths
 	return search(environ_paths(), xset)
@@ -109,14 +109,14 @@ def prepare(
 		}
 	) -> typing.Tuple[libroutes.File, libdev.Construction]:
 	"""
-	Prepare a probe by initializing the given &directory as a composite factor
-	containing a single source file whose content is defined by &source. Often, &directory
-	is a temporary directory created by &..routes.library.File.temporary.
+	# Prepare a probe by initializing the given &directory as a composite factor
+	# containing a single source file whose content is defined by &source. Often, &directory
+	# is a temporary directory created by &..routes.library.File.temporary.
 
-	The reduction of the composite (executable file) with respect to the &context and the
-	&libdev.Construction instance are returned in a &tuple. After construction is
-	complete, the executable reduction should be executed in order to retrieve the data
-	collected by the sensors.
+	# The reduction of the composite (executable file) with respect to the &context and the
+	# &libdev.Construction instance are returned in a &tuple. After construction is
+	# complete, the executable reduction should be executed in order to retrieve the data
+	# collected by the sensors.
 	"""
 
 	output = None
@@ -182,13 +182,13 @@ def runtime(mechanisms, language, source, **parameters):
 
 def sysctl(names, route=None):
 	"""
-	Retrieve the system control variables using (system:executable)`sysctl`.
+	# Retrieve the system control variables using (system:executable)`sysctl`.
 
-	[Parameters]
-	/route
-		The route to the `sysctl` executable.
-	/names
-		The settings to get.
+	# [Parameters]
+	# /route
+		# The route to the `sysctl` executable.
+	# /names
+		# The settings to get.
 	"""
 
 	if route is None:
@@ -208,23 +208,23 @@ def includes(
 		**parameters
 	) -> bool:
 	"""
-	Search for &includes present in the environment described by &matrix.
+	# Search for &includes present in the environment described by &matrix.
 
-	Returns a bool on whether the environment has the requested headers in its
-	configuration for the designated compiler.
+	# Returns a bool on whether the environment has the requested headers in its
+	# configuration for the designated compiler.
 
-	The check is compiler sensitive; the configuration of a compiler can have
-	arbitrary include paths, so a particular compiler must be stated in order to
-	perform the check.
+	# The check is compiler sensitive; the configuration of a compiler can have
+	# arbitrary include paths, so a particular compiler must be stated in order to
+	# perform the check.
 
-	[ Parameters ]
-	/language
-		The identifier of the language that is to be compiled.
+	# [ Parameters ]
+	# /language
+		# The identifier of the language that is to be compiled.
 
-	/includes
-		A sequence of includes to test for. A sequence is used so that
-		dependencies may be included prior to the actual header or headers of interest.
-		The check is only interested in whether or not compilation succeeded.
+	# /includes
+		# A sequence of includes to test for. A sequence is used so that
+		# dependencies may be included prior to the actual header or headers of interest.
+		# The check is only interested in whether or not compilation succeeded.
 	"""
 
 	main = "\nint main(int argc, char *argv[]) { return 0; }"

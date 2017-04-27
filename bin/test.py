@@ -1,5 +1,5 @@
 """
-Terminal test execution for libtest.
+# Terminal test execution for libtest.
 """
 import os
 import sys
@@ -36,7 +36,7 @@ bottom_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+--')
 
 class Harness(libharness.Harness):
 	"""
-	The collection and execution of a series of tests.
+	# The collection and execution of a series of tests.
 	"""
 	concurrently = staticmethod(libsys.concurrently)
 

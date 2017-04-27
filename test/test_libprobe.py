@@ -1,5 +1,5 @@
 """
-Check environment and probe classes.
+# Check environment and probe classes.
 """
 import os
 from .. import libprobe as library

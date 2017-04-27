@@ -1,9 +1,9 @@
 """
-System executable access to the Python bytecode compiler.
+# System executable access to the Python bytecode compiler.
 
-Exposes the ability to designate the output bytecode file so
-factor processing can manage Python bytecode in the same fashion as
-other targets.
+# Exposes the ability to designate the output bytecode file so
+# factor processing can manage Python bytecode in the same fashion as
+# other targets.
 """
 import sys
 import py_compile

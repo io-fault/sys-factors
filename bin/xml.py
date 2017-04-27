@@ -1,8 +1,8 @@
 """
-XML integration and transformation command.
+# XML integration and transformation command.
 
-Used by the default configuration to integrate the transformed sources into a single
-XML document.
+# Used by the default configuration to integrate the transformed sources into a single
+# XML document.
 """
 import sys
 from ...xml import lxml, libfactor
@@ -10,7 +10,7 @@ from ...xml import library as libxml
 
 def transform(document, parameters):
 	"""
-	Load the given &route as an XML document and perform any necessary processing.
+	# Load the given &route as an XML document and perform any necessary processing.
 	"""
 
 	# Remove elements ctl:include-if
@@ -18,7 +18,7 @@ def transform(document, parameters):
 
 def integrate(document):
 	"""
-	Load the given &route as an XML document and perform any necessary processing.
+	# Load the given &route as an XML document and perform any necessary processing.
 	"""
 
 	# Perform inclusions.

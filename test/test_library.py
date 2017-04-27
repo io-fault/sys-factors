@@ -5,7 +5,7 @@ from ...routes import library as libroutes
 
 def test_Factor(test):
 	"""
-	Check the Construction Factor features.
+	# Check the Construction Factor features.
 	"""
 	f = library.Factor.from_fullname(__name__)
 	test.isinstance(f.module, types.ModuleType)
@@ -159,7 +159,7 @@ def test_updated(test):
 
 def test_sequence(test):
 	"""
-	Check the sequencing of a traversed Sources graph.
+	# Check the sequencing of a traversed Sources graph.
 	"""
 	tr = test.exits.enter_context(libroutes.File.temporary())
 	m = [
@@ -231,11 +231,11 @@ def test_identity(test):
 
 def test_construction_sequence(test):
 	"""
-	&library.initialize of a temporary system target
-	and its subsequent &library.transform and &library.reduce.
+	# &library.initialize of a temporary system target
+	# and its subsequent &library.transform and &library.reduce.
 
-	! WARNING:
-		Performs no tests aside from execution.
+	# ! WARNING:
+		# Performs no tests aside from execution.
 	"""
 	tr = test.exits.enter_context(libroutes.File.temporary())
 	import builtins

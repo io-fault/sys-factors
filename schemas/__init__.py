@@ -1,5 +1,5 @@
 """
-Schema set for tracebacks, test reports, and metrics.
+# Schema set for tracebacks, test reports, and metrics.
 """
 #__factor_type__ 'set.xml'
 

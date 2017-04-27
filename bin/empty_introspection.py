@@ -1,9 +1,9 @@
 """
-Used internally; emit an empty introspection XML file.
+# Used internally; emit an empty introspection XML file.
 
-In cases where language introspection is not supported, a fallback must be
-available for making product snapshots possible. &.bin.configure uses
-this when a given language is not supported.
+# In cases where language introspection is not supported, a fallback must be
+# available for making product snapshots possible. &.bin.configure uses
+# this when a given language is not supported.
 """
 import sys
 

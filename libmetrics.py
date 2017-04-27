@@ -1,13 +1,13 @@
 """
-Test coverage data aggregation and serialization.
+# Test coverage data aggregation and serialization.
 
-Used in conjunction with &.bin.measure and &..factors to report the collected trace data.
+# Used in conjunction with &.bin.measure and &..factors to report the collected trace data.
 
-[ Development Tasks ]
+# [ Development Tasks ]
 
-This is heavily Python specific, and &..development needs to be able to support arbitrary
-languages. The structure of the module may need significant refactoring in order
-to properly support arbitrary measurement pipelines.
+# This is heavily Python specific, and &..development needs to be able to support arbitrary
+# languages. The structure of the module may need significant refactoring in order
+# to properly support arbitrary measurement pipelines.
 """
 import typing
 import operator
@@ -46,7 +46,7 @@ def statistics(
 		Counter=collections.Counter,
 	):
 	"""
-	Calculate basic statistics useful for analyzing time measurements.
+	# Calculate basic statistics useful for analyzing time measurements.
 	"""
 
 	timings = Sequence(data)
@@ -83,13 +83,13 @@ def statistics(
 
 def source_file_map(interests:typing.Sequence[libroutes.Import]):
 	"""
-	Query Python for the entire package tree of all the
-	given Import routes.
+	# Query Python for the entire package tree of all the
+	# given Import routes.
 
-	[Effects]
-	/Product
-		Mapping of file paths associated with the module path that
-		represents the file.
+	# [Effects]
+	# /Product
+		# Mapping of file paths associated with the module path that
+		# represents the file.
 	"""
 
 	# Get the full set of modules that are of interest to the perspective.
@@ -117,25 +117,25 @@ def source_file_map(interests:typing.Sequence[libroutes.Import]):
 
 def reorient(container:str, sfm:dict, input:libtrace.Measurements, output:libtrace.Measurements):
 	"""
-	Transform per-test measurements produced by &measure
-	into per-file measurements. This essentially swaps the &container with
-	the file path while restructuring the key to be collapsible.
+	# Transform per-test measurements produced by &measure
+	# into per-file measurements. This essentially swaps the &container with
+	# the file path while restructuring the key to be collapsible.
 
-	[ Parameters ]
+	# [ Parameters ]
 
-	/container
-		Expected to be a string identifying the source
-		of the trace data. Usually, the identity of the test,
-		the qualified name.
-	/sfm
-		A dictionary produced by &source_file_map for resolving
-		the module from the source file. This is what determines
-		which data is kept. Events from lines that do not
-		exist in any of these files are removed.
-	/output
-		The &libtrace.Measurements that will be updated.
-	/input
-		The source &libtrace.Measurements produced by &libtrace.Measure.
+	# /container
+		# Expected to be a string identifying the source
+		# of the trace data. Usually, the identity of the test,
+		# the qualified name.
+	# /sfm
+		# A dictionary produced by &source_file_map for resolving
+		# the module from the source file. This is what determines
+		# which data is kept. Events from lines that do not
+		# exist in any of these files are removed.
+	# /output
+		# The &libtrace.Measurements that will be updated.
+	# /input
+		# The source &libtrace.Measurements produced by &libtrace.Measure.
 	"""
 	out_times, out_counts = output
 	times, counts = input
@@ -165,19 +165,19 @@ def reorient(container:str, sfm:dict, input:libtrace.Measurements, output:libtra
 
 def collapse(data:typing.Mapping, merge:typing.Callable, dimensions:int=1) -> typing.Mapping:
 	"""
-	Collapse dimensions in the given &data by removing
-	the specified number of &dimensions from the key and merging
-	data with the given &merge function.
+	# Collapse dimensions in the given &data by removing
+	# the specified number of &dimensions from the key and merging
+	# data with the given &merge function.
 
-	Collapse is primarily used by &aggregates.
+	# Collapse is primarily used by &aggregates.
 
-	[ Parameters ]
+	# [ Parameters ]
 
-	/data
-		A &collections.defaultdict instance designating the data to collapse.
-	/merge
-		A callable that can combine measurements. For &collections.Counter,
-		this is &collections.Counter.update. For &list, this is &list.extend.
+	# /data
+		# A &collections.defaultdict instance designating the data to collapse.
+	# /merge
+		# A callable that can combine measurements. For &collections.Counter,
+		# this is &collections.Counter.update. For &list, this is &list.extend.
 	"""
 	collapsed = collections.defaultdict(data.default_factory)
 	collapse = functools.lru_cache(128)(lambda x: x[:-dimensions])
@@ -189,16 +189,16 @@ def collapse(data:typing.Mapping, merge:typing.Callable, dimensions:int=1) -> ty
 
 def isolate(measures) -> dict:
 	"""
-	Construct a mapping that isolates each project's tests from each other.
+	# Construct a mapping that isolates each project's tests from each other.
 
-	[ Effects ]
+	# [ Effects ]
 
-	/Product
-		A dictionary instance whose keys are &libroutes.Import instances referring
-		to the project containing the test. The values are a triple containing
-		the &libroutes.Import referring to the test module, the attributes that
-		select the test from the module, and the key used to access the entry
-		in the given &measures dictionary.
+	# /Product
+		# A dictionary instance whose keys are &libroutes.Import instances referring
+		# to the project containing the test. The values are a triple containing
+		# the &libroutes.Import referring to the test module, the attributes that
+		# select the test from the module, and the key used to access the entry
+		# in the given &measures dictionary.
 	"""
 
 	project_tests = collections.defaultdict(list)
@@ -217,10 +217,10 @@ def isolate(measures) -> dict:
 
 def merge(perspective, sfm, project_entry, measures):
 	"""
-	Merge the re-oriented metrics into the given perspective and return
-	the test results in a dictionary..
+	# Merge the re-oriented metrics into the given perspective and return
+	# the test results in a dictionary..
 
-	This loads the stored metrics from disk for the given test specified in &project_entry.
+	# This loads the stored metrics from disk for the given test specified in &project_entry.
 	"""
 	import pickle
 	# recollect stored coverage data and orient them relative to the project
@@ -249,12 +249,12 @@ def aggregate(item, islice=itertools.islice):
 
 def group(times, counts):
 	"""
-	Construct the set of groupings for the times and counts.
+	# Construct the set of groupings for the times and counts.
 
-	[ Parameters ]
+	# [ Parameters ]
 
-	/measures
-		A mapping of test results produced by &.bin.measure.
+	# /measures
+		# A mapping of test results produced by &.bin.measure.
 	"""
 
 	# recollect stored coverage data and orient them relative to the project
@@ -275,19 +275,19 @@ def group(times, counts):
 
 def coverage(module, counts, RangeSet=librange.Set):
 	"""
-	Identify the uncovered units (lines) from the line counts.
+	# Identify the uncovered units (lines) from the line counts.
 
-	! DEVELOPER:
-		This is hardcoded to Python. fault.development being multi-lingual needs
-		to be able to find the necessary coverage information for arbitrary languages.
+	# ! DEVELOPER:
+		# This is hardcoded to Python. fault.development being multi-lingual needs
+		# to be able to find the necessary coverage information for arbitrary languages.
 
-		For gcov, the diagnostic files produced during tests runs were processed
-		and the traversed-traversable information was available at the end of the test.
-		Currently, the measurements do not collect this information as the structure of
-		extension modules have changed to a multi-file configuration.
+		# For gcov, the diagnostic files produced during tests runs were processed
+		# and the traversed-traversable information was available at the end of the test.
+		# Currently, the measurements do not collect this information as the structure of
+		# extension modules have changed to a multi-file configuration.
 
-		Potentially, traversable information should be made available
-		prior to this point.
+		# Potentially, traversable information should be made available
+		# prior to this point.
 	"""
 
 	# Use the AST walker in libpython.
@@ -307,7 +307,7 @@ def process(measures, item,
 		list=list, zip=zip, map=map,
 	):
 	"""
-	Process the isolated project data.
+	# Process the isolated project data.
 	"""
 	project, data = item
 
@@ -357,10 +357,10 @@ def process(measures, item,
 
 def prepare(metrics:libfs.Dictionary, store=pickle.dump):
 	"""
-	Prepare the metrics for formatting by tools like &..factors.
+	# Prepare the metrics for formatting by tools like &..factors.
 
-	Given a &libfs.Dictionary of collected metrics by &.libmetrics.Harness, process
-	it into a form that is more suitable for consumption by reporting tools.
+	# Given a &libfs.Dictionary of collected metrics by &.libmetrics.Harness, process
+	# it into a form that is more suitable for consumption by reporting tools.
 	"""
 
 	i = isolate(metrics)
@@ -388,7 +388,7 @@ def prepare(metrics:libfs.Dictionary, store=pickle.dump):
 
 class Harness(libharness.Harness):
 	"""
-	Test harness for measuring a project using its tests.
+	# Test harness for measuring a project using its tests.
 	"""
 	from ..chronometry import library as libtime
 
@@ -398,9 +398,9 @@ class Harness(libharness.Harness):
 	@staticmethod
 	def llvm_merge_profile_data(output, *inputs):
 		"""
-		Return the constructed command to perform instrumentation profile data merge.
+		# Return the constructed command to perform instrumentation profile data merge.
 
-		This is a requisite step in order to get the recordd coverage information.
+		# This is a requisite step in order to get the recordd coverage information.
 		"""
 		l = ['llvm-profdata', 'merge', '-instr', '-output=' + str(output)]
 		l.extend(inputs)
@@ -477,10 +477,10 @@ class Harness(libharness.Harness):
 
 	def prepare_extensions(self, test_id):
 		"""
-		Prepare extensions with instrumentation for collection.
+		# Prepare extensions with instrumentation for collection.
 
-		This sets the desintation path of the counters and resets
-		the current in memory data inside the extension.
+		# This sets the desintation path of the counters and resets
+		# the current in memory data inside the extension.
 		"""
 		prefix = self.work / 'llvm' / test_id
 		prefix.init('directory')
@@ -492,12 +492,12 @@ class Harness(libharness.Harness):
 	@staticmethod
 	def merge_instrumentation_metrics(work, path):
 		"""
-		When collecting metrics for instrumented binaries, merge the per-test set
-		produced into a single file for each binary.
+		# When collecting metrics for instrumented binaries, merge the per-test set
+		# produced into a single file for each binary.
 
-		This performs a final merge giving a set of counters that represent the
-		counts across all test runs. When using &.bin.measure, this is performed
-		when the (system:environment)`FAULT_COVERAGE_TOTALS` is set.
+		# This performs a final merge giving a set of counters that represent the
+		# counts across all test runs. When using &.bin.measure, this is performed
+		# when the (system:environment)`FAULT_COVERAGE_TOTALS` is set.
 		"""
 		prefix = work / 'llvm'
 		totals = libroutes.File.from_path(path)
@@ -533,12 +533,12 @@ class Harness(libharness.Harness):
 
 	def flush_extensions(self, directory):
 		"""
-		Iterate over the extensions writing any collected data to disk.
-		The data is written to a file determined by &prepare_extensions prior
-		to the execution of a test.
+		# Iterate over the extensions writing any collected data to disk.
+		# The data is written to a file determined by &prepare_extensions prior
+		# to the execution of a test.
 
-		After the data has been written, a postprocessor is immediately ran in-place
-		to merge the data.
+		# After the data has been written, a postprocessor is immediately ran in-place
+		# to merge the data.
 		"""
 		if not self.instrumentation_set:
 			# No instrumentation extensions loaded.
@@ -556,8 +556,8 @@ class Harness(libharness.Harness):
 
 	def instrumentation_metrics(self, directory):
 		"""
-		Iterate over the merged profile data in the given &directory
-		to collect the per-file measurements.
+		# Iterate over the merged profile data in the given &directory
+		# to collect the per-file measurements.
 		"""
 		from ..llvm import instr
 
@@ -572,8 +572,8 @@ class Harness(libharness.Harness):
 
 	def seal(self, test):
 		"""
-		Perform the test and store its report and measurements into
-		the configured metrics directory.
+		# Perform the test and store its report and measurements into
+		# the configured metrics directory.
 		"""
 		trace, events = libtrace.prepare()
 		subscribe = trace.subscribe

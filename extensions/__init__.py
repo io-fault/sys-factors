@@ -1,3 +1,3 @@
 """
-Extensions providing support for development tools.
+# Extensions providing support for development tools.
 """

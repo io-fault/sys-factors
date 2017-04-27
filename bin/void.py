@@ -1,6 +1,6 @@
 """
-Destroy the (system:directory)`__pycache__` directories in the
-directories given as parameters to the command.
+# Destroy the (system:directory)`__pycache__` directories in the
+# directories given as parameters to the command.
 """
 
 import sys

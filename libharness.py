@@ -1,16 +1,16 @@
 """
-Test execution management and status control.
+# Test execution management and status control.
 
-libharness provides management tools for the execution of tests and
-the destination of their resulting status. Status being both the fate
-of the test and any collected coverage or profile data.
+# libharness provides management tools for the execution of tests and
+# the destination of their resulting status. Status being both the fate
+# of the test and any collected coverage or profile data.
 
-! DEVELOPER:
-	Future model: run tests with a specified concurrency level,
-	failures are enqueued and processed by the (human) controller.
-	Tests are not ran when queue is full; developer chooses to exit
-	or pop/debug the failure.
-	Concise failure is reported to the text log.
+# ! DEVELOPER:
+	# Future model: run tests with a specified concurrency level,
+	# failures are enqueued and processed by the (human) controller.
+	# Tests are not ran when queue is full; developer chooses to exit
+	# or pop/debug the failure.
+	# Concise failure is reported to the text log.
 """
 import os
 import sys
@@ -26,17 +26,17 @@ from . import library as libdev
 
 class Harness(object):
 	"""
-	The collection and execution of a set of tests.
+	# The collection and execution of a set of tests.
 
-	Harness provides overridable actions for the execution of Tests.
-	Simple test runners subclass &Harness in order to manage the execution
-	and status display of an evaluation.
+	# Harness provides overridable actions for the execution of Tests.
+	# Simple test runners subclass &Harness in order to manage the execution
+	# and status display of an evaluation.
 
-	[ Properties ]
+	# [ Properties ]
 
-	/contexts
-		The construction contexts that will be referenced to identify
-		the builds to test.
+	# /contexts
+		# The construction contexts that will be referenced to identify
+		# the builds to test.
 	"""
 	from . import libtest # class attribute for general access.
 	Test = libtest.Test
@@ -49,8 +49,8 @@ class Harness(object):
 
 	def module_test(self, test):
 		"""
-		Method used to implement the root module test that divides
-		into the set of tests defined therein.
+		# Method used to implement the root module test that divides
+		# into the set of tests defined therein.
 		"""
 		module = importlib.import_module(test.identity)
 		test/module.__name__ == test.identity
@@ -66,8 +66,8 @@ class Harness(object):
 
 	def package_test(self, test):
 		"""
-		Method used to implement the test package test that divides
-		into the set of &module_test executions.
+		# Method used to implement the test package test that divides
+		# into the set of &module_test executions.
 		"""
 		# The package module
 		module = importlib.import_module(test.identity)
@@ -95,18 +95,18 @@ class Harness(object):
 
 	def dispatch(self, test):
 		"""
-		Execute the test directly using &test.seal.
+		# Execute the test directly using &test.seal.
 
-		This method is often overwritten in subclasses to control execution.
+		# This method is often overwritten in subclasses to control execution.
 		"""
 		test.seal()
 
 	def execute(self, container, modules):
 		"""
-		Execute the *tests* of the given container.
+		# Execute the *tests* of the given container.
 
-		Construct the Test instances for the tests gathered in &container
-		and perform them using &dispatch.
+		# Construct the Test instances for the tests gathered in &container
+		# and perform them using &dispatch.
 		"""
 		for tid, tcall in getattr(container, '__tests__', ()):
 			test = self.Test(tid, tcall)
@@ -114,12 +114,12 @@ class Harness(object):
 
 	def preload_extension(self, test_id, route:Import):
 		"""
-		Given an extension route, &route, import the module using
-		the configured &role.
+		# Given an extension route, &route, import the module using
+		# the configured &role.
 
-		Used by the harness to import extensions that are being tested in a fashion
-		that allows for coverage and profile data to be collected and for injection
-		dependent tests.
+		# Used by the harness to import extensions that are being tested in a fashion
+		# that allows for coverage and profile data to be collected and for injection
+		# dependent tests.
 		"""
 
 		env = os.environ
@@ -159,11 +159,11 @@ class Harness(object):
 
 	def root(self, route):
 		"""
-		Generate the root test from the given route.
+		# Generate the root test from the given route.
 
-		This creates a pseudo-module that holds the selected test modules
-		to run. Using &Harness.root allows &Harness to operate the initial
-		stage identically to how divisions are handled at later stages.
+		# This creates a pseudo-module that holds the selected test modules
+		# to run. Using &Harness.root allows &Harness to operate the initial
+		# stage identically to how divisions are handled at later stages.
 		"""
 
 		# pseudo-module for absolute root; the initial divisions are built

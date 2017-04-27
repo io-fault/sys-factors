@@ -1,6 +1,6 @@
 """
-Executable module taking a single parameter that emits the compilation
-transcript to standard out.
+# Executable module taking a single parameter that emits the compilation
+# transcript to standard out.
 """
 import sys
 import os

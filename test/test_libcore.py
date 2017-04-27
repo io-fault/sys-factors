@@ -3,7 +3,7 @@ from .. import libcore as library
 
 def test_location(test):
 	"""
-	Test &.libcore's capacity to identify the location of a core image.
+	# Test &.libcore's capacity to identify the location of a core image.
 	"""
 	test.explicit()
 	with test/None.__class__ as exc, libcore.constraint(None):

@@ -1,5 +1,5 @@
 """
-Functions for working with Python syntax.
+# Functions for working with Python syntax.
 """
 import ast
 
@@ -12,7 +12,7 @@ untraversable_nodes = (
 
 def lines(path):
 	"""
-	Return the set of lines that have expressions.
+	# Return the set of lines that have expressions.
 	"""
 	seq = set()
 	add = seq.add

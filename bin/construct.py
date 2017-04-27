@@ -1,5 +1,5 @@
 """
-Construct the targets of a package hierarchy for the selected context and role.
+# Construct the targets of a package hierarchy for the selected context and role.
 """
 import os
 import sys
@@ -19,14 +19,14 @@ import_from_module = libroutes.Import.from_module
 
 def set_exit_code(cxn, unit=None):
 	"""
-	Report the number of failures.
+	# Report the number of failures.
 	"""
 	# Restrict revealed count to 201. The exit code is rather small.
 	unit.result = min(cxn.failures, 201)
 
 def main():
 	"""
-	Prepare the entire package building factor targets and writing bytecode.
+	# Prepare the entire package building factor targets and writing bytecode.
 	"""
 	call = libio.context()
 	sector = call.sector

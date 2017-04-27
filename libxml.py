@@ -1,10 +1,10 @@
 """
-XML interface set for &..development.
+# XML interface set for &..development.
 
-[ Properties ]
+# [ Properties ]
 
-/(&typing.Mapping)namespaces
-	The namespace label (schema module basename) associated with the namespace URI.
+# /(&typing.Mapping)namespaces
+	# The namespace label (schema module basename) associated with the namespace URI.
 """
 import itertools
 import typing
@@ -30,7 +30,7 @@ def map_coverage_data(measures):
 
 class Metrics(libschema.Interface):
 	"""
-	System invocation descriptor.
+	# System invocation descriptor.
 	"""
 
 	@staticmethod
@@ -39,7 +39,7 @@ class Metrics(libschema.Interface):
 			chain=itertools.chain.from_iterable
 		):
 		"""
-		Serialize the profiling measurements.
+		# Serialize the profiling measurements.
 		"""
 		xml = serialization
 		key_strings = keys
@@ -69,7 +69,7 @@ class Metrics(libschema.Interface):
 			chain=itertools.chain.from_iterable
 		):
 		"""
-		Serialize coverage data.
+		# Serialize coverage data.
 		"""
 		# Essentially the same as &profile, but the line count data is structured
 		# differently, so run the measures through &map_coverage_data.
@@ -100,7 +100,7 @@ class Test(libschema.Interface):
 			chain=itertools.chain.from_iterable
 		):
 		"""
-		Serialize the test &report.
+		# Serialize the test &report.
 		"""
 		xml = serialization
 

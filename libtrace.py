@@ -1,29 +1,29 @@
 """
-Coverage and profiling data collection.
+# Coverage and profiling data collection.
 
-! WARNING:
-	&Collector instances *must* be per-thread in order for &measure to
-	properly calculate call timings.
+# ! WARNING:
+	# &Collector instances *must* be per-thread in order for &measure to
+	# properly calculate call timings.
 
-Common usage:
+# Common usage:
 
-#!/pl/python
-	collector, events = libtrace.prepare()
-	with collector:
-		...
-	aggregate = libtrace.measure(events)
+## !/pl/python
+	# collector, events = libtrace.prepare()
+	# with collector:
+		# ...
+	# aggregate = libtrace.measure(events)
 
-[ Development Tasks ]
+# [ Development Tasks ]
 
-	- Refactor &measure as a stateful method that can be called during collection
-		in order to reduce memory consumption during long runs.
-	- Make use of interjection in order to perform collection maintenance
-		for &measure; cancel collection, run measure, serialize new data(?), resume.
+	# - Refactor &measure as a stateful method that can be called during collection
+		# in order to reduce memory consumption during long runs.
+	# - Make use of interjection in order to perform collection maintenance
+		# for &measure; cancel collection, run measure, serialize new data(?), resume.
 
-[ Properties ]
+# [ Properties ]
 
-/Measurements
-	A tuple of measured trace data.
+# /Measurements
+	# A tuple of measured trace data.
 """
 import sys
 import collections
@@ -49,7 +49,7 @@ event_integers = {
 
 class Collector(object):
 	"""
-	Python collector. &trace.Collector is used when available.
+	# Python collector. &trace.Collector is used when available.
 	"""
 
 	def __init__(self, endpoint, time_delta):
@@ -118,15 +118,15 @@ def prepare(
 		Collector=(Collector if trace is None else trace.Collector),
 	) -> typing.Tuple[Collector, typing.Sequence]:
 	"""
-	Construct trace event collection using a &list instance
-	as the destination. This is the primary entry point for this module and should
-	be used to create the necessary per-thread &Collector instances.
+	# Construct trace event collection using a &list instance
+	# as the destination. This is the primary entry point for this module and should
+	# be used to create the necessary per-thread &Collector instances.
 
-	[ Effects ]
+	# [ Effects ]
 
-	/product
-		Returns a pair containing the &Collector instance and the events instance
-		of the configured &Sequence type.
+	# /product
+		# Returns a pair containing the &Collector instance and the events instance
+		# of the configured &Sequence type.
 	"""
 
 	if Chronometer is None:
@@ -163,28 +163,28 @@ def measure(
 		Counter=collections.Counter,
 	) -> Measurements:
 	"""
-	Measure line counts and call times from the collected trace data.
+	# Measure line counts and call times from the collected trace data.
 
-	Coverage events and profile events should be processed here.
+	# Coverage events and profile events should be processed here.
 
-	[ Parameters ]
+	# [ Parameters ]
 
-	/events
-		The sequence of events identified as the endpoint of a &Collector instance.
-		Usually, a triple whose first key is the calling context, the second is
-		the traced events, and the third is the time index.
+	# /events
+		# The sequence of events identified as the endpoint of a &Collector instance.
+		# Usually, a triple whose first key is the calling context, the second is
+		# the traced events, and the third is the time index.
 
-	[ Effects ]
+	# [ Effects ]
 
-	/Product
-		A pair consisting of the exact call times, cumulative and resident, and the line counts.
+	# /Product
+		# A pair consisting of the exact call times, cumulative and resident, and the line counts.
 
-		Each item in the tuple is a mapping. The line counts is a two-level mapping
-		keyed with the filename followed with the line number. The line number is a key
-		to a &collections.Counter instance. The exact timings is a mapping whose keys
-		are tuples whose contents are the calling context of the time measurements. The
-		value of the mapping is a sequence of pairs describing the cumulative and resident
-		times of the call context (key).
+		# Each item in the tuple is a mapping. The line counts is a two-level mapping
+		# keyed with the filename followed with the line number. The line number is a key
+		# to a &collections.Counter instance. The exact timings is a mapping whose keys
+		# are tuples whose contents are the calling context of the time measurements. The
+		# value of the mapping is a sequence of pairs describing the cumulative and resident
+		# times of the call context (key).
 	"""
 
 	call_state = deque((0,))

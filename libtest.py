@@ -1,11 +1,11 @@
 """
-A testing library that minimizes the distance between the test harness, and
-the actual tests for the purpose of keeping the execution machinary as simple as possible.
+# A testing library that minimizes the distance between the test harness, and
+# the actual tests for the purpose of keeping the execution machinary as simple as possible.
 
-libtest provides the very basics for testing in Python. Test harnesses are implemented else-
-where as they tend to be significant pieces of code. However, a trivial &execute
-function is provided that, when given a module, will execute the tests therein. Exceptions
-are allowed to raise normally in order to report failures of any kind.
+# libtest provides the very basics for testing in Python. Test harnesses are implemented else-
+# where as they tend to be significant pieces of code. However, a trivial &execute
+# function is provided that, when given a module, will execute the tests therein. Exceptions
+# are allowed to raise normally in order to report failures of any kind.
 """
 import builtins
 import gc
@@ -40,20 +40,20 @@ def get_test_index(tester, int=int, set=set, AttributeError=AttributeError):
 
 def test_order(kv):
 	"""
-	Key function used by &gather that uses &get_test_index in
-	order to elevate a test's position given that it was explicitly listed.
+	# Key function used by &gather that uses &get_test_index in
+	# order to elevate a test's position given that it was explicitly listed.
 	"""
 	return get_test_index(kv[1])
 
 def gather(container, prefix = 'test_', key=test_order, getattr=getattr):
 	"""
-	Returns an ordered dictionary of attribute names associated with a &Test instance:
+	# Returns an ordered dictionary of attribute names associated with a &Test instance:
 
 	#!/pl/python
 		{k : Test(v, k) for k, v in container.items()}
 
-	Collect the objects in the container whose name starts with "test_".
-	The ordering is defined by the &test_order function.
+	# Collect the objects in the container whose name starts with "test_".
+	# The ordering is defined by the &test_order function.
 	"""
 
 	tests = [
@@ -99,9 +99,9 @@ class Absurdity(Exception):
 # Exposes an assert like interface to Test objects.
 class Contention(object):
 	"""
-	Contentions are objects used by &Test objects to provide assertions.
-	Usually, contention instances are made by the true division operator of
-	&Test instances passed into unit test subjects.
+	# Contentions are objects used by &Test objects to provide assertions.
+	# Usually, contention instances are made by the true division operator of
+	# &Test instances passed into unit test subjects.
 
 	#!/pl/python
 		import featurelib
@@ -110,12 +110,12 @@ class Contention(object):
 			expectation = ...
 			test/featurelib.functionality() == expectation
 
-	True division, "/", is used as it has high operator precedance that allows assertion
-	expresssions to be constructed using minimal syntax that lends to readable failure
-	conditions.
+	# True division, "/", is used as it has high operator precedance that allows assertion
+	# expresssions to be constructed using minimal syntax that lends to readable failure
+	# conditions.
 
-	All of the comparison operations are supported by Contention and are passed on to the
-	underlying objects being examined.
+	# All of the comparison operations are supported by Contention and are passed on to the
+	# underlying objects being examined.
 	"""
 	__slots__ = ('test', 'object', 'storage', 'inverse')
 
@@ -168,12 +168,12 @@ class Contention(object):
 
 	def __xor__(self, subject):
 		"""
-		Contend that the &subject raises the given exception when it is called::
+		# Contend that the &subject raises the given exception when it is called::
 
 		#!/pl/python
 			test/Exception ^ subject
 
-		Reads: "Test that 'Exception' is raised by 'subject'".
+		# Reads: "Test that 'Exception' is raised by 'subject'".
 		"""
 		with self as exc:
 			subject()
@@ -182,19 +182,19 @@ class Contention(object):
 
 	def __lshift__(self, subject):
 		"""
-		Contend that the parameter is contained by the object, &Container::
+		# Contend that the parameter is contained by the object, &Container::
 
 		#!/pl/python
 			test/Container << subject
 
-		Reads: "Test that 'Container' contains 'subject'".
+		# Reads: "Test that 'Container' contains 'subject'".
 		"""
 		return subject in self.object
 	__rlshift__ = __lshift__
 
 class Fate(BaseException):
 	"""
-	The Fate of a test. &Test.seal uses &Fate exceptions to describe the result of a unit test.
+	# The Fate of a test. &Test.seal uses &Fate exceptions to describe the result of a unit test.
 	"""
 	name = 'fate'
 	content = None
@@ -276,10 +276,10 @@ class Interrupt(Fail):
 
 class Core(Fail):
 	"""
-	Failure cause by a process dropping a core image or similar uncontrollable crash.
+	# Failure cause by a process dropping a core image or similar uncontrollable crash.
 
-	This exception is used by advanced test harnesses that execute tests in subprocesses to
-	protect subsequent tests.
+	# This exception is used by advanced test harnesses that execute tests in subprocesses to
+	# protect subsequent tests.
 	"""
 
 	abstract = 'The test caused a core image to be produced by the operating system.'
@@ -306,24 +306,24 @@ fate_exceptions = {
 
 class Test(object):
 	"""
-	An object that manages an individual test unit and it's execution.
+	# An object that manages an individual test unit and it's execution.
 
-	[ Properties ]
+	# [ Properties ]
 
-	/identity
-		A unique identifier for the &Test. Usually, a qualified name that can be used to
-		locate &focus without having the actual object.
+	# /identity
+		# A unique identifier for the &Test. Usually, a qualified name that can be used to
+		# locate &focus without having the actual object.
 
-	/focus
-		The callable that performs a series of checks--using the &Test instance--that
-		determines the &fate.
+	# /focus
+		# The callable that performs a series of checks--using the &Test instance--that
+		# determines the &fate.
 
-	/fate
-		The conclusion of the Test; pass, fail, error, skip. An instance of &Fate.
+	# /fate
+		# The conclusion of the Test; pass, fail, error, skip. An instance of &Fate.
 
-	/exits
-		A &contextlib.ExitStack for cleaning up allocations made during the test.
-		The harness running the test decides when the stack's exit is processed.
+	# /exits
+		# A &contextlib.ExitStack for cleaning up allocations made during the test.
+		# The harness running the test decides when the stack's exit is processed.
 	"""
 	__slots__ = ('focus', 'identity', 'constraints', 'fate', 'exits')
 
@@ -378,11 +378,11 @@ class Test(object):
 
 	def seal(self, isinstance=builtins.isinstance, BaseException=BaseException, Exception=Exception, Fate=Fate):
 		"""
-		Seal the fate of the Test by executing the subject-callable with the Test
-		instance as the only parameter.
+		# Seal the fate of the Test by executing the subject-callable with the Test
+		# instance as the only parameter.
 
-		Any exception that occurs is trapped and assigned to the &fate attribute
-		on the Test instance. &None is always returned by &seal.
+		# Any exception that occurs is trapped and assigned to the &fate attribute
+		# on the Test instance. &None is always returned by &seal.
 		"""
 		tb = None
 
@@ -420,14 +420,14 @@ class Test(object):
 
 	def explicit(self):
 		"""
-		Used by test subjects to inhibit runs of a particular test in aggregate runs.
+		# Used by test subjects to inhibit runs of a particular test in aggregate runs.
 		"""
 		raise self.Explicit("test must be explicitly invoked in order to run")
 
 	def skip(self, condition):
 		"""
-		Used by test subjects to skip the test given that the provided &condition is
-		&True.
+		# Used by test subjects to skip the test given that the provided &condition is
+		# &True.
 		"""
 		if condition: raise self.Skip(condition)
 
@@ -439,16 +439,16 @@ class Test(object):
 
 	def trap(self):
 		"""
-		Set a trap for exceptions converting a would-be &Error fate on exit to a &Failure.
+		# Set a trap for exceptions converting a would-be &Error fate on exit to a &Failure.
 
 		#!/pl/python
 			with test.trap():
 				...
 
-		This allows &fail implementations set a trace prior to exiting
-		the test's &focus.
+		# This allows &fail implementations set a trace prior to exiting
+		# the test's &focus.
 
-		&Fate exceptions are not trapped.
+		# &Fate exceptions are not trapped.
 		"""
 		return (self / None.__class__)
 
@@ -457,9 +457,9 @@ class Test(object):
 		from gc import collect
 		def garbage(self, minimum = None, collect = collect, **kw):
 			"""
-			Request collection with the expectation of a minimum unreachable.
+			# Request collection with the expectation of a minimum unreachable.
 
-			Used by tests needing to analyze the effects garbage collection.
+			# Used by tests needing to analyze the effects garbage collection.
 			"""
 			unreachable = collect()
 			if minimum is not None and (
@@ -474,12 +474,12 @@ class Test(object):
 
 def execute(module):
 	"""
-	A minimal test harness for Python.
+	# A minimal test harness for Python.
 
-	Execute the tests contained in the given container. Usually given a module object.
+	# Execute the tests contained in the given container. Usually given a module object.
 
-	! WARNING:
-		No status information is printed. Raises the first negative impact Test.
+	# ! WARNING:
+		# No status information is printed. Raises the first negative impact Test.
 	"""
 	for id, func in gather(module):
 		test = Test(id, func)

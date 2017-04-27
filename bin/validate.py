@@ -1,5 +1,5 @@
 """
-Validate a project as functioning by performing its tests against the *active variant*.
+# Validate a project as functioning by performing its tests against the *active variant*.
 """
 import os
 import sys
@@ -27,7 +27,7 @@ exits = {
 
 def failure_report_file(test):
 	"""
-	Return the route to the failure report for the given test.
+	# Return the route to the failure report for the given test.
 	"""
 	ir, rpath = libroutes.Import.from_attributes(test.identity)
 	cd = ir.floor().directory() / '__pycache__'
@@ -37,11 +37,11 @@ def failure_report_file(test):
 
 class Harness(libharness.Harness):
 	"""
-	The collection and execution of a series of tests for the purpose
-	of validating a configured build.
+	# The collection and execution of a series of tests for the purpose
+	# of validating a configured build.
 
-	This harness executes many tests in parallel. Validation should be quick
-	and generally quiet.
+	# This harness executes many tests in parallel. Validation should be quick
+	# and generally quiet.
 	"""
 	concurrently = staticmethod(libsys.concurrently)
 

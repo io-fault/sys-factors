@@ -1,17 +1,17 @@
 """
-Web context support for &.library.
+# Web context support for &.library.
 
-Provides command constructors for the (dev:context)`web` context.
+# Provides command constructors for the (dev:context)`web` context.
 
-[Index]
-/&<https://www.npmjs.com/package/uglify-js>
-	&javascript_uglify
-/&<https://www.npmjs.com/package/clean-css>
-	&css_cleancss
-/&<https://www.npmjs.com/package/less>
-	&lessc
-/&<https://xmlsoft.org>
-	&xinclude
+# [Index]
+# /&<https://www.npmjs.com/package/uglify-js>
+	# &javascript_uglify
+# /&<https://www.npmjs.com/package/clean-css>
+	# &css_cleancss
+# /&<https://www.npmjs.com/package/less>
+	# &lessc
+# /&<https://xmlsoft.org>
+	# &xinclude
 """
 import operator
 import itertools
@@ -24,7 +24,7 @@ def xinclude(
 		module=None
 	):
 	"""
-	Command constructor for (system:command)`xmllint` based XInclude processing.
+	# Command constructor for (system:command)`xmllint` based XInclude processing.
 	"""
 
 	input, = inputs
@@ -42,7 +42,7 @@ def xml(
 		module=None
 	):
 	"""
-	&..xml based processor for XML targets.
+	# &..xml based processor for XML targets.
 	"""
 	vars = list(build.variants.items())
 	vars.sort()
@@ -58,7 +58,7 @@ def lessc(
 		source_map_root=None, module=None
 	):
 	"""
-	Command constructor for (system:command)`lessc`.
+	# Command constructor for (system:command)`lessc`.
 	"""
 
 	cmd = ['https://www.npmjs.com/package/less', '--source-map']
@@ -73,7 +73,7 @@ def css_cleancss(
 		source_map_root=None, module=None
 	):
 	"""
-	Command constructor for (system:command)`cleancss`.
+	# Command constructor for (system:command)`cleancss`.
 	"""
 
 	assert build.factor.dynamics == 'library'
@@ -98,7 +98,7 @@ def javascript_uglify(
 		source_map_root=None, module=None
 	):
 	"""
-	Command constructor for (system:command)`uglifyjs`.
+	# Command constructor for (system:command)`uglifyjs`.
 	"""
 	factor = build.factor
 	basename = factor.route.identifier

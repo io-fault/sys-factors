@@ -1,5 +1,5 @@
 """
-Basic sanity checks for the metrics.
+# Basic sanity checks for the metrics.
 """
 
 def test_measure(test):

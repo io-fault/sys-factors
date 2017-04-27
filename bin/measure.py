@@ -1,8 +1,8 @@
 """
-Test harness access for collecting metrics.
+# Test harness access for collecting metrics.
 
-Invoking measure requires two or more command parameters. The first is the reporting
-directory, for collected data, and the remainder being packages to test.
+# Invoking measure requires two or more command parameters. The first is the reporting
+# directory, for collected data, and the remainder being packages to test.
 """
 import sys
 import os

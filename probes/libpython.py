@@ -1,9 +1,9 @@
 """
-Python extension environment probe module.
+# Python extension environment probe module.
 
-libpython provides the necessary imaginary factors for building an extension depending on Python.
-Enables special cases for Python extension modules for relocatable targets; this is only
-used given that the corresponding includes are properly used.
+# libpython provides the necessary imaginary factors for building an extension depending on Python.
+# Enables special cases for Python extension modules for relocatable targets; this is only
+# used given that the corresponding includes are properly used.
 """
 __factor_type__ = 'system'
 __factor_dynamics__ = 'probe'
@@ -49,15 +49,15 @@ lpython = libdev.iFactor(
 
 def defines(module_fullname, target_fullname):
 	"""
-	Generate a set of defines for the construction of Python extension modules
-	located inside a `extensions` package.
+	# Generate a set of defines for the construction of Python extension modules
+	# located inside a `extensions` package.
 
-	The distinction from &factor_defines is necessary as there are additional
-	defines to manage the actual target. The factor addressing is maintained
-	for the `'FACTOR_'` prefixed defines, but `'MODULE_'` specifies the destination
-	so that the &.include/fault/python/module.INIT macro can construct the appropriate
-	entry point name, and &.include/fault/python/environ.QPATH can generate
-	proper paths for type names.
+	# The distinction from &factor_defines is necessary as there are additional
+	# defines to manage the actual target. The factor addressing is maintained
+	# for the `'FACTOR_'` prefixed defines, but `'MODULE_'` specifies the destination
+	# so that the &.include/fault/python/module.INIT macro can construct the appropriate
+	# entry point name, and &.include/fault/python/environ.QPATH can generate
+	# proper paths for type names.
 	"""
 
 	mp = module_fullname.rfind('.')

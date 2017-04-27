@@ -1,5 +1,5 @@
 """
-Construct the targets of a package hierarchy for the selected context and role.
+# Construct the targets of a package hierarchy for the selected context and role.
 """
 import os
 import sys
@@ -14,7 +14,7 @@ import_from_module = libroutes.Import.from_module
 
 def main():
 	"""
-	Prepare the entire package building factor targets and writing bytecode.
+	# Prepare the entire package building factor targets and writing bytecode.
 	"""
 	call = libio.context()
 	sector = call.sector

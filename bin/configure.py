@@ -1,5 +1,5 @@
 """
-Formulate the developer construction contexts.
+# Formulate the developer construction contexts.
 """
 import os
 import sys
@@ -97,7 +97,7 @@ def debug_isolate(self, target):
 
 def debug_isolate(self, target):
 	"""
-	Isolate debugging information from the target.
+	# Isolate debugging information from the target.
 	"""
 	debugfile = target + '.debug'
 
@@ -109,8 +109,8 @@ def debug_isolate(self, target):
 
 def select(paths, possibilities, preferences):
 	"""
-	Select a file from the given &paths using the &possibilities and &preferences
-	to identify the most desired.
+	# Select a file from the given &paths using the &possibilities and &preferences
+	# to identify the most desired.
 	"""
 	global libprobe
 
@@ -154,8 +154,8 @@ runtime_objects = set([
 
 def compiler_libraries(compiler, prefix, version, executable, target):
 	"""
-	Attempt to select the compiler libraries directory containing compiler support
-	libraries for profiling, sanity, and runtime.
+	# Attempt to select the compiler libraries directory containing compiler support
+	# libraries for profiling, sanity, and runtime.
 	"""
 	if compiler == 'clang':
 		lib = prefix / 'lib' / 'clang' / version / 'lib'
@@ -172,14 +172,14 @@ def compiler_libraries(compiler, prefix, version, executable, target):
 
 def python_bytecode_type(paths):
 	"""
-	Constructs the subject for building Python bytecode for a host context.
+	# Constructs the subject for building Python bytecode for a host context.
 
-	Currently, only builds subject for the executing Python.
+	# Currently, only builds subject for the executing Python.
 
-	! DEVELOPMENT: Features
-		Must provide a means for compiling with versions of
-		Python aside from the one that is running. A reasonable
-		possibility is constructing the the `-c` command.
+	# ! DEVELOPMENT: Features
+		# Must provide a means for compiling with versions of
+		# Python aside from the one that is running. A reasonable
+		# possibility is constructing the the `-c` command.
 	"""
 	# Python library = module with preprocessed sources
 	# Python executable = python source executed in __main__
@@ -207,10 +207,10 @@ def python_bytecode_type(paths):
 
 def javascript_type(paths):
 	"""
-	Initialize the javascript subject for JavaScript file compilation.
+	# Initialize the javascript subject for JavaScript file compilation.
 
-	This primarily means "minification" and mere concatenation, but languages
-	targeting JavaScript can be added.
+	# This primarily means "minification" and mere concatenation, but languages
+	# targeting JavaScript can be added.
 	"""
 	jscat = select(paths, ['uglifyjs'], javascript_combiners_preference)
 	if jscat is None:
@@ -246,7 +246,7 @@ def javascript_type(paths):
 
 def css_type(paths):
 	"""
-	Initialize the CSS subject for CSS compilation.
+	# Initialize the CSS subject for CSS compilation.
 	"""
 	css_combine = select(paths, ['cleancss', 'cat'], ('cleancss', 'cat',))
 	if css_combine is None:
@@ -295,7 +295,7 @@ def css_type(paths):
 
 def xml_type(paths):
 	"""
-	Construct the subject for XML files.
+	# Construct the subject for XML files.
 	"""
 	xml = {
 		'encoding': 'ascii',
@@ -338,7 +338,7 @@ def xml_type(paths):
 
 def source_type(paths):
 	"""
-	Initialize a (ctx:ftype)`resource` subject for inclusion in a context.
+	# Initialize a (ctx:ftype)`resource` subject for inclusion in a context.
 	"""
 	mech = {
 		'target-file-extensions': {None:''},
@@ -363,7 +363,7 @@ def source_type(paths):
 
 def resource_type(paths):
 	"""
-	Initialize a (ctx:ftype)`resource` subject for inclusion in a context.
+	# Initialize a (ctx:ftype)`resource` subject for inclusion in a context.
 	"""
 	mech = {
 		'target-file-extensions': {None:''}, # Resources manage their own.
@@ -391,7 +391,7 @@ def resource_type(paths):
 
 def inspect(reqs, ctx, paths):
 	"""
-	Initialize a (libdev:context)`inspect` context.
+	# Initialize a (libdev:context)`inspect` context.
 	"""
 	iempty = {
 		'command': 'fault.development.bin.empty_introspection',
@@ -749,7 +749,7 @@ def purposes(corefile):
 
 def static(reqs, ctx, paths):
 	"""
-	Platform independent processing.
+	# Platform independent processing.
 	"""
 	core = {
 		'source': source_type(paths),
@@ -781,7 +781,7 @@ def static(reqs, ctx, paths):
 
 def host(reqs, ctx, paths):
 	"""
-	Initialize a (libdev:context)`host` context.
+	# Initialize a (libdev:context)`host` context.
 	"""
 	core = {
 		'system': host_system_type(reqs, paths),

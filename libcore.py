@@ -1,8 +1,8 @@
 """
-Tool interfaces for extracting information from core file and interacting with them.
+# Tool interfaces for extracting information from core file and interacting with them.
 
-! DEVELOPMENT: Flux
-	The system invocations here need to rely on configuration.
+# ! DEVELOPMENT: Flux
+	# The system invocations here need to rely on configuration.
 """
 import sys
 import subprocess
@@ -10,10 +10,10 @@ import shutil
 
 def debug(corefile, executable=sys.executable):
 	"""
-	Load the debugger for a given core file, `corefile` and `executable`.
-	This will operate interactively and return the status code on exit.
+	# Load the debugger for a given core file, `corefile` and `executable`.
+	# This will operate interactively and return the status code on exit.
 
-	By default, the executable is the Python executable.
+	# By default, the executable is the Python executable.
 	"""
 
 	debugger = shutil.which('lldb') or shutil.which('gdb')
@@ -31,7 +31,7 @@ lldb_snapshot = [
 
 def snapshot(corefile, executable=sys.executable):
 	"""
-	Get a text dump of the corefile from either lldb or gdb.
+	# Get a text dump of the corefile from either lldb or gdb.
 	"""
 
 	debugger = shutil.which('lldb')

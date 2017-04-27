@@ -1,22 +1,22 @@
 """
-Management of factor processing instructions for creating system binaries.
+# Management of factor processing instructions for creating system binaries.
 
-[ Properties ]
+# [ Properties ]
 
-/library_extensions
-	Used by &library_filename to select the appropriate extension
-	for `system.library` and `system.extension` factors.
+# /library_extensions
+	# Used by &library_filename to select the appropriate extension
+	# for `system.library` and `system.extension` factors.
 
-/selections
-	A mapping providing the selected role to use for the factor module.
+# /selections
+	# A mapping providing the selected role to use for the factor module.
 
-/python_triplet
-	The `-` separated strings representing the currently executing Python context.
-	Used to construct directories for Python extension builds.
+# /python_triplet
+	# The `-` separated strings representing the currently executing Python context.
+	# Used to construct directories for Python extension builds.
 
-/bytecode_triplet
-	The `-` separated strings representing the bytecode used by the executing Python
-	context.
+# /bytecode_triplet
+	# The `-` separated strings representing the bytecode used by the executing Python
+	# context.
 """
 import os
 import sys
@@ -57,7 +57,7 @@ library_extensions = {
 
 def library_filename(platform, name):
 	"""
-	Construct a dynamic library filename for the given platform.
+	# Construct a dynamic library filename for the given platform.
 	"""
 	return 'lib' + name.lstrip('lib') + '.' + library_extensions.get(platform, 'so')
 
@@ -71,8 +71,8 @@ def strip_library_name(filename):
 
 def python_context(implementation, version_info, abiflags, platform):
 	"""
-	Construct the triplet representing the Python context for the platform.
-	Used to define the construction context for Python extension modules.
+	# Construct the triplet representing the Python context for the platform.
+	# Used to define the construction context for Python extension modules.
 	"""
 	pyversion = ''.join(map(str, version_info[:2]))
 	return '-'.join((implementation, pyversion + abiflags, platform))
@@ -93,12 +93,12 @@ _factor_roles = None # exact matches
 
 def select(module, role, context=None):
 	"""
-	Designate that the given role should be used for the identified &package and its content.
+	# Designate that the given role should be used for the identified &package and its content.
 
-	&select should only be used during development or development related operations. Notably,
-	selecting the role for a given package during the testing of a project.
+	# &select should only be used during development or development related operations. Notably,
+	# selecting the role for a given package during the testing of a project.
 
-	It can also be used for one-off debugging purposes where a particular target is of interest.
+	# It can also be used for one-off debugging purposes where a particular target is of interest.
 	"""
 	global _factor_roles, _factor_role_patterns
 	if _factor_roles is None:
@@ -122,16 +122,16 @@ def select(module, role, context=None):
 
 def rebuild(outputs, inputs):
 	"""
-	Unconditionally report the &outputs as outdated.
+	# Unconditionally report the &outputs as outdated.
 	"""
 	return False
 
 def updated(outputs, inputs, requirement=None):
 	"""
-	Return whether or not the &outputs are up-to-date.
+	# Return whether or not the &outputs are up-to-date.
 
-	&False returns means that the target should be reconstructed,
-	and &True means that the file is up-to-date and needs no processing.
+	# &False returns means that the target should be reconstructed,
+	# and &True means that the file is up-to-date and needs no processing.
 	"""
 	olm = None
 	for output in outputs:
@@ -178,28 +178,28 @@ def update_bytecode_cache(src, induct, condition,
 		mkr=libroutes.File.from_path
 	) -> typing.Tuple[bool, str]:
 	"""
-	Determine whether to update the cached Python bytecode file associated
-	with &src.
+	# Determine whether to update the cached Python bytecode file associated
+	# with &src.
 
-	[ Parameters ]
-	/src
-		A Python source &File properly positioned in its package directory.
-		&importlib.util.cache_from_source will be called to find its
-		final destination.
-	/induct
-		Compiled bytecode &File to install.
+	# [ Parameters ]
+	# /src
+		# A Python source &File properly positioned in its package directory.
+		# &importlib.util.cache_from_source will be called to find its
+		# final destination.
+	# /induct
+		# Compiled bytecode &File to install.
 
-	[ Return ]
+	# [ Return ]
 	#
-		/&bool
-			Whether the file was updated or not.
+		# /&bool
+			# Whether the file was updated or not.
 	#
-		/&str
-			The string path to the cache file location
-			that should be overwritten.
+		# /&str
+			# The string path to the cache file location
+			# that should be overwritten.
 
-			When &1 is &False, this will be a message describing
-			why it should not be updated.
+			# When &1 is &False, this will be a message describing
+			# why it should not be updated.
 	"""
 
 	fp = str(src)
@@ -221,8 +221,8 @@ def references(factors):
 
 class iFactor(object):
 	"""
-	Imaginary Factor. Used by probes to create virtual dependencies representing
-	an already constructed Factor.
+	# Imaginary Factor. Used by probes to create virtual dependencies representing
+	# an already constructed Factor.
 	"""
 
 	@classmethod
@@ -258,15 +258,15 @@ class iFactor(object):
 
 class Factor(object):
 	"""
-	A Factor of a development environment; similar to "targets" in IDEs.
+	# A Factor of a development environment; similar to "targets" in IDEs.
 
-	Initialized with the primary dependencies of most operations to avoid
-	redundancy and in order to allow simulated factors to be managed without
-	modifying or cleaning up &sys.modules.
+	# Initialized with the primary dependencies of most operations to avoid
+	# redundancy and in order to allow simulated factors to be managed without
+	# modifying or cleaning up &sys.modules.
 
-	[ Properties ]
-	/local_variants
-		Explicitly designated variants.
+	# [ Properties ]
+	# /local_variants
+		# Explicitly designated variants.
 	"""
 
 	default_source_directory = 'src'
@@ -288,10 +288,10 @@ class Factor(object):
 			parameters:typing.Mapping=None,
 		):
 		"""
-		Either &route or &module can be &None, but not both. The system's
-		&importlib will be used to resolve a module from the &route in its
-		absence, and the module's (python:attribute)`__name__` field will
-		be used to construct the &Import route given &route's absence.
+		# Either &route or &module can be &None, but not both. The system's
+		# &importlib will be used to resolve a module from the &route in its
+		# absence, and the module's (python:attribute)`__name__` field will
+		# be used to construct the &Import route given &route's absence.
 		"""
 		self.local_variants = {}
 		self.key = None
@@ -325,15 +325,15 @@ class Factor(object):
 	@classmethod
 	def from_fullname(Class, fullname):
 		"""
-		Create from a module's fullname that is available on &sys.path.
+		# Create from a module's fullname that is available on &sys.path.
 		"""
 		return Class(Import.from_fullname(fullname), None, None)
 
 	@classmethod
 	def from_module(Class, module):
 		"""
-		Create from a &types.ModuleType. This constructor should be used in
-		cases where a simulated Factor was formed.
+		# Create from a &types.ModuleType. This constructor should be used in
+		# cases where a simulated Factor was formed.
 		"""
 		if hasattr(module, '__factor__'):
 			return module.__factor__
@@ -386,7 +386,7 @@ class Factor(object):
 	@property
 	def source_directory(self):
 		"""
-		Get the factor's source directory.
+		# Get the factor's source directory.
 		"""
 		srcdir = self.package_directory / self.default_source_directory
 		if not srcdir.exists():
@@ -395,7 +395,7 @@ class Factor(object):
 
 	def sources(self):
 		"""
-		An iterable producing the source files of the Factor.
+		# An iterable producing the source files of the Factor.
 		"""
 		# Full set of regular files in the sources location.
 		fs = getattr(self.module, '__factor_sources__', None)
@@ -412,30 +412,30 @@ class Factor(object):
 	@property
 	def cache_directory(self) -> File:
 		"""
-		Python cache directory to use for the factor.
+		# Python cache directory to use for the factor.
 		"""
 		return self.package_directory / self.default_cache_name
 
 	@property
 	def fpi_root(self) -> File:
 		"""
-		Factor Processing Instruction root work directory for the given Factor, &self.
+		# Factor Processing Instruction root work directory for the given Factor, &self.
 		"""
 		return self.cache_directory / self.default_fpi_name
 
 	@staticmethod
 	def fpi_work_key(variants):
 		"""
-		Calculate the key from the sorted list.
+		# Calculate the key from the sorted list.
 
-		Sort function is of minor importance, there is no warranty
-		of consistent accessibility across platform.
+		# Sort function is of minor importance, there is no warranty
+		# of consistent accessibility across platform.
 		"""
 		return ';'.join('='.join((k,v)) for k,v in variants).encode('utf-8')
 
 	def fpi_initialize(self, *variant_sets, **variants):
 		"""
-		Update and return the dictionary key used to access the processed factor.
+		# Update and return the dictionary key used to access the processed factor.
 		"""
 		vl = list(itertools.chain.from_iterable(v.items() for v in variant_sets))
 		vl.extend(self.local_variants.items())
@@ -459,7 +459,7 @@ class Factor(object):
 	@functools.lru_cache(32)
 	def fpi_set(self) -> libfs.Dictionary:
 		"""
-		&libfs.Dictionary containing the builds of different variants.
+		# &libfs.Dictionary containing the builds of different variants.
 		"""
 		fr = self.fpi_root
 		wd = libfs.Dictionary.use(fr, addressing=fpi_addressing)
@@ -467,16 +467,16 @@ class Factor(object):
 
 	def fpi_work_exists(self, key):
 		"""
-		Get the work directory of the Factor for the given variants.
+		# Get the work directory of the Factor for the given variants.
 		"""
 
 		return self.fpi_set.has_key(key)
 
 	def integral(self, key=None, slot='factor'):
 		"""
-		Get the appropriate reduction for the Factor based on the
-		configured &key. If no key has been configured, the returned
-		route will be to the inducted factor.
+		# Get the appropriate reduction for the Factor based on the
+		# configured &key. If no key has been configured, the returned
+		# route will be to the inducted factor.
 		"""
 
 		if getattr(self.module, 'reflection', False):
@@ -496,7 +496,7 @@ class Factor(object):
 
 	def dependencies(factor):
 		"""
-		Return the set of dependencies that the given factor has.
+		# Return the set of dependencies that the given factor has.
 		"""
 
 		is_composite = libfactor.composite
@@ -517,7 +517,7 @@ class Factor(object):
 
 	def report(self, context, mechanism, factor):
 		"""
-		Probe abstraction used to access the module's report function.
+		# Probe abstraction used to access the module's report function.
 		"""
 		if getattr(self.module, 'reflective', False):
 			# Unconditionally use report directly for reflective modules.
@@ -527,7 +527,7 @@ class Factor(object):
 
 	def aggregate(self, references, variants, context, mechanism, dynamics='probe'):
 		"""
-		Aggregate the probe reports.
+		# Aggregate the probe reports.
 		"""
 
 		src_params = []
@@ -548,10 +548,10 @@ class Factor(object):
 
 	def formats(self, mechanism, dependents):
 		"""
-		Yield the formats to build based on the given mechanism, dependents and
-		the factor's dynamics.
+		# Yield the formats to build based on the given mechanism, dependents and
+		# the factor's dynamics.
 
-		For factors other than `'fragment'`, this is always a single item.
+		# For factors other than `'fragment'`, this is always a single item.
 		"""
 
 		fformats = mechanism.descriptor['formats'] # code types used by the object types
@@ -570,18 +570,18 @@ class Factor(object):
 
 	def link(self, variants, context, mechanism, refs, dependents):
 		"""
-		Generate the variants, source parameters, and locations used
-		to perform a build.
+		# Generate the variants, source parameters, and locations used
+		# to perform a build.
 
-		[ Parameters ]
-		/context
-			&Context instance providing the required mechanisms.
-		/mechanism
-			&Mechanism selected for production of the Factor Processing Instructions.
-		/refs
-			The dependencies, composite factors, specified by imports.
-		/dependents
-			The list of Factors depending on this target.
+		# [ Parameters ]
+		# /context
+			# &Context instance providing the required mechanisms.
+		# /mechanism
+			# &Mechanism selected for production of the Factor Processing Instructions.
+		# /refs
+			# The dependencies, composite factors, specified by imports.
+		# /dependents
+			# The list of Factors depending on this target.
 		"""
 
 		for fmt in self.formats(mechanism, dependents):
@@ -599,7 +599,7 @@ class Factor(object):
 
 def scan_modification_times(factor, aggregate=max):
 	"""
-	Scan the factor's sources for the latest modification time.
+	# Scan the factor's sources for the latest modification time.
 	"""
 	dirs, files = libfactor.sources(factor).tree()
 	del dirs
@@ -619,8 +619,8 @@ merge_operations = {
 
 def merge(parameters, source, operations = merge_operations):
 	"""
-	Merge the given &source into &parameters applying merge functions
-	defined in &operations. Dictionaries are merged using recursion.
+	# Merge the given &source into &parameters applying merge functions
+	# defined in &operations. Dictionaries are merged using recursion.
 	"""
 	for key in source:
 		if key in parameters:
@@ -640,17 +640,17 @@ def merge(parameters, source, operations = merge_operations):
 
 class Mechanism(object):
 	"""
-	The mechanics used to produce an Integral from a set of Sources associated
-	with a Factor.
+	# The mechanics used to produce an Integral from a set of Sources associated
+	# with a Factor.
 
-	[ Properties ]
+	# [ Properties ]
 
-	/descriptor
-		The data structure referring to the interface used
-		to construct commands for the selected mechanism.
-	/cache
-		Mapping of resolved adapters. Used internally for handling
-		adapter inheritance.
+	# /descriptor
+		# The data structure referring to the interface used
+		# to construct commands for the selected mechanism.
+	# /cache
+		# Mapping of resolved adapters. Used internally for handling
+		# adapter inheritance.
 	"""
 
 	def __init__(self, descriptor):
@@ -674,7 +674,7 @@ class Mechanism(object):
 
 	def suffix(self, factor):
 		"""
-		Return the suffix that the given factor should use for its integral.
+		# Return the suffix that the given factor should use for its integral.
 		"""
 		tfe = self.descriptor['target-file-extensions']
 		return (
@@ -684,7 +684,7 @@ class Mechanism(object):
 
 	def prepare(self, build):
 		"""
-		Generate any requisite filesystem initializations.
+		# Generate any requisite filesystem initializations.
 		"""
 
 		loc = build.locations
@@ -714,9 +714,9 @@ class Mechanism(object):
 
 	def adaption(self, build, type, source, phase='transformations'):
 		"""
-		Select the adapter of the mechanism for the given source.
+		# Select the adapter of the mechanism for the given source.
 
-		Adapters with inheritance will be cached by the mechanism.
+		# Adapters with inheritance will be cached by the mechanism.
 		"""
 		acache = self.cache
 		aset = self.descriptor[phase]
@@ -752,7 +752,7 @@ class Mechanism(object):
 
 	def transform(self, build, filtered=rebuild):
 		"""
-		Transform the sources using the mechanisms defined in &context.
+		# Transform the sources using the mechanisms defined in &context.
 		"""
 		global languages, include
 
@@ -792,7 +792,7 @@ class Mechanism(object):
 
 	def formulate(self, route, logfile, adapter, sequence, python=sys.executable):
 		"""
-		Convert a generated instruction into a form accepted by &Construction.
+		# Convert a generated instruction into a form accepted by &Construction.
 		"""
 		method = adapter.get('method')
 		command = adapter.get('command')
@@ -814,9 +814,9 @@ class Mechanism(object):
 
 	def integrate(self, build, filtered=rebuild, sys_platform=sys.platform):
 		"""
-		Construct the operations for reducing the object files created by &transform
-		instructions into a set of targets that can satisfy
-		the set of dependents.
+		# Construct the operations for reducing the object files created by &transform
+		# instructions into a set of targets that can satisfy
+		# the set of dependents.
 		"""
 
 		f = build.factor
@@ -874,7 +874,7 @@ xml_namespaces = {
 
 class Build(tuple):
 	"""
-	Container for the set of build parameters used by the configured abstraction functions.
+	# Container for the set of build parameters used by the configured abstraction functions.
 	"""
 	context = property(operator.itemgetter(0))
 	mechanism = property(operator.itemgetter(1))
@@ -887,9 +887,9 @@ class Build(tuple):
 
 class Context(object):
 	"""
-	A sequence of mechanism sets, Construction Context, that
-	can be used to supply a given build with tools for factor
-	processing.
+	# A sequence of mechanism sets, Construction Context, that
+	# can be used to supply a given build with tools for factor
+	# processing.
 	"""
 
 	def __init__(self, sequence):
@@ -898,17 +898,17 @@ class Context(object):
 	@functools.lru_cache(8)
 	def purpose(self, ftype):
 		"""
-		The purpose of the Context for the given factor type.
+		# The purpose of the Context for the given factor type.
 
-		While usually consistent across the mechanism sets, there are
-		cases where an implementation chooses to reduce the purposes
-		where it is known that the builds are consistent. Python bytecode
-		being the notable case where (dev:purpose)`debug` is consistent
-		with (dev:purpose)`test` and (dev:purpose)`measure`.
+		# While usually consistent across the mechanism sets, there are
+		# cases where an implementation chooses to reduce the purposes
+		# where it is known that the builds are consistent. Python bytecode
+		# being the notable case where (dev:purpose)`debug` is consistent
+		# with (dev:purpose)`test` and (dev:purpose)`measure`.
 
-		Presumes optimal if the mechanism sets did not define a purpose.
-		This is used for compensating cases where the generated mechanism
-		sets have consistent purpose for automated builds.
+		# Presumes optimal if the mechanism sets did not define a purpose.
+		# This is used for compensating cases where the generated mechanism
+		# sets have consistent purpose for automated builds.
 		"""
 		for x in self.sequence:
 			if ftype not in x:
@@ -933,14 +933,14 @@ class Context(object):
 
 	def __bool__(self):
 		"""
-		Whether the Context has any mechanisms.
+		# Whether the Context has any mechanisms.
 		"""
 		return bool(self.sequence)
 
 	@staticmethod
 	def load_xml(route:File):
 		"""
-		Load the XML context designated by the &route.
+		# Load the XML context designated by the &route.
 		"""
 
 		with route.open('r') as f:
@@ -1030,12 +1030,12 @@ del k, y, v
 
 def simulate_composite(route):
 	"""
-	Given a Python package route, fabricate a composite factor in order
-	to process Python module sources.
+	# Given a Python package route, fabricate a composite factor in order
+	# to process Python module sources.
 
-	[ Return ]
+	# [ Return ]
 
-	A pair consisting of the fabricated module and the next set of packages to process.
+	# A pair consisting of the fabricated module and the next set of packages to process.
 	"""
 	global libfactor
 	pkgs, modules = route.subnodes()
@@ -1080,14 +1080,14 @@ python_extension_suffix = importlib.machinery.EXTENSION_SUFFIXES[0]
 
 def link_extension(route, factor):
 	"""
-	Link an inducted Python extension module so that the constructed binary
-	can be used by (python:statement)`import`.
+	# Link an inducted Python extension module so that the constructed binary
+	# can be used by (python:statement)`import`.
 
-	Used by &.bin.induct after copying the target's factor to the &libfactor.
+	# Used by &.bin.induct after copying the target's factor to the &libfactor.
 
-	[ Parameters ]
-	/route
-		The &Import selecting the composite factor to induct.
+	# [ Parameters ]
+	# /route
+		# The &Import selecting the composite factor to induct.
 	"""
 	# system.extension being built for this Python
 	# construct links to optimal.
@@ -1112,13 +1112,13 @@ def link_extension(route, factor):
 
 def traverse(working, tree, inverse, factor):
 	"""
-	Invert the directed graph of dependencies from the target modules.
+	# Invert the directed graph of dependencies from the target modules.
 
-	System factor modules import their dependencies into their global
-	dictionary forming a directed graph. The imported factor modules are
-	identified as dependencies that need to be constructed in order
-	to process the subject module. The inverted graph is constructed to manage
-	completion signalling for processing purposes.
+	# System factor modules import their dependencies into their global
+	# dictionary forming a directed graph. The imported factor modules are
+	# identified as dependencies that need to be constructed in order
+	# to process the subject module. The inverted graph is constructed to manage
+	# completion signalling for processing purposes.
 	"""
 
 	deps = set(factor.dependencies())
@@ -1142,17 +1142,17 @@ def traverse(working, tree, inverse, factor):
 
 def sequence(factors):
 	"""
-	Generator maintaining the state of sequencing a traversed factor depedency
-	graph. This generator emits factors as they are ready to be processed and receives
-	factors that have completed processing.
+	# Generator maintaining the state of sequencing a traversed factor depedency
+	# graph. This generator emits factors as they are ready to be processed and receives
+	# factors that have completed processing.
 
-	When a set of dependencies has been processed, they should be sent to the generator
-	as a collection; the generator identifies whether another set of modules can be
-	processed based on the completed set.
+	# When a set of dependencies has been processed, they should be sent to the generator
+	# as a collection; the generator identifies whether another set of modules can be
+	# processed based on the completed set.
 
-	Completion is an abstract notion, &sequence has no requirements on the semantics of
-	completion and its effects; it merely communicates what can now be processed based
-	completion state.
+	# Completion is an abstract notion, &sequence has no requirements on the semantics of
+	# completion and its effects; it merely communicates what can now be processed based
+	# completion state.
 	"""
 
 	refs = dict()
@@ -1198,14 +1198,14 @@ def sequence(factors):
 
 def identity(module):
 	"""
-	Discover the base identity of the target.
+	# Discover the base identity of the target.
 
-	Primarily, used to identify the proper basename of a library.
-	The (python:attribute)`name` attribute on a target module provides an explicit
-	override. If the `name` is not present, then the first `'lib'` prefix
-	is removed from the module's name if any. The result is returned as the identity.
-	The removal of the `'lib'` prefix only occurs when the target factor is a
-	`'system.library'`.
+	# Primarily, used to identify the proper basename of a library.
+	# The (python:attribute)`name` attribute on a target module provides an explicit
+	# override. If the `name` is not present, then the first `'lib'` prefix
+	# is removed from the module's name if any. The result is returned as the identity.
+	# The removal of the `'lib'` prefix only occurs when the target factor is a
+	# `'system.library'`.
 	"""
 	na = getattr(module, 'name', None)
 	if na is not None:
@@ -1224,8 +1224,8 @@ def identity(module):
 
 def disabled(*args, **kw):
 	"""
-	A transformation that can be assigned to a subject's mechanism
-	in order to describe it as being disabled.
+	# A transformation that can be assigned to a subject's mechanism
+	# in order to describe it as being disabled.
 	"""
 	return ()
 
@@ -1233,7 +1233,7 @@ def transparent(build, adapter, o_type, output, i_type, inputs,
 		verbose=True,
 	):
 	"""
-	Create links from the input to the output; used for zero transformations.
+	# Create links from the input to the output; used for zero transformations.
 	"""
 
 	input, = inputs # Rely on exception from unpacking; expecting one input.
@@ -1243,10 +1243,10 @@ def concatenation(build, adapter, o_type, output, i_type, inputs,
 		verbose=True,
 	):
 	"""
-	Create the factor by concatenating the files. Only used in cases
-	where the order of concatentation is already managed or irrelevant.
+	# Create the factor by concatenating the files. Only used in cases
+	# where the order of concatentation is already managed or irrelevant.
 
-	Requires 'execute-redirect'.
+	# Requires 'execute-redirect'.
 	"""
 	return ['cat'] + list(inputs)
 
@@ -1256,11 +1256,11 @@ def empty(context, mechanism, factor, output, inputs,
 		verbose=True,
 	):
 	"""
-	Create the factor by executing a command without arguments.
-	Used to create constant outputs for reduction.
+	# Create the factor by executing a command without arguments.
+	# Used to create constant outputs for reduction.
 
-	! DEVELOPMENT:
-		Rewrite in terms of (system:command)`cat`.
+	# ! DEVELOPMENT:
+		# Rewrite in terms of (system:command)`cat`.
 	"""
 	return ['empty']
 
@@ -1305,10 +1305,10 @@ def unix_compiler_collection(
 		}
 	):
 	"""
-	Construct an argument sequence for a common compiler collection command.
+	# Construct an argument sequence for a common compiler collection command.
 
-	&unix_compiler_collection is the interface for constructing compilation
-	commands for a compiler collection.
+	# &unix_compiler_collection is the interface for constructing compilation
+	# commands for a compiler collection.
 	"""
 
 	f = build.factor
@@ -1410,7 +1410,7 @@ def python_bytecode_compiler(context, mechanism, factor,
 		filepath=str
 	):
 	"""
-	Command constructor for compiling Python bytecode to an arbitrary file.
+	# Command constructor for compiling Python bytecode to an arbitrary file.
 	"""
 	purpose = context.purpose(factor.type)
 	inf, = inputs
@@ -1422,7 +1422,7 @@ def local_bytecode_compiler(
 		build, adapter, o_type, output, i_type, inputs,
 		verbose=True, filepath=str):
 	"""
-	Command constructor for compiling Python bytecode to an arbitrary file.
+	# Command constructor for compiling Python bytecode to an arbitrary file.
 	"""
 	from .bin.pyc import compile_python_bytecode
 
@@ -1462,7 +1462,7 @@ def macosx_link_editor(
 		platform_version_flag='-macosx_version_min',
 	):
 	"""
-	Command constructor for Mach-O link editor provided on Apple MacOS X systems.
+	# Command constructor for Mach-O link editor provided on Apple MacOS X systems.
 	"""
 	assert build.factor.type == 'system'
 	factor = build.factor
@@ -1522,7 +1522,7 @@ def web_compiler_collection(context,
 		**kw
 	):
 	"""
-	Command constructor for emscripten.
+	# Command constructor for emscripten.
 	"""
 	output = _r_file_ext(output, '.bc')
 	return unix_compiler_collection(context, output, inputs, **kw)
@@ -1547,18 +1547,18 @@ def web_link_editor(context,
 		},
 	):
 	"""
-	Command constructor for the emcc link editor.
+	# Command constructor for the emcc link editor.
 
-	[Parameters]
+	# [Parameters]
 
-	/output
-		The file system location to write the linker output to.
+	# /output
+		# The file system location to write the linker output to.
 
-	/inputs
-		The set of object files to link.
+	# /inputs
+		# The set of object files to link.
 
-	/verbose
-		Enable or disable the verbosity of the command. Defaults to &True.
+	# /verbose
+		# Enable or disable the verbosity of the command. Defaults to &True.
 	"""
 	get = context.get
 	f = get('factor')
@@ -1624,24 +1624,24 @@ def unix_link_editor(
 		use_shared='-Bdynamic',
 	):
 	"""
-	Command constructor for the unix link editor. For platforms other than &(Darwin) and
-	&(Windows), this is the default interface indirectly selected by &.development.bin.configure.
+	# Command constructor for the unix link editor. For platforms other than &(Darwin) and
+	# &(Windows), this is the default interface indirectly selected by &.development.bin.configure.
 
-	Traditional link editors have an insane characteristic that forces the user to decide what
-	the appropriate order of archives are. The
-	(system:command)`lorder` command was apparently built long ago to alleviate this while
-	leaving the interface to (system:command)`ld` to be continually unforgiving.
+	# Traditional link editors have an insane characteristic that forces the user to decide what
+	# the appropriate order of archives are. The
+	# (system:command)`lorder` command was apparently built long ago to alleviate this while
+	# leaving the interface to (system:command)`ld` to be continually unforgiving.
 
-	[Parameters]
+	# [Parameters]
 
-	/output
-		The file system location to write the linker output to.
+	# /output
+		# The file system location to write the linker output to.
 
-	/inputs
-		The set of object files to link.
+	# /inputs
+		# The set of object files to link.
 
-	/verbose
-		Enable or disable the verbosity of the command. Defaults to &True.
+	# /verbose
+		# Enable or disable the verbosity of the command. Defaults to &True.
 	"""
 	fdyna = factor.dynamics
 	purpose = context.variants['purpose']
@@ -1708,7 +1708,7 @@ else:
 
 def probe_retrieve(probe, context, mechanism, key):
 	"""
-	Retrieve the stored data collected by the sensor.
+	# Retrieve the stored data collected by the sensor.
 	"""
 
 	rf = probe_cache(probe, context)
@@ -1725,7 +1725,7 @@ def probe_retrieve(probe, context, mechanism, key):
 
 def probe_record(probe, context, key, report):
 	"""
-	Record the report for subsequent runs.
+	# Record the report for subsequent runs.
 	"""
 
 	rf = probe_cache(probe, context)
@@ -1737,14 +1737,14 @@ def probe_record(probe, context, key, report):
 
 def probe_cache(probe, context):
 	"""
-	Return the route to the probe's recorded report.
+	# Return the route to the probe's recorded report.
 	"""
 	return probe.cache_directory / (probe.route.identifier + '.pc')
 
 def initial_factor_defines(module_fullname):
 	"""
-	Generate a set of defines that describe the factor being created.
-	Takes the full module path of the factor as a string.
+	# Generate a set of defines that describe the factor being created.
+	# Takes the full module path of the factor as a string.
 	"""
 	modname = module_fullname.split('.')
 
@@ -1757,8 +1757,8 @@ def initial_factor_defines(module_fullname):
 @functools.lru_cache(6)
 def context_interface(path):
 	"""
-	Resolves the construction interface for processing a source or performing
-	the final reduction (link-stage).
+	# Resolves the construction interface for processing a source or performing
+	# the final reduction (link-stage).
 	"""
 
 	mod, apath = Import.from_attributes(path)
@@ -1769,20 +1769,20 @@ def context_interface(path):
 
 class Construction(libio.Processor):
 	"""
-	Construction process manager. Maintains the set of target modules to construct and
-	dispatches the work to be performed for completion in the appropriate order.
+	# Construction process manager. Maintains the set of target modules to construct and
+	# dispatches the work to be performed for completion in the appropriate order.
 
-	! DEVELOPMENT: Pending
-		- Rewrite as a Flow.
-		- Generalize; flow accepts jobs and emits FlowControl events
-			describing the process. (rusage, memory, etc of process)
+	# ! DEVELOPMENT: Pending
+		# - Rewrite as a Flow.
+		# - Generalize; flow accepts jobs and emits FlowControl events
+			# describing the process. (rusage, memory, etc of process)
 
-	! DEVELOPER:
-		Primarily, this class traverses the directed graph constructed by imports
-		performed by the target modules being built.
+	# ! DEVELOPER:
+		# Primarily, this class traverses the directed graph constructed by imports
+		# performed by the target modules being built.
 
-		Refactoring could yield improvements; notably moving the work through a Flow
-		in order to leverage obstruction signalling.
+		# Refactoring could yield improvements; notably moving the work through a Flow
+		# in order to leverage obstruction signalling.
 	"""
 
 	def __init__(self,
@@ -1828,7 +1828,7 @@ class Construction(libio.Processor):
 
 	def finish(self, factors):
 		"""
-		Called when a set of factors have been completed.
+		# Called when a set of factors have been completed.
 		"""
 		try:
 			for x in factors:
@@ -1847,7 +1847,7 @@ class Construction(libio.Processor):
 
 	def collect(self, factor, references, dependents=()):
 		"""
-		Collect all the work to be done for processing the factor.
+		# Collect all the work to be done for processing the factor.
 		"""
 		tracks = self.tracking[factor]
 		ctx = self.c_context
@@ -2030,9 +2030,9 @@ class Construction(libio.Processor):
 
 	def drain_process_queue(self):
 		"""
-		After process slots have been cleared by &process_exit,
-		&continuation is called and performs this method to execute
-		system processes enqueued in &command_queue.
+		# After process slots have been cleared by &process_exit,
+		# &continuation is called and performs this method to execute
+		# system processes enqueued in &command_queue.
 		"""
 		# Process slots may have been cleared, run more if possible.
 		nitems = len(self.command_queue)
@@ -2049,9 +2049,9 @@ class Construction(libio.Processor):
 
 	def continuation(self):
 		"""
-		Process exits occurred that may trigger an addition to the working set of tasks.
-		Usually called indirectly by &process_exit, this manages the collection
-		of further work identified by the sequenced dependency tree managed by &sequence.
+		# Process exits occurred that may trigger an addition to the working set of tasks.
+		# Usually called indirectly by &process_exit, this manages the collection
+		# of further work identified by the sequenced dependency tree managed by &sequence.
 		"""
 		# Reset continuation
 		self.continued = False
@@ -2090,7 +2090,7 @@ class Construction(libio.Processor):
 
 	def dispatch(self, factor):
 		"""
-		Process the collected work for the factor.
+		# Process the collected work for the factor.
 		"""
 		assert self.progress[factor] == -1
 		self.progress[factor] = 0
