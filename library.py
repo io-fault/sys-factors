@@ -1600,16 +1600,13 @@ def web_link_editor(context,
 	return command
 
 def unix_link_editor(
-		context, mechanism, factor,
-		output:File, inputs:typing.Sequence[File],
+		build, adapter, o_type, output, i_type, inputs,
+		fragments, libraries, filepath=str,
 
-		format=None,
-		verbose=True,
-
-		filepath=str,
 		pie_flag='-pie',
 		verbose_flag='-v',
-		link_flag='-l', libdir_flag='-L',
+		link_flag='-l',
+		libdir_flag='-L',
 		rpath_flag='-rpath',
 		soname_flag='-soname',
 		output_flag='-o',
@@ -1643,20 +1640,21 @@ def unix_link_editor(
 	# /verbose
 		# Enable or disable the verbosity of the command. Defaults to &True.
 	"""
+	factor = build.factor
 	fdyna = factor.dynamics
-	purpose = context.variants['purpose']
-	mech = mechanism.descriptor
+	purpose = build.variants['purpose']
+	format = build.variants['format']
+	mech = build.mechanism.descriptor
 
 	command = [None]
 	add = command.append
 	iadd = command.extend
 
-	if mechanism['integrations'][None].get('name') == 'lld':
+	if mech['integrations'][None].get('name') == 'lld':
 		add('-flavor')
 		add('gnu')
 	else:
-		if verbose:
-			add(verbose_flag)
+		add(verbose_flag)
 
 	loutput_type = type_map[fdyna] # failure indicates bad type parameter to libfactor.load()
 	if loutput_type:
@@ -1679,7 +1677,7 @@ def unix_link_editor(
 			# Enable by default, but allow override.
 			add(allow_runpath)
 
-		prefix, suffix = mechanism.descriptor['objects'][fdyna][format]
+		prefix, suffix = mech['objects'][fdyna][format]
 
 		command.extend(prefix)
 		command.extend(map(filepath, inputs))
@@ -2134,6 +2132,4 @@ class Construction(libio.Processor):
 	def terminate(self, by=None):
 		# Manages the dispatching of processes,
 		# so termination is immediate.
-		self.terminating = False
-		self.terminated = True
 		self.exit()
