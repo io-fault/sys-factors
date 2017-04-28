@@ -74,7 +74,7 @@ def main():
 		ncpu = 2
 		try:
 			import psutil
-			ncpu = psutil.cpu_count(logical=False)
+			ncpu = psutil.cpu_count(logical=False) or 2
 		except ImportError:
 			pass
 
