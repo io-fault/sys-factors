@@ -190,16 +190,14 @@ def update_bytecode_cache(src, induct, condition,
 		# Compiled bytecode &File to install.
 
 	# [ Return ]
-	#
-		# /&bool
-			# Whether the file was updated or not.
-	#
-		# /&str
-			# The string path to the cache file location
-			# that should be overwritten.
+	# /&bool
+		# Whether the file was updated or not.
+	# /&str
+		# The string path to the cache file location
+		# that should be overwritten.
 
-			# When &1 is &False, this will be a message describing
-			# why it should not be updated.
+		# When &1 is &False, this will be a message describing
+		# why it should not be updated.
 	"""
 
 	fp = str(src)
@@ -1771,7 +1769,7 @@ class Construction(libio.Processor):
 	# dispatches the work to be performed for completion in the appropriate order.
 
 	# ! DEVELOPMENT: Pending
-		# - Rewrite as a Flow.
+		# - Rewrite as a Context maintaining a Flow.
 		# - Generalize; flow accepts jobs and emits FlowControl events
 			# describing the process. (rusage, memory, etc of process)
 
