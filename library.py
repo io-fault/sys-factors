@@ -2105,6 +2105,7 @@ class Construction(libio.Processor):
 				dst.link(src)
 				self.progress[factor] += 1
 			elif x[0] == 'call':
+				logfile = x[-1]
 				try:
 					seq = x[1]
 					seq[0](*seq[1:])
@@ -2112,7 +2113,6 @@ class Construction(libio.Processor):
 						logfile.void()
 				except BaseException as err:
 					from traceback import format_exception
-					logfile = x[-1]
 					out = format_exception(err.__class__, err, err.__traceback__)
 					logfile.store('[Exception]\n#!/traceback\n\t', 'w')
 					logfile.store('\t'.join(out).encode('utf-8'), 'ba')
