@@ -26,10 +26,40 @@ def test_Factor(test):
 	test/str(f.fpi_root) == str(fpir)
 
 def test_unix_compiler_collection(test):
+	"""
+	# Check &.library.unix_compiler_collection constructions.
+
+	# Originally written for an older API, the current incarnation
+	# tries to adapt the old parameter style to the new giving the
+	# test some unnecessary confusion.
+	"""
+	import types
+	Build = library.Build
+	Factor = library.Factor
+
+	cc_function = library.unix_compiler_collection
 	m = {
 		'type': 'collection',
 	}
-	stdhead = [None, '-c', '-v', '-fvisibility=hidden', '-fcolor-diagnostics', '-O3', '-g', '-DFAULT_TYPE=unspecified']
+	adapter = {
+		'language': 'c',
+	}
+	def cc(ctx, outfile, inputs, mechanism=m, language=None):
+		fm = types.ModuleType("__imaginary__")
+		fm.__file__ = '/dev/null'
+		f = Factor.from_module(fm)
+		adapter = {}
+		bp = ctx['system'].get('source.parameters') or []
+		bp.extend([(k,None) for k in ctx['system'].get('compiler.preprocessor.undefines', ())])
+		refs = ctx['system'].get('refs', {})
+		opts = ctx['system'].get('command.option.injection', ())
+		include_set = ctx['system'].get('include.set', ())
+		if 'standards' in ctx['system']:
+			fm.standards = ctx['system']['standards']
+		b = Build((ctx, mechanism, f, refs, {}, ctx['variants'], None, bp))
+		return cc_function(b, adapter, None, outfile, language, inputs, options=opts, includes=include_set)
+
+	stdhead = [None, '-c', '-v', '-fvisibility=hidden', '-fcolor-diagnostics', '-O3', '-g']
 	context = {
 		'variants': {'purpose':'optimal', 'name':'host'},
 		'system': {
@@ -37,7 +67,7 @@ def test_unix_compiler_collection(test):
 		}
 	}
 
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), mechanism=m)
+	cmd = cc(context, 'out.o', ('input.c',), mechanism=m)
 	test/cmd == stdhead + ['-o', 'out.o', 'input.c']
 
 	context = {
@@ -48,7 +78,7 @@ def test_unix_compiler_collection(test):
 			],
 		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), mechanism=m)
+	cmd = cc(context, 'out.o', ('input.c',), mechanism=m)
 	test/cmd == stdhead + ['-DTEST=VALUE', '-o', 'out.o', 'input.c']
 
 	# coverage flags from metrics role.
@@ -60,27 +90,31 @@ def test_unix_compiler_collection(test):
 			],
 		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), mechanism=m)
+	cmd = cc(context, 'out.o', ('input.c',), mechanism=m)
 	metrics_head = list(stdhead)
 	metrics_head = [None, '-c', '-v', '-fvisibility=hidden', '-fcolor-diagnostics', '-O0', '-g',
-		'-fprofile-instr-generate', '-fcoverage-mapping', '-DFAULT_TYPE=unspecified']
+		'-fprofile-instr-generate', '-fcoverage-mapping']
 	test/cmd == metrics_head + ['-DTEST=VALUE', '-o', 'out.o', 'input.c']
 
 	# include directories
 	context = {
 		'variants': {'purpose':'optimal', 'name':'host'},
 		'system': {
-			'include.directories': [
-				'incdir1', 'incdir2',
-			],
+			'refs': {
+				('source', 'library'): [
+					library.iFactor.headers(x) for x in [
+						'incdir1', 'incdir2',
+					]
+				]
+			},
 			'source.parameters': [
 				('TEST', 'VALUE'),
 			],
 		}
 	}
 	expect = [None, '-c', '-v', '-fvisibility=hidden', '-fcolor-diagnostics', '-O3', '-g',
-		'-Iincdir1', '-Iincdir2', '-DFAULT_TYPE=unspecified', '-DTEST=VALUE', '-o', 'out.o', 'input.c']
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), mechanism=m)
+		'-Iincdir1', '-Iincdir2', '-DTEST=VALUE', '-o', 'out.o', 'input.c']
+	cmd = cc(context, 'out.o', ('input.c',), mechanism=m)
 	test/cmd == expect
 
 	# include set
@@ -93,9 +127,8 @@ def test_unix_compiler_collection(test):
 		}
 	}
 	expect = [None, '-c', '-v', '-fvisibility=hidden', '-fcolor-diagnostics', '-O3', '-g',
-		'-DFAULT_TYPE=unspecified',
 		'-include', 'inc1.h', '-include', 'inc2.h', '-o', 'out.o', 'input.c']
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), mechanism=m)
+	cmd = cc(context, 'out.o', ('input.c',), mechanism=m)
 	test/cmd == expect
 
 	# injection
@@ -105,7 +138,7 @@ def test_unix_compiler_collection(test):
 			'command.option.injection': ['-custom-op'],
 		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), mechanism=m)
+	cmd = cc(context, 'out.o', ('input.c',), mechanism=m)
 	test/cmd == stdhead + ['-custom-op', '-o', 'out.o', 'input.c']
 
 	# undefines
@@ -117,7 +150,7 @@ def test_unix_compiler_collection(test):
 			],
 		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), mechanism=m)
+	cmd = cc(context, 'out.o', ('input.c',), mechanism=m)
 	test/cmd == stdhead + ['-UTEST1', '-UTEST2', '-o', 'out.o', 'input.c']
 
 	# language
@@ -126,7 +159,7 @@ def test_unix_compiler_collection(test):
 		'system': {
 		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), language='c', mechanism=m)
+	cmd = cc(context, 'out.o', ('input.c',), mechanism=m, language='c')
 	test/cmd == stdhead[0:3] + ['-x', 'c'] + stdhead[3:] + ['-o', 'out.o', 'input.c']
 
 	# language and standard
@@ -136,7 +169,7 @@ def test_unix_compiler_collection(test):
 			'standards': {'c': 'c99'},
 		}
 	}
-	cmd = library.unix_compiler_collection(context, 'out.o', ('input.c',), language='c', mechanism=m)
+	cmd = cc(context, 'out.o', ('input.c',), language='c', mechanism=m)
 	test/cmd == stdhead[0:3] + ['-x', 'c', '-std=c99'] + stdhead[3:] + ['-o', 'out.o', 'input.c']
 
 def test_updated(test):
@@ -163,14 +196,14 @@ def test_sequence(test):
 	"""
 	tr = test.exits.enter_context(libroutes.File.temporary())
 	m = [
+		types.ModuleType("M0"),
 		types.ModuleType("M1"),
 		types.ModuleType("M2"),
-		types.ModuleType("M3"),
 	]
 	n = [
+		types.ModuleType("N0"),
 		types.ModuleType("N1"),
 		types.ModuleType("N2"),
-		types.ModuleType("N3"),
 	]
 	for x in m+n:
 		x.__factor_type__ = 'system'
@@ -178,54 +211,68 @@ def test_sequence(test):
 		x.__factor_composite__ = True
 		x.__file__ = str(tr / (x.__name__ + '.py'))
 
-	# M1.m2 = M2
-	m[0].m2 = m[1]
+	m[0].m1 = m[1]
 
 	factors = [library.Factor(None, x, None) for x in m+n]
 	fd = {f.module: f for f in factors}
 	ms = library.sequence(factors)
 	test/next(ms) == None
 
+	# Initial set: Everything except M1
 	proc = ms.send(())[0]
-	test/set(proc) == set((fd[m[1]], fd[m[2]]))
+	test/set(x.module for x in proc) == set(n + m[1:])
 
 	proc = ms.send(proc)[0]
 	test/set(proc) == set((fd[m[0]],))
 
-	# M3 -> N1 -> N2 -> N3
-	n[0].n2 = n[1]
-	n[1].n3 = n[2]
-	m[2].n1 = n[0]
+	# M2 -> N0 -> N1 -> N2
+	n[0].n1 = n[1]
+	n[1].n2 = n[2]
+	m[2].n0 = n[0]
 
+	# Restart. M0.m1 = M1 still holds.
 	factors = [library.Factor(None, x, None) for x in m+n]
 	fd = {f.module: f for f in factors}
 	ms = library.sequence(factors)
 	test/next(ms) == None
 
 	proc = ms.send(())[0]
-	test/set(proc) == set([fd[n[2]], fd[m[1]]])
+	# Need exact completion.
+	fin = {x.module: x for x in proc}
+	test/set(x.module for x in proc) == set((m[1], n[2]))
 	test/set(ms.send(())[0]) == set() # no op
-	test/set(ms.send([fd[n[2]]])[0]) == set((fd[n[1]],)) # triggers n[1]
-	test/set(ms.send([fd[m[1]]])[0]) == set((fd[m[0]],)) # triggers m[0]
+	test/set(ms.send(())[0]) == set() # no op
+	fn2 = fin[n[2]]
+	fm1 = fin[m[1]]
+
+	# triggers n[1]
+	test/set(x.module for x in ms.send([fn2])[0]) == set((n[1],))
+
+	# triggers m[0]
+	test/set(x.module for x in ms.send([fm1])[0]) == set((m[0],))
 
 def test_identity(test):
 	import types
 	m = types.ModuleType("some.pkg.lib.name")
-	m.__factor_type__ = 'system.library'
+	m.__factor_type__ = 'system'
+	m.__factor_dynamics__ = 'library'
 	test/library.identity(m) == 'name'
 
 	m = types.ModuleType("some.pkg.lib.libname")
-	m.__factor_type__ = 'system.library'
+	m.__factor_type__ = 'system'
+	m.__factor_dynamics__ = 'library'
 	test/library.identity(m) == 'name'
 
 	# executables are indifferent
 	m = types.ModuleType("some.pkg.lib.libname")
-	m.__factor_type__ = 'system.executable'
+	m.__factor_type__ = 'system'
+	m.__factor_dynamics__ = 'executable'
 	test/library.identity(m) == 'libname'
 
 	# explicit overrides are taken regardless
 	m = types.ModuleType("some.pkg.lib.libname")
-	m.__factor_type__ = 'system.library'
+	m.__factor_type__ = 'system'
+	m.__factor_dynamics__ = 'library'
 	m.name = 'libsomethingelse'
 	test/library.identity(m) == 'libsomethingelse'
 
@@ -261,10 +308,7 @@ def test_construction_sequence(test):
 
 	mt.__file__ = str(py)
 	mt.__package__ = 'pkg.exe'
-
-	mech, ctx = library.initialize([], library.Factor(None, mt, None), collections.defaultdict(set), ())
-	xf = list(library.transform(ctx, mt))
-	rd = list(library.reduce(ctx, mt))
+	test.fail("Construction execution path not tested")
 
 if __name__ == '__main__':
 	from .. import libtest; import sys

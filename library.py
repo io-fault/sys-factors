@@ -271,6 +271,24 @@ class Factor(object):
 	default_cache_name = '__pycache__'
 	default_fpi_name = '.fpi'
 
+	def __repr__(self):
+		return "{0.__class__.__name__}({1}, {2}, {3})".format(
+			self,
+			self.route,
+			self.module,
+			self.parameters
+		)
+
+	def __hash__(self):
+		p = list(self.parameters or ())
+		p.sort()
+		return hash((self.module, tuple(p)))
+
+	def __eq__(self, ob):
+		if not isinstance(ob, Factor):
+			return False
+		return ob.module == self.module and ob.parameters == self.parameters
+
 	@staticmethod
 	@functools.lru_cache(32)
 	def _directory_cache(route):
@@ -331,7 +349,8 @@ class Factor(object):
 	def from_module(Class, module):
 		"""
 		# Create from a &types.ModuleType. This constructor should be used in
-		# cases where a simulated Factor was formed.
+		# cases where a Factor is being simulated and is not addressable in
+		# Python's module path.
 		"""
 		if hasattr(module, '__factor__'):
 			return module.__factor__
@@ -501,9 +520,8 @@ class Factor(object):
 		is_probe = libfactor.probe
 		ModuleType = types.ModuleType
 
-		for v in factor.module.__dict__.values():
-			if not isinstance(v, ModuleType):
-				continue
+		refs = set(x for x in factor.module.__dict__.values() if isinstance(x, ModuleType))
+		for v in refs:
 			if not hasattr(v, '__factor_type__'):
 				continue
 			if not hasattr(v, '__factor_dynamics__'):
@@ -658,7 +676,7 @@ class Mechanism(object):
 	@property
 	def integrations(self):
 		return self.descriptor['integrations']
-		
+
 	def integrates(self):
 		ints = self.descriptor.get('integrations')
 		if ints:
@@ -1212,7 +1230,7 @@ def identity(module):
 
 	idx = module.__name__.rfind('.')
 	basename = module.__name__[idx+1:]
-	if module.__factor_type__.endswith('.library'):
+	if module.__factor_dynamics__ == 'library':
 		if basename.startswith('lib'):
 			# strip the leading lib from module identifier.
 			# 'libNAME' returns 'NAME'
@@ -1267,6 +1285,7 @@ def unix_compiler_collection(
 		options=(), # Direct option injection.
 		verbose=True, # Enable verbose output.
 		root=False, # Designates the input as a root.
+		includes:typing.Sequence[str]=(),
 
 		verbose_flag='-v',
 		language_flag='-x', standard_flag='-std',
@@ -1310,7 +1329,6 @@ def unix_compiler_collection(
 	"""
 
 	f = build.factor
-	fdyna = f.dynamics
 	purpose = build.variants['purpose']
 	lang = adapter.get('language', i_type)
 
@@ -1343,6 +1361,12 @@ def unix_compiler_collection(
 	format_flags = format_map.get(o_type)
 	if format_flags is not None:
 		command.append(format_flags)
+	else:
+		if o_type is not None:
+			# The selected output type did not have
+			# a corresponding flag. Noting this
+			# may illuminate an error.
+			pass
 
 	# Compiler optimization target: -O0, -O1, ..., -Ofast, -Os, -Oz
 	co = optimizations[purpose]
@@ -1387,12 +1411,8 @@ def unix_compiler_collection(
 	command.extend(spo)
 
 	# -include files. Forced inclusion.
-	# TODO
-	sis = ()
-	for x in sis:
+	for x in includes:
 		command.extend((si_flag, x))
-
-	command.extend(options)
 
 	# finally, the output file and the inputs as the remainder.
 	command.extend((output_flag, output))
@@ -1409,6 +1429,7 @@ def python_bytecode_compiler(context, mechanism, factor,
 	):
 	"""
 	# Command constructor for compiling Python bytecode to an arbitrary file.
+	# Executes in a distinct process.
 	"""
 	purpose = context.purpose(factor.type)
 	inf, = inputs
@@ -1421,6 +1442,7 @@ def local_bytecode_compiler(
 		verbose=True, filepath=str):
 	"""
 	# Command constructor for compiling Python bytecode to an arbitrary file.
+	# Executes locally to minimize overhead.
 	"""
 	from .bin.pyc import compile_python_bytecode
 
@@ -1765,7 +1787,7 @@ def context_interface(path):
 		obj = getattr(obj, x)
 	return obj
 
-class Construction(libio.Processor):
+class Construction(libio.Context):
 	"""
 	# Construction process manager. Maintains the set of target modules to construct and
 	# dispatches the work to be performed for completion in the appropriate order.

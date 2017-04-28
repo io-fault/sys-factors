@@ -31,6 +31,7 @@ def test_executables(test):
 		test/found == {}
 
 def test_runtime(test):
+	test.fail("depends on libio.parallel()")
 	src = "#include <stdio.h>\nint main(int ac, char *av[]) {printf(\"test\\n\");return(0);}"
 	test/b'test\n' == library.runtime([], 'c', src, libraries=['c'])
 
@@ -38,6 +39,7 @@ def test_runtime(test):
 	test/None == library.runtime([], 'c', syntax_error)
 
 def test_includes(test):
+	test.fail("depends on libio.parallel()")
 	test/library.includes([], "c", ("fault/libc.h",)) == True
 	test/library.includes([], "c", ("fault/nosuchfile.h",)) == False
 
