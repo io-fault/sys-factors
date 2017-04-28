@@ -1662,11 +1662,13 @@ def unix_link_editor(
 		# fragment is an incremental link. Most options are irrelevant.
 		command.extend(map(filepath, inputs))
 	else:
-		sld = []
-		libdirs = [libdir_flag + filepath(x) for x in sld]
+		lfactors = [f for f in build.references[(factor.type, 'library')]]
 
-		sls = []
-		libs = [link_flag + filepath(x) for x in sls]
+		dirs = set([x.integral() for x in lfactors])
+		dirs.discard(None)
+		libdirs = [libdir_flag + filepath(x) for x in dirs]
+
+		libs = [link_flag + y for y in set([x.name for x in lfactors])]
 
 		if False:
 			command.extend((soname_flag, sys['abi']))
