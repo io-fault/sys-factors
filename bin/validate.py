@@ -136,6 +136,8 @@ def main(packages):
 	failures = 0
 
 	for pkg in pkgset:
+		if not pkg.exists():
+			raise FileNotFoundError(str(pkg))
 		cdr = pkg.directory() / '__pycache__' / 'failures'
 		if cdr.exists():
 			cdr.void()
