@@ -22,19 +22,16 @@ import subprocess
 import types
 
 from ..system import library as libsys
-from ..system import libcore
+from ..system import corefile
 from ..system import libfactor
 
 from ..routes import library as libroutes
 from ..filesystem import library as libfs
 from ..computation import library as libc
 
-from ..xml import library as libxml
-from . import libxml as devxml
-
 from . import libpython
 from . import libtrace
-from . import libharness
+from . import testing
 
 def statistics(
 		data,
@@ -81,15 +78,16 @@ def statistics(
 
 	return agg
 
-def source_file_map(interests:typing.Sequence[libroutes.Import]):
+def source_file_map(interests:typing.Sequence[libroutes.Import]) -> typing.Mapping[str, str]:
 	"""
-	# Query Python for the entire package tree of all the
-	# given Import routes.
+	# Query Python for the entire package tree of all the given Import routes.
 
-	# [Effects]
-	# /Product
-		# Mapping of file paths associated with the module path that
-		# represents the file.
+	# [Return]
+	# /key
+		# The sources contained within the package's (filesystem/relative)`src/` directory.
+	# /value
+		# The factor's Python module path with the source's relative path appended.
+		# For example: `'project.libcpkg/main.c'`.
 	"""
 
 	# Get the full set of modules that are of interest to the perspective.
@@ -386,7 +384,7 @@ def prepare(metrics:libfs.Dictionary, store=pickle.dump):
 		with metrics.route(b'tests:'+project_key).open('wb') as f:
 			store(test_results, f)
 
-class Harness(libharness.Harness):
+class Harness(harness.Harness):
 	"""
 	# Test harness for measuring a project using its tests.
 	"""
@@ -453,14 +451,14 @@ class Harness(libharness.Harness):
 			faten = 'core'
 			report['fate'] = 'core'
 			test.fate = self.libtest.Core(None)
-			corefile = libcore.location(pid)
-			if corefile is None or not os.path.exists(corefile):
+			corepath = corefile.location(pid)
+			if corepath is None or not os.path.exists(corepath):
 				pass
 			else:
-				report['core'] = corefile
+				report['core'] = corepath
 				rr = self.measurements.route(test.identity.encode('utf-8'))
 				cr = self.measurements.route(('core:'+test.identity).encode('utf-8'))
-				os.move(corefile, str(cr))
+				os.move(corepath, str(cr))
 				# dump the report with core's snapshot.
 				with rr.open('wb') as f:
 					pickle.dump(report, f)

@@ -7,11 +7,11 @@ import functools
 import collections
 import signal
 
+from ...system import corefile
 from ...system import library as libsys
-from ...system import libcore
 from ...routes import library as libroutes
 
-from .. import libharness
+from .. import testing
 
 # The escapes are used directly to avoid dependencies.
 exits = {
@@ -35,7 +35,7 @@ def failure_report_file(test):
 
 	return rf
 
-class Harness(libharness.Harness):
+class Harness(testing.Harness):
 	"""
 	# The collection and execution of a series of tests for the purpose
 	# of validating a configured build.
@@ -178,5 +178,5 @@ if __name__ == '__main__':
 		# Ignore nice() failures.
 		pass
 
-	with libcore.constraint():
+	with corefile.constraint():
 		libsys.control(main, packages)

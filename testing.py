@@ -1,7 +1,7 @@
 """
 # Test execution management and status control.
 
-# libharness provides management tools for the execution of tests and
+# harness provides management tools for the execution of tests and
 # the destination of their resulting status. Status being both the fate
 # of the test and any collected coverage or profile data.
 

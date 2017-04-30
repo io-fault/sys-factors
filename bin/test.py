@@ -10,14 +10,14 @@ import types
 import importlib
 
 from ...system import library as libsys
-from ...system import libcore
+from ...system import corefile
 from ...routes import library as libroutes
 
 from .. import libtest
 from .. import libtrace
 
-from .. import libharness
-from .. import libcore as devcore
+from .. import testing
+from .. import backtrace
 
 def color(color, text):
 	return text
@@ -33,8 +33,9 @@ close_fate_message = color('0x1c1c1c', '|')
 top_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+--')
 working_fate_messages = color('0x1c1c1c', '|' + (' execute  ') + '|')
 bottom_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+--')
+report_core_message = '\r{start} {fate!s} {stop} {tid}                \n'
 
-class Harness(libharness.Harness):
+class Harness(testing.Harness):
 	"""
 	# The collection and execution of a series of tests.
 	"""
@@ -53,8 +54,9 @@ class Harness(libharness.Harness):
 		self.status.flush() # need to see the test being ran right now
 
 	def _report_core(self, test):
-		self.status.write('\r{start} {fate!s} {stop} {tid}                \n'.format(
-			fate = color(test.fate.color, 'core'.ljust(8)), tid = color_identity(test.identity),
+		self.status.write(report_core_message.format(
+			fate = color(test.fate.color, 'core'.ljust(8)),
+			tid = color_identity(test.identity),
 			start = open_fate_message,
 			stop = close_fate_message
 		))
@@ -65,7 +67,7 @@ class Harness(libharness.Harness):
 
 		if os.path.exists(corefile):
 			self.status.write("CORE: Identified, {0!r}, loading debugger.\n".format(corefile))
-			debugger = devcore.debug(corefile)
+			debugger = backtrace.debug(corefile)
 			debugger.wait()
 			self.status.write("CORE: Removed file.\n".format(corefile))
 			os.remove(corefile)
@@ -103,7 +105,7 @@ class Harness(libharness.Harness):
 			report['fate'] = 'core'
 			test.fate = self.libtest.Core(None)
 			self._report_core(test)
-			self._handle_core(libcore.location(pid))
+			self._handle_core(corefile.location(pid))
 		elif not os.WIFEXITED(status):
 			# redrum
 			import signal
@@ -190,5 +192,5 @@ def main(package, modules, role='test'):
 
 if __name__ == '__main__':
 	command, package, *modules = sys.argv
-	with libcore.constraint(None):
+	with corefile.constraint(None):
 		libsys.control(functools.partial(main, package, modules))

@@ -63,7 +63,7 @@ Index of terms used organized into subsections describing their context.
 	by a project.
 
 /Harness
-	In the context of &.libtest and &.libharness, a harness is an
+	In the context of &.libtest and &.testing, a harness is an
 	object used to manage execution of the tests. Harnesses define how and
 	what tests are executed.
 

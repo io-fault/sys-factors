@@ -15,7 +15,8 @@ from ...system import libfactor
 
 from ...llvm import instr
 from ...routes import library as libroutes
-from ...system import libcore
+from ...system import corefile
+from ...system import libsys
 from ...computation import library as libc
 
 RangeSet = libc.range.Set
@@ -122,8 +123,8 @@ if __name__ == '__main__':
 		raise TypeError("command invoked with one parameter; requires: '.bin.measure target_dir packages ...'")
 
 	# Remove core constraints if any.
-	cm = libcore.constraint(None).__enter__()
+	cm = corefile.constraint(None).__enter__()
 
 	# Adjust the profile file environment to a trap file.
 	# The actual file is set before each test.
-	libmetrics.libsys.control(functools.partial(main, target_dir, packages))
+	libsys.control(functools.partial(main, target_dir, packages))

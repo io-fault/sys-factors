@@ -1,8 +1,5 @@
 """
-# Tool interfaces for extracting information from core file and interacting with them.
-
-# ! DEVELOPMENT: Flux
-	# The system invocations here need to rely on configuration.
+# Tool interfaces for extracting information from corefiles.
 """
 import sys
 import subprocess

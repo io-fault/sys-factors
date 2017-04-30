@@ -1,11 +1,5 @@
 """
-# A testing library that minimizes the distance between the test harness, and
-# the actual tests for the purpose of keeping the execution machinary as simple as possible.
-
-# libtest provides the very basics for testing in Python. Test harnesses are implemented else-
-# where as they tend to be significant pieces of code. However, a trivial &execute
-# function is provided that, when given a module, will execute the tests therein. Exceptions
-# are allowed to raise normally in order to report failures of any kind.
+# Collection of primitives used to facilite the testing of software.
 """
 import builtins
 import gc
