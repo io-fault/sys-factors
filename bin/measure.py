@@ -16,7 +16,9 @@ from ...system import libfactor
 from ...llvm import instr
 from ...routes import library as libroutes
 from ...system import libcore
-from ...computation import librange
+from ...computation import library as libc
+
+RangeSet = libc.range.Set
 
 def main(target_dir, packages):
 	global instr
@@ -102,11 +104,11 @@ def main(target_dir, packages):
 					traversed_inc.append((start, stop))
 					start = stop = None
 
-			data['untraversed'] = librange.Set.from_normal_sequence([(x[0][0], x[1][0]) for x in data['zero_counters']])
-			data['traversed'] = librange.Set.from_normal_sequence(traversed_inc)
+			data['untraversed'] = RangeSet.from_normal_sequence([(x[0][0], x[1][0]) for x in data['zero_counters']])
+			data['traversed'] = RangeSet.from_normal_sequence(traversed_inc)
 			with open(str(path), 'rb') as f:
 				lc = len(f.readlines())
-			data['traversable'] = librange.Set.from_normal_sequence([librange.IRange((1, lc))])
+			data['traversable'] = RangeSet.from_normal_sequence([librange.IRange((1, lc))])
 
 			with target_fsdict.route(covkey).open('wb') as f:
 				pickle.dump(data, f)

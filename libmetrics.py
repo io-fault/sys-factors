@@ -27,7 +27,7 @@ from ..system import libfactor
 
 from ..routes import library as libroutes
 from ..filesystem import library as libfs
-from ..computation import librange
+from ..computation import library as libc
 
 from ..xml import library as libxml
 from . import libxml as devxml
@@ -273,7 +273,7 @@ def group(times, counts):
 
 	return times_groups, counts_groups
 
-def coverage(module, counts, RangeSet=librange.Set):
+def coverage(module, counts, RangeSet=libc.range.Set, irs=libc.range.inclusive_range_set):
 	"""
 	# Identify the uncovered units (lines) from the line counts.
 
@@ -292,7 +292,7 @@ def coverage(module, counts, RangeSet=librange.Set):
 
 	# Use the AST walker in libpython.
 	traversable = libpython.lines(module.spec().origin)
-	traversable = list(librange.inclusive_range_set(traversable))
+	traversable = list(irs(traversable))
 	traversable = RangeSet.from_normal_sequence(traversable)
 
 	traversed = RangeSet.from_set(counts)
