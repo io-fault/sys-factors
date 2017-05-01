@@ -29,7 +29,7 @@ from ..routes import library as libroutes
 from ..filesystem import library as libfs
 from ..computation import library as libc
 
-from . import libpython
+from . import python
 from . import libtrace
 from . import testing
 
@@ -288,8 +288,8 @@ def coverage(module, counts, RangeSet=libc.range.Set, irs=libc.range.inclusive_r
 		# prior to this point.
 	"""
 
-	# Use the AST walker in libpython.
-	traversable = libpython.lines(module.spec().origin)
+	# Use the AST walker in python.
+	traversable = python.lines(module.spec().origin)
 	traversable = list(irs(traversable))
 	traversable = RangeSet.from_normal_sequence(traversable)
 
