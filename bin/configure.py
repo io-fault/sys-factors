@@ -8,7 +8,7 @@ import subprocess
 
 from ...routes import library as libroutes
 from ...xml import library as libxml
-from .. import libprobe
+from .. import probe
 from .. import library as libdev
 from .. import web
 
@@ -112,12 +112,11 @@ def select(paths, possibilities, preferences):
 	# Select a file from the given &paths using the &possibilities and &preferences
 	# to identify the most desired.
 	"""
-	global libprobe
 
 	# Override for particular version
 	possible = set(possibilities)
 
-	found, missing = libprobe.search(paths, tuple(possible))
+	found, missing = probe.search(paths, tuple(possible))
 	if not found:
 		return None
 	else:
@@ -603,7 +602,7 @@ def host_system_type(reqs, paths):
 		('/lib', '/usr/lib',))) # Make sure likely directories are included.
 
 	# scan for system objects (crt1.o, crt0.o, etc)
-	found, missing = libprobe.search(libdirs, runtime_objects)
+	found, missing = probe.search(libdirs, runtime_objects)
 	prepare = lambda x: tuple(map(str, [y for y in x if y]))
 	system = {
 		# subject data
@@ -927,7 +926,7 @@ def main(name, args, paths=None):
 		fpi = libroutes.File.home() / '.fault' / 'fpi'
 
 	if paths is None:
-		paths = libprobe.environ_paths()
+		paths = probe.environ_paths()
 
 	host(reqs, init(fpi / 'host'), paths)
 	static(reqs, init(fpi / 'static'), paths)

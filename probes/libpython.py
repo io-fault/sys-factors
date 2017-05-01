@@ -11,7 +11,6 @@ __factor_dynamics__ = 'probe'
 import sys
 import sysconfig
 
-from .. import libprobe
 from .. import library as libdev
 from ...system import libfactor
 

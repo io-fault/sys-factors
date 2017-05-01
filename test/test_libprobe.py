@@ -2,7 +2,7 @@
 # Check environment and probe classes.
 """
 import os
-from .. import libprobe as library
+from .. import probe as module
 from ...routes import library as libroutes
 from ...io import library as libio
 
@@ -16,32 +16,32 @@ def test_executables(test):
 		os.environ['PATH'] = str(b)
 
 		# One found
-		found, unavail = library.executables(['test', 'cat', 'x'])
+		found, unavail = module.executables(['test', 'cat', 'x'])
 		test/unavail == set(['test', 'cat'])
 		test/found == {'x': x}
 
 		# None found
-		found, unavail = library.executables(['y'])
+		found, unavail = module.executables(['y'])
 		test/unavail == set(['y'])
 		test/found == {}
 
 		# None queried
-		found, unavail = library.executables([])
+		found, unavail = module.executables([])
 		test/unavail == set([])
 		test/found == {}
 
 def test_runtime(test):
 	test.fail("depends on libio.parallel()")
 	src = "#include <stdio.h>\nint main(int ac, char *av[]) {printf(\"test\\n\");return(0);}"
-	test/b'test\n' == library.runtime([], 'c', src, libraries=['c'])
+	test/b'test\n' == module.runtime([], 'c', src, libraries=['c'])
 
 	syntax_error = "...int i = $\n"
-	test/None == library.runtime([], 'c', syntax_error)
+	test/None == module.runtime([], 'c', syntax_error)
 
 def test_includes(test):
 	test.fail("depends on libio.parallel()")
-	test/library.includes([], "c", ("fault/libc.h",)) == True
-	test/library.includes([], "c", ("fault/nosuchfile.h",)) == False
+	test/module.includes([], "c", ("fault/libc.h",)) == True
+	test/module.includes([], "c", ("fault/nosuchfile.h",)) == False
 
 if __name__ == '__main__':
 	from .. import libtest; import sys
