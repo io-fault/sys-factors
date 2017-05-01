@@ -92,5 +92,5 @@ def main():
 
 if __name__ == '__main__':
 	sys.dont_write_bytecode = True
-	from ...io import libcommand
-	libcommand.execute()
+	from ...io import command
+	command.execute()

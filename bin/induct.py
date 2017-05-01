@@ -98,5 +98,5 @@ def main():
 	sector.unit.result = 0
 
 if __name__ == '__main__':
-	from ...io import libcommand
-	libcommand.execute()
+	from ...io import command
+	command.execute()
