@@ -10,7 +10,7 @@ import functools
 import itertools
 import pickle
 
-from .. import libmetrics
+from .. import metrics
 from ...system import libfactor
 
 from ...llvm import instr
@@ -24,8 +24,8 @@ RangeSet = libc.range.Set
 def main(target_dir, packages):
 	global instr
 
-	target_fsdict = libmetrics.libfs.Dictionary.create(
-		libmetrics.libfs.Hash('fnv1a_32', depth=1), target_dir
+	target_fsdict = metrics.libfs.Dictionary.create(
+		metrics.libfs.Hash('fnv1a_32', depth=1), target_dir
 	)
 
 	work = libroutes.File.from_path(target_dir) / '_instr_cov_'
@@ -41,16 +41,16 @@ def main(target_dir, packages):
 
 	p = None
 	for package in packages:
-		p = libmetrics.Harness(work, target_fsdict, package, sys.stderr)
+		p = metrics.Harness(work, target_fsdict, package, sys.stderr)
 		p.execute(p.root(libroutes.Import.from_fullname(package)), ())
 		# Build measurements.
 
-	libmetrics.prepare(target_fsdict)
+	metrics.prepare(target_fsdict)
 
-	# &libmetrics.prepare manages the data produced by Python,
+	# &metrics.prepare manages the data produced by Python,
 	# but the instrumentation is managed by llvm-profdata merge.
 	fct = os.environ.get('FAULT_COVERAGE_TOTALS', str(work / 'totals'))
-	libmetrics.Harness.merge_instrumentation_metrics(work, fct)
+	metrics.Harness.merge_instrumentation_metrics(work, fct)
 	fct_r = libroutes.File.from_absolute(fct)
 
 	# Collect the per-test instrumentation data from the filesystem.

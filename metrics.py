@@ -357,7 +357,7 @@ def prepare(metrics:libfs.Dictionary, store=pickle.dump):
 	"""
 	# Prepare the metrics for formatting by tools like &..factors.
 
-	# Given a &libfs.Dictionary of collected metrics by &.libmetrics.Harness, process
+	# Given a &libfs.Dictionary of collected metrics by &.metrics.Harness, process
 	# it into a form that is more suitable for consumption by reporting tools.
 	"""
 
@@ -384,7 +384,7 @@ def prepare(metrics:libfs.Dictionary, store=pickle.dump):
 		with metrics.route(b'tests:'+project_key).open('wb') as f:
 			store(test_results, f)
 
-class Harness(harness.Harness):
+class Harness(testing.Harness):
 	"""
 	# Test harness for measuring a project using its tests.
 	"""
@@ -588,8 +588,8 @@ class Harness(harness.Harness):
 				cancel()
 
 		if isinstance(test.fate, self.libtest.Fail):
-			from ..xml import libpython
-			xml = libpython.Serialization(xml_prefix='py:', xml_encoding='ascii')
+			from ..xml.python import Serialization
+			xml = Serialization(xml_prefix='py:', xml_encoding='ascii')
 			error = list(xml.exception(test.fate, attributes=[
 					('xmlns:py', 'http://fault.io/xml/python')
 				], traversed=set((id(test.fate), id(events), id(xml), id(test), id(view), id(self))))

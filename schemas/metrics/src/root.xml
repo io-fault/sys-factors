@@ -12,7 +12,7 @@
 
 	<!-- Used to represent tracebacks for test failures. -->
 
-	<define name="libmetrics.xml.id">
+	<define name="metrics.xml.id">
 		<a:documentation>Name attribute used on most elements.</a:documentation>
 		<optional>
 			<attribute name="xml:id">
@@ -24,7 +24,7 @@
 		</optional>
 	</define>
 
-	<define name="libmetrics.xml.space">
+	<define name="metrics.xml.space">
 		<attribute name="xml:space">
 			<choice>
 				<value>default</value>
@@ -33,13 +33,13 @@
 		</attribute>
 	</define>
 
-	<define name="libmetrics.identifier">
+	<define name="metrics.identifier">
 		<attribute name="identifier">
 			<data type="normalizedString"/>
 		</attribute>
 	</define>
 
-	<define name="libmetrics.report">
+	<define name="metrics.report">
 		<a:documentation>Set of data describing a factor or a part of a factor.</a:documentation>
 		<element name="report">
 			<attribute name="timestamp">
@@ -47,15 +47,15 @@
 			</attribute>
 
 			<zeroOrMore>
-				<ref name="libmetrics.measurements"/>
+				<ref name="metrics.measurements"/>
 			</zeroOrMore>
 		</element>
 	</define>
 
-	<define name="libmetrics.measurements">
+	<define name="metrics.measurements">
 		<a:documentation>Data frames container.</a:documentation>
 		<element name="measurements">
-			<ref name="libmetrics.xml.id"/>
+			<ref name="metrics.xml.id"/>
 
 			<optional>
 				<attribute name="dimensions">
@@ -78,27 +78,27 @@
 			</optional>
 
 			<zeroOrMore>
-				<ref name="libmetrics.frame"/>
+				<ref name="metrics.frame"/>
 			</zeroOrMore>
 		</element>
 	</define>
 
-	<define name="libmetrics.key">
+	<define name="metrics.key">
 		<element>
 			<anyName/>
 			<optional>
-				<ref name="libmetrics.identifier"/>
+				<ref name="metrics.identifier"/>
 			</optional>
 
 			<text/>
 		</element>
 	</define>
 
-	<define name="libmetrics.frame">
+	<define name="metrics.frame">
 		<element name="frame">
 			<zeroOrMore>
 				<choice>
-					<ref name="libmetrics.xml.id"/>
+					<ref name="metrics.xml.id"/>
 					<attribute>
 						<anyName ns="http://fault.io/xml/key"/>
 						<text/>
@@ -120,12 +120,12 @@
 
 			<!-- Keys are isolated so measurements can processed independently -->
 			<zeroOrMore>
-				<ref name="libmetrics.key"/>
+				<ref name="metrics.key"/>
 			</zeroOrMore>
 		</element>
 	</define>
 
 	<start>
-		<ref name="libmetrics.report"/>
+		<ref name="metrics.report"/>
 	</start>
 </grammar>
