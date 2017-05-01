@@ -30,7 +30,7 @@ from ..filesystem import library as libfs
 from ..computation import library as libc
 
 from . import python
-from . import libtrace
+from . import trace
 from . import testing
 
 def statistics(
@@ -113,7 +113,7 @@ def source_file_map(interests:typing.Sequence[libroutes.Import]) -> typing.Mappi
 
 	return sfm
 
-def reorient(container:str, sfm:dict, input:libtrace.Measurements, output:libtrace.Measurements):
+def reorient(container:str, sfm:dict, input:trace.Measurements, output:trace.Measurements):
 	"""
 	# Transform per-test measurements produced by &measure
 	# into per-file measurements. This essentially swaps the &container with
@@ -131,9 +131,9 @@ def reorient(container:str, sfm:dict, input:libtrace.Measurements, output:libtra
 		# which data is kept. Events from lines that do not
 		# exist in any of these files are removed.
 	# /output
-		# The &libtrace.Measurements that will be updated.
+		# The &trace.Measurements that will be updated.
 	# /input
-		# The source &libtrace.Measurements produced by &libtrace.Measure.
+		# The source &trace.Measurements produced by &trace.Measure.
 	"""
 	out_times, out_counts = output
 	times, counts = input
@@ -568,12 +568,12 @@ class Harness(testing.Harness):
 			# Each file in this directory is the profile emitted by an extension.
 			yield from instr.extract_nonzero_counters(mod.__file__, str(data))
 
-	def seal(self, test):
+	def seal(self, test, prepare=trace.prepare):
 		"""
 		# Perform the test and store its report and measurements into
 		# the configured metrics directory.
 		"""
-		trace, events = libtrace.prepare()
+		trace, events = prepare()
 		subscribe = trace.subscribe
 		cancel = trace.cancel
 
@@ -600,7 +600,7 @@ class Harness(testing.Harness):
 		self.flush_extensions(llmetrics)
 
 		faten = test.fate.__class__.__name__.lower()
-		profile, coverage = libtrace.measure(events)
+		profile, coverage = trace.measure(events)
 
 		for path, counters in self.instrumentation_metrics(llmetrics):
 			coverage[path].update({

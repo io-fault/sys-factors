@@ -14,7 +14,6 @@ from ...system import corefile
 from ...routes import library as libroutes
 
 from .. import libtest
-from .. import libtrace
 
 from .. import testing
 from .. import backtrace

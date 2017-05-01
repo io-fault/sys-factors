@@ -8,10 +8,10 @@
 # Common usage:
 
 ## !/pl/python
-	# collector, events = libtrace.prepare()
+	# collector, events = trace.prepare()
 	# with collector:
 		# ...
-	# aggregate = libtrace.measure(events)
+	# aggregate = trace.measure(events)
 
 # [ Development Tasks ]
 
@@ -82,15 +82,21 @@ class Collector(object):
 		return self._partial(*args)
 
 	def subscribe(self):
-		"Subscribe to all events."
+		"""
+		# Subscribe to all events.
+		"""
 		sys.settrace(self)
 
 	def profile(self):
-		"Subscribe to profile data only."
+		"""
+		# Subscribe to profile data only.
+		"""
 		sys.setprofile(self)
 
 	def cancel(self):
-		"Cancel the collection of data in the current thread."
+		"""
+		# Cancel the collection of data in the current thread.
+		"""
 		sys.settrace(None)
 		sys.setprofile(None)
 
