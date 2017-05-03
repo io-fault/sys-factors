@@ -1,5 +1,5 @@
 """
-# Collection of primitives used to facilite the testing of software.
+# Collection of primitives used to facilite testing.
 """
 import builtins
 import gc
@@ -379,6 +379,10 @@ class Test(object):
 		# on the Test instance. &None is always returned by &seal.
 		"""
 		tb = None
+		if hasattr(self, 'fate'):
+			self.fail("test has already been sealed") # recursion protection
+
+		self.fate = None
 
 		try:
 			r = self.focus(self)
