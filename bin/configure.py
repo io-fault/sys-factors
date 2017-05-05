@@ -169,7 +169,7 @@ def compiler_libraries(compiler, prefix, version, executable, target):
 	else:
 		pass
 
-def python_bytecode_type(paths):
+def python_bytecode_domain(paths):
 	"""
 	# Constructs the subject for building Python bytecode for a host context.
 
@@ -204,7 +204,7 @@ def python_bytecode_type(paths):
 		}
 	}
 
-def javascript_type(paths):
+def javascript_domain(paths):
 	"""
 	# Initialize the javascript subject for JavaScript file compilation.
 
@@ -243,7 +243,7 @@ def javascript_type(paths):
 		}
 	}
 
-def css_type(paths):
+def css_domain(paths):
 	"""
 	# Initialize the CSS subject for CSS compilation.
 	"""
@@ -292,7 +292,7 @@ def css_type(paths):
 
 	return css
 
-def xml_type(paths):
+def xml_domain(paths):
 	"""
 	# Construct the subject for XML files.
 	"""
@@ -335,7 +335,7 @@ def xml_type(paths):
 
 	return xml
 
-def source_type(paths):
+def source_domain(paths):
 	"""
 	# Initialize a (ctx:ftype)`resource` subject for inclusion in a context.
 	"""
@@ -360,7 +360,7 @@ def source_type(paths):
 
 	return mech
 
-def resource_type(paths):
+def resource_domain(paths):
 	"""
 	# Initialize a (ctx:ftype)`resource` subject for inclusion in a context.
 	"""
@@ -470,9 +470,9 @@ def inspect(reqs, ctx, paths):
 	corefile = ctx / 'core.xml'
 	corefile.store(xml)
 
-	purposes(corefile)
+	intentions(corefile)
 
-def host_system_type(reqs, paths):
+def host_system_domain(reqs, paths):
 	target_file_extensions = {
 		'executable': '.exe',
 		'library': '.so',
@@ -708,24 +708,24 @@ def host_system_type(reqs, paths):
 
 	return system
 
-common_purposes = {
-	'debug': 'Reduced optimizations and defines for debugging',
+common_intentions = {
 	'optimal': 'Subjective performance selection',
+	'debug': 'Reduced optimizations and defines for emitting debugging information',
 
-	'test': 'Debug role with support for injections for comprehensive testing',
-	'metrics': 'Test role with profiling and coverage collection enabled',
+	'test': 'Debugging intention with support for injections for comprehensive testing',
+	'metrics': 'Test intention with profiling and coverage collection enabled',
 
 	'profiling': 'Raw profiling build for custom collections',
 	'coverage': 'Raw coverage build for custom collections',
 }
 
-def purposes(corefile):
+def intentions(corefile):
 	ctx = corefile.container
 	S = libxml.Serialization()
 	D = S.switch('data:')
 
 	empty = {}
-	for x, abstract in common_purposes.items():
+	for x, abstract in common_intentions.items():
 		ctxfile = ctx / (x + '.xml')
 
 		xml = b''.join(
@@ -736,7 +736,7 @@ def purposes(corefile):
 					),
 					S.element('context',
 						libxml.Data.serialize(D, empty),
-						('purpose', x),
+						('intention', x),
 					),
 				)),
 				('xmlns', 'http://fault.io/xml/dev/fpi'),
@@ -751,11 +751,11 @@ def static(reqs, ctx, paths):
 	# Platform independent processing.
 	"""
 	core = {
-		'source': source_type(paths),
-		'resource': resource_type(paths),
-		'javascript': javascript_type(paths),
-		'css': css_type(paths),
-		'xml': xml_type(paths),
+		'source': source_domain(paths),
+		'resource': resource_domain(paths),
+		'javascript': javascript_domain(paths),
+		'css': css_domain(paths),
+		'xml': xml_domain(paths),
 	}
 
 	import pprint
@@ -776,16 +776,16 @@ def static(reqs, ctx, paths):
 	corefile = ctx / 'core.xml'
 	corefile.store(xml)
 
-	purposes(corefile)
+	intentions(corefile)
 
 def host(reqs, ctx, paths):
 	"""
 	# Initialize a (libdev:context)`host` context.
 	"""
 	core = {
-		'system': host_system_type(reqs, paths),
+		'system': host_system_domain(reqs, paths),
 		# Move to static.
-		'bytecode.python': python_bytecode_type(paths),
+		'bytecode.python': python_bytecode_domain(paths),
 	}
 
 	import pprint
@@ -805,7 +805,7 @@ def host(reqs, ctx, paths):
 	corefile = ctx / 'core.xml'
 	corefile.store(xml)
 
-	purposes(corefile)
+	intentions(corefile)
 
 def web_context(reqs, ctx, paths):
 	# default command
@@ -914,7 +914,7 @@ def web_context(reqs, ctx, paths):
 	corefile = ctx / 'core.xml'
 	corefile.store(xml)
 
-	purposes(corefile)
+	intentions(corefile)
 
 def main(name, args, paths=None):
 	reqs = dict(zip(args[0::2], args[1::2]))

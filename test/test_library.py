@@ -18,8 +18,8 @@ def test_Factor(test):
 	test/str(f.cache_directory) == pkgcache
 
 	# Defaults.
-	test/f.type == 'python'
-	test/f.dynamics == 'library'
+	test/f.domain == 'python'
+	test/f.type == 'library'
 	test/str(f.source_directory) == str(pkgdir)
 
 	fpir = os.path.join(pkgcache, library.Factor.default_fpi_name)
@@ -61,7 +61,7 @@ def test_unix_compiler_collection(test):
 
 	stdhead = [None, '-c', '-v', '-fvisibility=hidden', '-fcolor-diagnostics', '-O3', '-g']
 	context = {
-		'variants': {'purpose':'optimal', 'name':'host'},
+		'variants': {'intention':'optimal', 'name':'host'},
 		'system': {
 			'type': None,
 		}
@@ -71,7 +71,7 @@ def test_unix_compiler_collection(test):
 	test/cmd == stdhead + ['-o', 'out.o', 'input.c']
 
 	context = {
-		'variants': {'purpose':'optimal', 'name':'host'},
+		'variants': {'intention':'optimal', 'name':'host'},
 		'system': {
 			'source.parameters': [
 				('TEST', 'VALUE'),
@@ -83,7 +83,7 @@ def test_unix_compiler_collection(test):
 
 	# coverage flags from metrics role.
 	context = {
-		'variants': {'purpose':'metrics', 'name':'host'},
+		'variants': {'intention':'metrics', 'name':'host'},
 		'system': {
 			'source.parameters': [
 				('TEST', 'VALUE'),
@@ -98,7 +98,7 @@ def test_unix_compiler_collection(test):
 
 	# include directories
 	context = {
-		'variants': {'purpose':'optimal', 'name':'host'},
+		'variants': {'intention':'optimal', 'name':'host'},
 		'system': {
 			'refs': {
 				('source', 'library'): [
@@ -119,7 +119,7 @@ def test_unix_compiler_collection(test):
 
 	# include set
 	context = {
-		'variants': {'purpose':'optimal', 'name':'host'},
+		'variants': {'intention':'optimal', 'name':'host'},
 		'system': {
 			'include.set': [
 				'inc1.h', 'inc2.h',
@@ -133,7 +133,7 @@ def test_unix_compiler_collection(test):
 
 	# injection
 	context = {
-		'variants': {'purpose':'optimal', 'name':'host'},
+		'variants': {'intention':'optimal', 'name':'host'},
 		'system': {
 			'command.option.injection': ['-custom-op'],
 		}
@@ -143,7 +143,7 @@ def test_unix_compiler_collection(test):
 
 	# undefines
 	context = {
-		'variants': {'purpose':'optimal', 'name':'host'},
+		'variants': {'intention':'optimal', 'name':'host'},
 		'system': {
 			'compiler.preprocessor.undefines': [
 				'TEST1', 'TEST2',
@@ -155,7 +155,7 @@ def test_unix_compiler_collection(test):
 
 	# language
 	context = {
-		'variants': {'purpose':'optimal', 'name':'host'},
+		'variants': {'intention':'optimal', 'name':'host'},
 		'system': {
 		}
 	}
@@ -164,7 +164,7 @@ def test_unix_compiler_collection(test):
 
 	# language and standard
 	context = {
-		'variants': {'purpose':'optimal', 'name':'host'},
+		'variants': {'intention':'optimal', 'name':'host'},
 		'system': {
 			'standards': {'c': 'c99'},
 		}
@@ -206,8 +206,8 @@ def test_sequence(test):
 		types.ModuleType("N2"),
 	]
 	for x in m+n:
-		x.__factor_type__ = 'system'
-		x.__factor_dynamics__ = 'library'
+		x.__factor_domain__ = 'system'
+		x.__factor_type__ = 'library'
 		x.__factor_composite__ = True
 		x.__file__ = str(tr / (x.__name__ + '.py'))
 
@@ -254,25 +254,25 @@ def test_sequence(test):
 def test_identity(test):
 	import types
 	m = types.ModuleType("some.pkg.lib.name")
-	m.__factor_type__ = 'system'
-	m.__factor_dynamics__ = 'library'
+	m.__factor_domain__ = 'system'
+	m.__factor_type__ = 'library'
 	test/library.identity(m) == 'name'
 
 	m = types.ModuleType("some.pkg.lib.libname")
-	m.__factor_type__ = 'system'
-	m.__factor_dynamics__ = 'library'
+	m.__factor_domain__ = 'system'
+	m.__factor_type__ = 'library'
 	test/library.identity(m) == 'name'
 
 	# executables are indifferent
 	m = types.ModuleType("some.pkg.lib.libname")
-	m.__factor_type__ = 'system'
-	m.__factor_dynamics__ = 'executable'
+	m.__factor_domain__ = 'system'
+	m.__factor_type__ = 'executable'
 	test/library.identity(m) == 'libname'
 
 	# explicit overrides are taken regardless
 	m = types.ModuleType("some.pkg.lib.libname")
-	m.__factor_type__ = 'system'
-	m.__factor_dynamics__ = 'library'
+	m.__factor_domain__ = 'system'
+	m.__factor_type__ = 'library'
 	m.name = 'libsomethingelse'
 	test/library.identity(m) == 'libsomethingelse'
 
@@ -290,8 +290,8 @@ def test_construction_sequence(test):
 	import collections
 
 	mt = types.ModuleType("pkg.exe", "docstring")
-	mt.__factor_type__ = 'system'
-	mt.__factor_dynamics__ = 'executable'
+	mt.__factor_domain__ = 'system'
+	mt.__factor_type__ = 'executable'
 	mt.__builtins__ = builtins
 
 	sys.path.append(str(tr))

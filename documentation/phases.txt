@@ -51,7 +51,7 @@ illuminate the need and purpose:
 	/Format
 		The format of the output files that construct the target. Might
 		not be referring to the actual binary format, but how they were built.
-	/Purpose
+	/Intention
 		The purpose of the build; debug, test, optimal. Controls
 		optimization level, debugging symbols and code sections.
 	/Context Name

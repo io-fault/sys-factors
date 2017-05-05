@@ -120,8 +120,8 @@ def prepare(
 
 	mod = types.ModuleType("fault_probe")
 	mod.__file__ = (str(directory / '__init__.py'))
-	mod.__factor_type__ = 'system'
-	mod.__factor_dynamics__ = 'executable'
+	mod.__factor_domain__ = 'system'
+	mod.__factor_type__ = 'executable'
 	mod.generated = 'probe'
 
 	mod.system = {

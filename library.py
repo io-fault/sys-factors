@@ -226,17 +226,17 @@ class iFactor(object):
 	@classmethod
 	def headers(Class, path):
 		return Class(
-			type = 'source',
-			dynamics = 'library',
+			domain = 'source',
+			type = 'library',
 			name = None,
 			integral = path
 		)
 
 	@classmethod
-	def library(Class, path, name, type='system'):
+	def library(Class, path, name, domain='system'):
 		return Class(
-			type = type,
-			dynamics = 'library',
+			domain = domain,
+			type = 'library',
 			integral = path,
 			name = name,
 		)
@@ -362,25 +362,25 @@ class Factor(object):
 		return self.route.fullname
 
 	def __str__(self):
-		struct = "factor://{0.type}.{scheme}/{0.fullname}#{0.module_file.fullpath}"
-		return struct.format(self, scheme=self.dynamics[:3])
+		struct = "factor://{0.domain}.{scheme}/{0.fullname}#{0.module_file.fullpath}"
+		return struct.format(self, scheme=self.type[:3])
 
 	@property
 	def name(self):
 		return self.route.identifier
 
 	@property
-	def type(self):
+	def domain(self):
 		try:
-			return self.module.__factor_type__
+			return self.module.__factor_domain__
 		except AttributeError:
 			# python.library
 			return 'python'
 
 	@property
-	def dynamics(self):
+	def type(self):
 		try:
-			return self.module.__factor_dynamics__
+			return self.module.__factor_type__
 		except AttributeError:
 			# python.library
 			return 'library'
@@ -394,7 +394,7 @@ class Factor(object):
 
 	@property
 	def pair(self):
-		return (self.type, self.dynamics)
+		return (self.domain, self.type)
 
 	@property
 	def latest_modification(self):
@@ -522,10 +522,10 @@ class Factor(object):
 
 		refs = set(x for x in factor.module.__dict__.values() if isinstance(x, ModuleType))
 		for v in refs:
-			if not hasattr(v, '__factor_type__'):
+			if not hasattr(v, '__factor_domain__'):
 				continue
-			if not hasattr(v, '__factor_dynamics__'):
-				# Factor, but no dynamics means that
+			if not hasattr(v, '__factor_type__'):
+				# Factor, but no type means that
 				# it has no transformation to perform.
 				continue
 
@@ -541,7 +541,7 @@ class Factor(object):
 		else:
 			return probe_retrieve(self, context, mechanism, None)
 
-	def aggregate(self, references, variants, context, mechanism, dynamics='probe'):
+	def aggregate(self, references, variants, context, mechanism, type='probe'):
 		"""
 		# Aggregate the probe reports.
 		"""
@@ -550,7 +550,7 @@ class Factor(object):
 		variants = {}
 		factors = []
 
-		for p in references[(self.type, dynamics)]:
+		for p in references[(self.domain, type)]:
 			build_params, params, pfactors = p.report(context, mechanism, self)
 			src_params.extend(params)
 			variants.update(build_params)
@@ -565,24 +565,24 @@ class Factor(object):
 	def formats(self, mechanism, dependents):
 		"""
 		# Yield the formats to build based on the given mechanism, dependents and
-		# the factor's dynamics.
+		# the factor's type.
 
 		# For factors other than `'fragment'`, this is always a single item.
 		"""
 
 		fformats = mechanism.descriptor['formats'] # code types used by the object types
 
-		if self.dynamics == 'fragment':
+		if self.type == 'fragment':
 			# For fragments, the dependents decide
 			# the format set to build. If no format is designated,
 			# the default is presumed.
 			default = fformats.get('fragment') or fformats[None]
 
 			for x in dependents:
-				yield fformats.get(x.dynamics, default)
+				yield fformats.get(x.type, default)
 		else:
 			# For system factors, this determines PIC/PIE/Unspecified.
-			yield fformats.get(self.dynamics) or fformats[None]
+			yield fformats.get(self.type) or fformats[None]
 
 	def link(self, variants, context, mechanism, refs, dependents):
 		"""
@@ -609,7 +609,7 @@ class Factor(object):
 			vars.update(bp)
 			# XXX: This doesn't work for fragments.
 			for f in ifs:
-				refs[(f.type, f.dynamics)].add(f)
+				refs[(f.domain, f.type)].add(f)
 
 			yield sp, self.fpi_initialize(vars, format=fmt)
 
@@ -694,7 +694,7 @@ class Mechanism(object):
 		"""
 		tfe = self.descriptor['target-file-extensions']
 		return (
-			tfe.get(factor.dynamics) or \
+			tfe.get(factor.type) or \
 			tfe.get(None) or '.i'
 		)
 
@@ -728,7 +728,7 @@ class Mechanism(object):
 			if not x.exists():
 				yield ('directory', x)
 
-	def adaption(self, build, type, source, phase='transformations'):
+	def adaption(self, build, domain, source, phase='transformations'):
 		"""
 		# Select the adapter of the mechanism for the given source.
 
@@ -738,11 +738,11 @@ class Mechanism(object):
 		aset = self.descriptor[phase]
 
 		# Mechanisms support explicit inheritance.
-		if (phase, type) in acache:
-			return acache[(phase, type)]
+		if (phase, domain) in acache:
+			return acache[(phase, domain)]
 
-		if type in aset:
-			key = type
+		if domain in aset:
+			key = domain
 		else:
 			# For transformations, usually a compiler collection.
 			# Integrations usually only consist of one.
@@ -762,7 +762,7 @@ class Mechanism(object):
 		cmech.pop('inherit', None)
 
 		# cache merged mechanism
-		acache[(phase, type)] = cmech
+		acache[(phase, domain)] = cmech
 
 		return cmech
 
@@ -773,7 +773,7 @@ class Mechanism(object):
 		global languages, include
 
 		f = build.factor
-		ftype = f.type
+		fdomain = f.domain
 		loc = build.locations
 		logs = loc['log']
 		ctxname = build.variants['name']
@@ -796,7 +796,7 @@ class Mechanism(object):
 			logfile = File(loc['log'], src.points)
 
 			src_type = languages.get(src.extension)
-			out_format = mechanism['formats'][f.dynamics]
+			out_format = mechanism['formats'][f.type]
 
 			adapter = self.adaption(build, src_type, src, phase='transformations')
 			xf = context_interface(adapter['interface'])
@@ -862,11 +862,11 @@ class Mechanism(object):
 			objdir.__class__(objdir, x) for x in sources
 		]
 
-		fragments = [x for x in build.references[(f.type, 'fragment')]]
+		fragments = [x for x in build.references[(f.domain, 'fragment')]]
 		if filtered((rr,), objects):
 			return
 
-		adapter = self.adaption(build, f.dynamics, objects, phase='integrations')
+		adapter = self.adaption(build, f.type, objects, phase='integrations')
 
 		# Mechanisms with a configured root means that the
 		# transformed objects will be referenced by the root file.
@@ -874,11 +874,11 @@ class Mechanism(object):
 		if root is not None:
 			objects = [objdir / root]
 
-		# Libraries and fragments of the same type are significant.
-		libraries = [x for x in build.references[(f.type, 'library')]]
+		# Libraries and fragments of the same domain are significant.
+		libraries = [x for x in build.references[(f.domain, 'library')]]
 
 		xf = context_interface(adapter['interface'])
-		seq = xf(build, adapter, f.dynamics, rr, fmt, objects, fragments, libraries)
+		seq = xf(build, adapter, f.type, rr, fmt, objects, fragments, libraries)
 		logfile = loc['log'] / 'Integration.log'
 
 		yield self.formulate(rr, logfile, adapter, seq)
@@ -912,35 +912,35 @@ class Context(object):
 		self.sequence = sequence or ()
 
 	@functools.lru_cache(8)
-	def purpose(self, ftype):
+	def intention(self, fdomain):
 		"""
-		# The purpose of the Context for the given factor type.
+		# The intention of the Context for the given factor domain.
 
 		# While usually consistent across the mechanism sets, there are
-		# cases where an implementation chooses to reduce the purposes
+		# cases where an implementation chooses to reduce the intentions
 		# where it is known that the builds are consistent. Python bytecode
-		# being the notable case where (dev:purpose)`debug` is consistent
-		# with (dev:purpose)`test` and (dev:purpose)`measure`.
+		# being the notable case where (intention)`debug` is consistent
+		# with (intention)`test` and (intention)`measure`.
 
-		# Presumes optimal if the mechanism sets did not define a purpose.
+		# Presumes optimal if the mechanism sets did not define a intention.
 		# This is used for compensating cases where the generated mechanism
-		# sets have consistent purpose for automated builds.
+		# sets have consistent intentions for automated builds.
 		"""
 		for x in self.sequence:
-			if ftype not in x:
+			if fdomain not in x:
 				continue
 
-			p = x['variants'].get('purpose')
+			p = x['variants'].get('intention')
 			if p is not None:
 				return p
 		else:
 			return 'optimal'
 
 	@functools.lru_cache(8)
-	def select(self, ftype):
+	def select(self, fdomain):
 		for x in self.sequence:
-			if ftype in x:
-				return x['variants'], Mechanism(x[ftype])
+			if fdomain in x:
+				return x['variants'], Mechanism(x[fdomain])
 		else:
 			# Select the [trap] if available.
 			for x in self.sequence:
@@ -1068,8 +1068,8 @@ def simulate_composite(route):
 	pkgfile = route.file()
 
 	mod = types.ModuleType(str(route), "Simulated composite factor for bytecode compilation")
-	mod.__factor_type__ = 'bytecode.python'
-	mod.__factor_dynamics__ = 'library' # Truthfully, a [python] Package.
+	mod.__factor_domain__ = 'bytecode.python'
+	mod.__factor_type__ = 'library' # Truthfully, a [python] Package.
 	mod.__factor_sources__ = sources # Modules in the package.
 	mod.__factor_context__ = bytecode_triplet
 	mod.__file__ = str(pkgfile)
@@ -1230,7 +1230,7 @@ def identity(module):
 
 	idx = module.__name__.rfind('.')
 	basename = module.__name__[idx+1:]
-	if module.__factor_dynamics__ == 'library':
+	if module.__factor_type__ == 'library':
 		if basename.startswith('lib'):
 			# strip the leading lib from module identifier.
 			# 'libNAME' returns 'NAME'
@@ -1329,7 +1329,7 @@ def unix_compiler_collection(
 	"""
 
 	f = build.factor
-	purpose = build.variants['purpose']
+	intention = build.variants['intention']
 	lang = adapter.get('language', i_type)
 
 	command = [None, compile_flag]
@@ -1369,7 +1369,7 @@ def unix_compiler_collection(
 			pass
 
 	# Compiler optimization target: -O0, -O1, ..., -Ofast, -Os, -Oz
-	co = optimizations[purpose]
+	co = optimizations[intention]
 	command.append(co_flag + co)
 
 	# Include debugging symbols unconditionally.
@@ -1385,7 +1385,7 @@ def unix_compiler_collection(
 	command.extend(options)
 
 	# coverage options for metrics and profile roles.
-	if purpose in {'metrics', 'profile'}:
+	if intention in {'metrics', 'profile'}:
 		command.extend(('-fprofile-instr-generate', '-fcoverage-mapping'))
 
 	# Include Directories; -I option.
@@ -1431,10 +1431,10 @@ def python_bytecode_compiler(context, mechanism, factor,
 	# Command constructor for compiling Python bytecode to an arbitrary file.
 	# Executes in a distinct process.
 	"""
-	purpose = context.purpose(factor.type)
+	intention = context.intention(factor.domain)
 	inf, = inputs
 
-	command = [None, filepath(output), filepath(inf), '2' if purpose == 'optimal' else '0']
+	command = [None, filepath(output), filepath(inf), '2' if intention == 'optimal' else '0']
 	return command
 
 def local_bytecode_compiler(
@@ -1446,12 +1446,12 @@ def local_bytecode_compiler(
 	"""
 	from .bin.pyc import compile_python_bytecode
 
-	purpose = build.variants['purpose']
+	intention = build.variants['intention']
 	inf, = inputs
 
 	command = [
 		compile_python_bytecode, filepath(output), filepath(inf),
-		'2' if purpose == 'optimal' else '0'
+		'2' if intention == 'optimal' else '0'
 	]
 	return command
 
@@ -1484,34 +1484,34 @@ def macosx_link_editor(
 	"""
 	# Command constructor for Mach-O link editor provided on Apple MacOS X systems.
 	"""
-	assert build.factor.type == 'system'
+	assert build.factor.domain == 'system'
 	factor = build.factor
 
 	command = [None, '-t', lto_preserve_exports, platform_version_flag, '10.11.0',]
 
-	purpose = build.variants['purpose']
+	intention = build.variants['intention']
 	format = build.variants['format']
-	fdyna = build.factor.dynamics
+	ftype = build.factor.type
 	mxf = build.mechanism.descriptor['transformations'][None]
 	mech = build.mechanism.descriptor
 
-	loutput_type = type_map[fdyna]
+	loutput_type = type_map[ftype]
 	command.append(loutput_type)
-	if fdyna == 'executable':
+	if ftype == 'executable':
 		if format == 'pie':
 			command.append(pie_flag)
 
-	if factor.dynamics == 'fragment':
+	if factor.type == 'fragment':
 		# Fragments use a partial link.
 		command.extend(inputs)
 	else:
-		libs = [f for f in build.references[(factor.type, 'library')]]
+		libs = [f for f in build.references[(factor.domain, 'library')]]
 
 		dirs = set([x.integral() for x in libs])
 		dirs.discard(None)
 		command.extend([libdir_flag+filepath(x) for x in dirs])
 
-		support = mech['objects'][fdyna][format]
+		support = mech['objects'][ftype][format]
 		if support is not None:
 			prefix, suffix = support
 		else:
@@ -1524,7 +1524,7 @@ def macosx_link_editor(
 		command.append(link_flag+'System')
 
 		command.extend(suffix)
-		if purpose in {'metrics', 'profile'}:
+		if intention in {'metrics', 'profile'}:
 			command.append(mxf['resources']['profile'])
 
 		command.append(mxf['resources']['builtins'])
@@ -1583,13 +1583,13 @@ def web_link_editor(context,
 	get = context.get
 	f = get('factor')
 	sys = get('system')
-	fdyna = f.dynamics
-	purpose = get('variants')['purpose']
+	ftype = f.type
+	intention = get('variants')['intention']
 
 	command = ['emcc']
 
 	# emcc is not terribly brilliant; file extensions are used to determine operation.
-	if fdyna == 'executable':
+	if ftype == 'executable':
 		command.append('--emrun')
 
 	add = command.append
@@ -1598,11 +1598,11 @@ def web_link_editor(context,
 	if verbose:
 		add(verbose_flag)
 
-	loutput_type = type_map[fdyna] # failure indicates bad type parameter to libfactor.load()
+	loutput_type = type_map[ftype] # failure indicates bad type parameter to libfactor.load()
 	if loutput_type:
 		add(loutput_type)
 
-	if fdyna != 'fragment':
+	if ftype != 'fragment':
 		sld = sys.get('library.directories', ())
 		libdirs = [libdir_flag + filepath(x) for x in sld]
 
@@ -1661,8 +1661,8 @@ def unix_link_editor(
 		# Enable or disable the verbosity of the command. Defaults to &True.
 	"""
 	factor = build.factor
-	fdyna = factor.dynamics
-	purpose = build.variants['purpose']
+	ftype = factor.type
+	intention = build.variants['intention']
 	format = build.variants['format']
 	mech = build.mechanism.descriptor
 
@@ -1676,15 +1676,15 @@ def unix_link_editor(
 	else:
 		add(verbose_flag)
 
-	loutput_type = type_map[fdyna] # failure indicates bad type parameter to libfactor.load()
+	loutput_type = type_map[ftype] # failure indicates bad type parameter to libfactor.load()
 	if loutput_type:
 		add(loutput_type)
 
-	if fdyna == 'fragment':
+	if ftype == 'fragment':
 		# fragment is an incremental link. Most options are irrelevant.
 		command.extend(map(filepath, inputs))
 	else:
-		lfactors = [f for f in build.references[(factor.type, 'library')]]
+		lfactors = [f for f in build.references[(factor.domain, 'library')]]
 
 		dirs = set([x.integral() for x in lfactors])
 		dirs.discard(None)
@@ -1699,7 +1699,7 @@ def unix_link_editor(
 			# Enable by default, but allow override.
 			add(allow_runpath)
 
-		prefix, suffix = mech['objects'][fdyna][format]
+		prefix, suffix = mech['objects'][ftype][format]
 
 		command.extend(prefix)
 		command.extend(map(filepath, inputs))
@@ -1710,7 +1710,7 @@ def unix_link_editor(
 
 		resources = mech['transformations'][None]['resources']
 
-		if purpose in {'metrics', 'profile'}:
+		if intention in {'metrics', 'profile'}:
 			command.append(resources['profile'])
 
 		command.append(resources['builtins'] or '-lgcc')
@@ -1883,7 +1883,7 @@ class Construction(libio.Context):
 				probe_set = [('probe', factor, x) for x in dependents]
 				tracks.append(probe_set)
 		else:
-			variants, mech = ctx.select(factor.type)
+			variants, mech = ctx.select(factor.domain)
 			variant_set = factor.link(variants, ctx, mech, refs, dependents)
 
 			for src_params, (vl, key, locations) in variant_set:
@@ -1891,8 +1891,8 @@ class Construction(libio.Context):
 
 				# The context parameters for rendering FPI.
 				b_src_params = [
-					('F_PURPOSE', variants['purpose']),
-					('F_DYNAMICS', factor.dynamics),
+					('F_INTENTION', variants['intention']),
+					('F_FACTOR_TYPE', factor.type),
 				] + src_params
 
 				if not mech.integrates() or factor.reflective:

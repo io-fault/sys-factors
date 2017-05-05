@@ -20,7 +20,7 @@ class Factor(metaclass=abc.ABCMeta):
 
 	@property
 	@abc.abstractmethod
-	def type(self):
+	def domain(self):
 		"""
 		# The factor type used to identify the mechanism that is to be
 		# used to process the factor's sources.
@@ -29,7 +29,7 @@ class Factor(metaclass=abc.ABCMeta):
 
 	@property
 	@abc.abstractmethod
-	def dynamics(self):
+	def type(self):
 		"""
 		# The use of the integral; usually one of four possibilities:
 

@@ -20,7 +20,7 @@ if __name__ == '__main__':
 	factor = libdev.Factor(libroutes.Import.from_fullname(module_fullname), None, None)
 
 	ctx = libdev.Context.from_environment()
-	variants, mech = ctx.select(factor.type)
+	variants, mech = ctx.select(factor.domain)
 
 	refs = list(factor.dependencies())
 	cs = collections.defaultdict(set)

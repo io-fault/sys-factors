@@ -7,5 +7,5 @@
 # dimensions. This is done to simplify the acceptance of ordering parameters
 # to XSL transformations.
 """
-__factor_type__ = 'xml'
-__factor_dynamics__ = 'executable'
+__factor_domain__ = 'xml'
+__factor_type__ = 'executable'

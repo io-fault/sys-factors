@@ -77,7 +77,7 @@ Index of terms used organized into subsections describing their context.
 	The execution of tests for the purpose of checking an inducted build.
 	Often prior to installation and potentially excluding Unit Tests.
 
-[ Glossary >> Build Purposes ]
+[ Glossary >> Build Intentions ]
 
 /Optimal
 	Factors built for optimal, subjective, performance.

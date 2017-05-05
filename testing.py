@@ -127,7 +127,7 @@ class Harness(object):
 		f = libdev.Factor(route, None, None)
 		ctx = libdev.Context.from_environment()
 		if ctx:
-			vars, mech = ctx.select(f.type)
+			vars, mech = ctx.select(f.domain)
 			refs = libdev.references(f.dependencies())
 			(sp, (vl, key, loc)), = f.link(dict(vars), ctx, mech, refs, ())
 

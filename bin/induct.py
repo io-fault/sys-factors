@@ -73,7 +73,7 @@ def main():
 
 	for route in candidates:
 		factor = libdev.Factor(route, None, None)
-		m = ctx.select(factor.type)
+		m = ctx.select(factor.domain)
 		if m is None:
 			print('ignoring[unknown type]', str(factor))
 			continue

@@ -76,7 +76,7 @@ def css_cleancss(
 	# Command constructor for (system:command)`cleancss`.
 	"""
 
-	assert build.factor.dynamics == 'library'
+	assert build.factor.type == 'library'
 	output = filepath(output)
 
 	command = ['cleancss',]
@@ -103,7 +103,7 @@ def javascript_uglify(
 	factor = build.factor
 	basename = factor.route.identifier
 
-	typ = factor.type
+	typ = factor.domain
 	output = filepath(output)
 
 	command = ['uglifyjs']

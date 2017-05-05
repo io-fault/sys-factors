@@ -5,8 +5,8 @@
 # Enables special cases for Python extension modules for relocatable targets; this is only
 # used given that the corresponding includes are properly used.
 """
-__factor_type__ = 'system'
-__factor_dynamics__ = 'probe'
+__factor_domain__ = 'system'
+__factor_type__ = 'probe'
 
 import sys
 import sysconfig
@@ -33,15 +33,15 @@ python_include_directory = sysconfig.get_config_var('INCLUDEPY')
 python_library_directory = sysconfig.get_config_var('LIBDIR')
 
 ipython = libdev.iFactor(
-	type = 'source',
-	dynamics = 'library',
+	domain = 'source',
+	type = 'library',
 	integral = python_include_directory,
 	name = 'python-includes',
 )
 
 lpython = libdev.iFactor(
-	type = 'system',
-	dynamics = 'library',
+	domain = 'system',
+	type = 'library',
 	integral = python_library_directory,
 	name = python_library,
 )
@@ -69,7 +69,7 @@ def defines(module_fullname, target_fullname):
 
 def report(probe, context, mechanism, factor):
 	srcparams = []
-	if factor.dynamics == 'extension':
+	if factor.type == 'extension':
 		fm_name = factor.module.__name__
 		ean = libfactor.extension_access_name(fm_name)
 		srcparams.extend(defines(fm_name, ean))
