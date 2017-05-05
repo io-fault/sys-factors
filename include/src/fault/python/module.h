@@ -4,8 +4,8 @@
 #include "../symbols.h"
 
 #ifndef MODULE_FUNCTIONS
-	#warning MODULE_FUNCTIONS macro not defined.
-	#define MODULE_FUNCTIONS() /* Should be defined by importer. */
+	#warning MODULE_FUNCTIONS() macro not defined. Should be defined by importer. Using empty set.
+	#define MODULE_FUNCTIONS()
 #endif
 
 #if FV_METRICS() && __clang__
