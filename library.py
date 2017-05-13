@@ -708,9 +708,9 @@ class Mechanism(object):
 		ftr = loc['integral']
 		rr = ftr / (f.name + self.suffix(f))
 
-		yield ('directory', ftr)
+		yield ('directory', None, None, (None, ftr))
 		if not f.reflective:
-			yield ('link', rr, ftr / 'pf.lnk')
+			yield ('link', None, None, (rr, ftr / 'pf.lnk'))
 
 		od = loc['output']
 		ld = loc['log']
@@ -726,7 +726,7 @@ class Mechanism(object):
 
 		for x in emitted:
 			if not x.exists():
-				yield ('directory', x)
+				yield ('directory', None, None, (None, x))
 
 	def adaption(self, build, domain, source, phase='transformations'):
 		"""
@@ -804,9 +804,9 @@ class Mechanism(object):
 			# Compilation to out_format for integration.
 			seq = list(xf(build, adapter, out_format, obj, src_type, (src,)))
 
-			yield self.formulate(obj, logfile, adapter, seq)
+			yield self.formulate(obj, (src,), logfile, adapter, seq)
 
-	def formulate(self, route, logfile, adapter, sequence, python=sys.executable):
+	def formulate(self, route, sources, logfile, adapter, sequence, python=sys.executable):
 		"""
 		# Convert a generated instruction into a form accepted by &Construction.
 		"""
@@ -817,16 +817,18 @@ class Mechanism(object):
 		if method == 'python':
 			sequence[0:1] = (python, '-m', command)
 		elif method == 'internal':
-			return ('call', sequence, logfile)
+			return ('call', sequence, logfile, (sources, route))
 		else:
 			# Adapter interface leaves this as None or a relative name.
 			# Update to absolute path entered into adapter.
 			sequence[0] = command
 
-		if redirect:
-			return ('execute-redirection', sequence, logfile, route)
+		if redirect == 'io':
+			return ('execute-stdio', sequence, logfile, (sources, route))
+		elif redirect:
+			return ('execute-redirection', sequence, logfile, (sources, route))
 		else:
-			return ('execute', sequence, logfile)
+			return ('execute', sequence, logfile, (sources, route))
 
 	def integrate(self, build, filtered=rebuild, sys_platform=sys.platform):
 		"""
@@ -881,7 +883,7 @@ class Mechanism(object):
 		seq = xf(build, adapter, f.type, rr, fmt, objects, fragments, libraries)
 		logfile = loc['log'] / 'Integration.log'
 
-		yield self.formulate(rr, logfile, adapter, seq)
+		yield self.formulate(rr, objects, logfile, adapter, seq)
 
 xml_namespaces = {
 	'lc': 'http://fault.io/xml/dev/fpi',
@@ -992,6 +994,8 @@ class Context(object):
 
 # Specifically for identifying files to be compiled and how.
 extensions = {
+	'txt': ('txt',),
+
 	'c': ('c',),
 	'c++': ('c++', 'cpp', 'hh'),
 	'objective-c': ('m',),
@@ -1254,6 +1258,13 @@ def transparent(build, adapter, o_type, output, i_type, inputs,
 
 	input, = inputs # Rely on exception from unpacking; expecting one input.
 	return [None, '-f', input, output]
+
+def standard_io(build, adapter, o_type, output, i_type, inputs, verbose=True):
+	"""
+	# Interface returning a command with no arguments.
+	# Used by transformation mechanisms that operate using standard I/O.
+	"""
+	return [None]
 
 def concatenation(build, adapter, o_type, output, i_type, inputs,
 		verbose=True,
@@ -1989,13 +2000,17 @@ class Construction(libio.Context):
 
 	def process_execute(self, instruction):
 		factor, ins = instruction
-		typ, cmd, log, *out = ins
-		if typ == 'execute-redirection':
-			stdout = str(out[0])
-		else:
-			stdout = os.devnull
+		typ, cmd, log, io, *tail = ins
 
-		assert typ in ('execute', 'execute-redirection')
+		stdout = stdin = os.devnull
+
+		if typ == 'execute-stdio':
+			stdout = str(io[1])
+			stdin = str(io[0][0]) # Catenate for integrations?
+		elif typ == 'execute-redirection':
+			stdout = str(io[0][0])
+
+		assert typ in ('execute', 'execute-redirection', 'execute-stdio')
 
 		strcmd = tuple(map(str, cmd))
 
@@ -2006,13 +2021,19 @@ class Construction(libio.Context):
 			f.write(b'\n\n[Standard Error]\n')
 
 			ki = libsys.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
-			with open(os.devnull, 'rb') as ci, open(stdout, 'wb') as co:
+			with open(stdin, 'rb') as ci, open(stdout, 'wb') as co:
 				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
 				sp = libio.Subprocess(pid)
 
 		print(' '.join(strcmd) + ' #' + str(pid))
+
 		self.sector.dispatch(sp)
-		sp.atexit(functools.partial(self.process_exit, start=libtime.now(), descriptor=(typ, cmd, log), factor=factor))
+		sp.atexit(functools.partial(
+			self.process_exit,
+			start=libtime.now(),
+			descriptor=(typ, cmd, log),
+			factor=factor
+		))
 
 	def process_exit(self, processor, start=None, factor=None, descriptor=None):
 		assert factor is not None
@@ -2116,21 +2137,22 @@ class Construction(libio.Context):
 		self.progress[factor] = 0
 
 		for x in self.tracking[factor][0]:
-			if x[0] in ('execute', 'execute-redirection'):
+			typ, cmd, logfile, *tail = x
+
+			if typ in ('execute', 'execute-redirection', 'execute-stdio'):
 				self.command_queue.append((factor, x))
-			elif x[0] == 'directory':
-				for y in x[1:]:
-					y.init('directory')
+			elif typ == 'directory':
+				tail[0][1].init('directory')
+
 				self.progress[factor] += 1
-			elif x[0] == 'link':
-				cmd, src, dst = x
+			elif typ == 'link':
+				src, dst = tail[0]
 				dst.link(src)
+
 				self.progress[factor] += 1
-			elif x[0] == 'call':
-				logfile = x[-1]
+			elif typ == 'call':
 				try:
-					seq = x[1]
-					seq[0](*seq[1:])
+					cmd[0](*cmd[1:])
 					if logfile.exists():
 						logfile.void()
 				except BaseException as err:
@@ -2138,8 +2160,9 @@ class Construction(libio.Context):
 					out = format_exception(err.__class__, err, err.__traceback__)
 					logfile.store('[Exception]\n#!/traceback\n\t', 'w')
 					logfile.store('\t'.join(out).encode('utf-8'), 'ba')
+
 				self.progress[factor] += 1
-			elif x[0] == 'probe':
+			elif typ == 'probe':
 				self.probe_execute(factor, x)
 			else:
 				print('unknown instruction', x)
