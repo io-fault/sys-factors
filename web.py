@@ -24,7 +24,7 @@ def xinclude(
 		module=None
 	):
 	"""
-	# Command constructor for (system:command)`xmllint` based XInclude processing.
+	# Command constructor for (system/command)`xmllint` based XInclude processing.
 	"""
 
 	input, = inputs
@@ -52,13 +52,42 @@ def xml(
 
 	return cmd
 
+def xml_link(
+		build, adapter,
+		otype, output,
+		itype, inputs,
+		*factors,
+		verbose=None,
+		filepath=str,
+		module=None
+	):
+	"""
+	# Interface to &..xml.bin.ld.
+	"""
+	assert adapter['name'] == 'integrate'
+	assert otype == 'library'
+
+	ciri = None
+	if build.factor.module:
+		ciri = build.factor.module.__dict__.get('canonical')
+
+	if ciri is None:
+		ciri = '<>'
+
+	psd = build.locations['output'] # processed source directory
+	rpaths = ['/'.join(x.relative) for x in inputs]
+
+	# xml.bin.ld works relative to a root directory.
+	# relative paths imply their path setting.
+	return [None, ciri, str(output), str(psd)] + rpaths
+
 def lessc(
 		build, adapter, o_type, output, i_type, inputs,
 		verbose=None, filepath=str,
 		source_map_root=None, module=None
 	):
 	"""
-	# Command constructor for (system:command)`lessc`.
+	# Command constructor for (system/command)`lessc`.
 	"""
 
 	cmd = ['https://www.npmjs.com/package/less', '--source-map']
@@ -73,7 +102,7 @@ def css_cleancss(
 		source_map_root=None, module=None
 	):
 	"""
-	# Command constructor for (system:command)`cleancss`.
+	# Command constructor for (system/command)`cleancss`.
 	"""
 
 	assert build.factor.type == 'library'
@@ -98,7 +127,7 @@ def javascript_uglify(
 		source_map_root=None, module=None
 	):
 	"""
-	# Command constructor for (system:command)`uglifyjs`.
+	# Command constructor for (system/command)`uglifyjs`.
 	"""
 	factor = build.factor
 	basename = factor.route.identifier
