@@ -44,6 +44,7 @@ lpython = libdev.iFactor(
 	type = 'library',
 	integral = python_library_directory,
 	name = python_library,
+	_position = 0xf16120f,
 )
 
 def defines(module_fullname, target_fullname):

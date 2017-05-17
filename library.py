@@ -362,7 +362,7 @@ class Factor(object):
 		return self.route.fullname
 
 	def __str__(self):
-		struct = "factor://{0.domain}.{scheme}/{0.fullname}#{0.module_file.fullpath}"
+		struct = "({0.domain}.{0.type}) {0.fullname}[{0.module_file.fullpath}]"
 		return struct.format(self, scheme=self.type[:3])
 
 	@property
@@ -607,6 +607,7 @@ class Factor(object):
 
 			bp, sp, ifs = self.aggregate(refs, variants, context, mechanism)
 			vars.update(bp)
+
 			# XXX: This doesn't work for fragments.
 			for f in ifs:
 				refs[(f.domain, f.type)].add(f)
@@ -810,6 +811,7 @@ class Mechanism(object):
 		"""
 		# Convert a generated instruction into a form accepted by &Construction.
 		"""
+
 		method = adapter.get('method')
 		command = adapter.get('command')
 		redirect = adapter.get('redirect')
@@ -1469,7 +1471,7 @@ def local_bytecode_compiler(
 def windows_link_editor(context, mechanisms, factor, output, inputs):
 	raise RuntimeError("cl.exe linker not implemented")
 
-def macosx_link_editor(
+def macos_link_editor(
 		build, adapter, o_type, output, i_type, inputs,
 		fragments, libraries, filepath=str,
 
@@ -1498,7 +1500,7 @@ def macosx_link_editor(
 	assert build.factor.domain == 'system'
 	factor = build.factor
 
-	command = [None, '-t', lto_preserve_exports, platform_version_flag, '10.11.0',]
+	command = [None, '-t', lto_preserve_exports, platform_version_flag, '10.12.0',]
 
 	intention = build.variants['intention']
 	format = build.variants['format']
@@ -1517,6 +1519,7 @@ def macosx_link_editor(
 		command.extend(inputs)
 	else:
 		libs = [f for f in build.references[(factor.domain, 'library')]]
+		libs.sort(key=lambda x: (getattr(x, '_position', 0), x.name))
 
 		dirs = set([x.integral() for x in libs])
 		dirs.discard(None)
@@ -1702,6 +1705,7 @@ def unix_link_editor(
 		libdirs = [libdir_flag + filepath(x) for x in dirs]
 
 		libs = [link_flag + y for y in set([x.name for x in lfactors])]
+		libs.sort(key=lambda x: (getattr(x, '_position', 0), x.name))
 
 		if False:
 			command.extend((soname_flag, sys['abi']))
@@ -1731,7 +1735,7 @@ def unix_link_editor(
 	return command
 
 if sys.platform == 'darwin':
-	link_editor = macosx_link_editor
+	link_editor = macos_link_editor
 elif sys.platform in ('win32', 'win64'):
 	link_editor = windows_link_editor
 else:
@@ -2007,8 +2011,12 @@ class Construction(libio.Context):
 		if typ == 'execute-stdio':
 			stdout = str(io[1])
 			stdin = str(io[0][0]) # Catenate for integrations?
+			iostr = ' <' + str(stdin) + ' >' + stdout
 		elif typ == 'execute-redirection':
 			stdout = str(io[0][0])
+			iostr = ' >' + str(stdout)
+		else:
+			iostr = ''
 
 		assert typ in ('execute', 'execute-redirection', 'execute-stdio')
 
@@ -2025,19 +2033,30 @@ class Construction(libio.Context):
 				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
 				sp = libio.Subprocess(pid)
 
-		print(' '.join(strcmd) + ' #' + str(pid))
+		path = factor.module.__name__ + ' '
+		pidstr = ' #' + str(pid)
+		message = path + ' '.join(strcmd) + iostr
+		print(message + pidstr)
 
 		self.sector.dispatch(sp)
 		sp.atexit(functools.partial(
 			self.process_exit,
 			start=libtime.now(),
 			descriptor=(typ, cmd, log),
-			factor=factor
+			factor=factor,
+			message=message,
 		))
 
-	def process_exit(self, processor, start=None, factor=None, descriptor=None):
+	def process_exit(self, processor,
+			start=None, factor=None, descriptor=None,
+			message=None,
+			_color='\x1b[38;5;1m',
+			_pid='\x1b[38;5;2m',
+			_normal='\x1b[0m'
+		):
 		assert factor is not None
 		assert descriptor is not None
+
 		self.progress[factor] += 1
 		self.process_count -= 1
 		self.activity.add(factor)
@@ -2045,8 +2064,19 @@ class Construction(libio.Context):
 		typ, cmd, log = descriptor
 		pid, status = processor.only
 		exit_method, exit_code, core_produced = status
+
 		if exit_code != 0:
 			self.failures += 1
+
+			if message is not None:
+				duration = repr(start.measure(libtime.now()))
+				prefix = "%s: %d -> %s in %s\n\t" %(
+					_color + factor.module.__name__ + _normal,
+					pid,
+					_color + str(exit_code) + _normal,
+					str(duration)
+				)
+				print(prefix+message[message.find(' ')+1:])
 
 		l = ''
 		l += ('\n[Profile]\n')
