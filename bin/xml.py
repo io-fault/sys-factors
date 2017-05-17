@@ -14,19 +14,28 @@ def transform(document, parameters):
 	"""
 
 	# Remove elements ctl:include-if
-	libxml.Control.filter(document, vd)
+	libxml.Control.filter(document, parameters)
+
+	# Perform xinclude here so that the source location
+	# is leveraged for relative paths.
+	document.xinclude()
 
 def integrate(document):
 	"""
 	# Load the given &route as an XML document and perform any necessary processing.
 	"""
 
-	# Perform inclusions.
+	# Perform inclusions (again) for root.xml.
 	document.xinclude()
-	# Create elements and attributes from fault.io/xml/control
+
+	# Create elements (post xincludes) and attributes from fault.io/xml/control
 	libxml.Control.materialize(document)
+
 	# Cleanup the namespaces after materialize (create elements/attributes)
 	lxml.etree.cleanup_namespaces(document)
+
+	# Remove ctl namespace and any ctl:namespaces elements.
+	libxml.Control.eliminations(document)
 
 if __name__ == '__main__':
 	cmd = sys.argv[1] # integrate or transform
