@@ -16,7 +16,7 @@ from itertools import product
 from itertools import chain
 chain = chain.from_iterable
 
-javascript_combiners_preference = ['uglifyjs']
+javascript_combiners_preference = ['uglifyjs', 'cat']
 web_compiler_collections = {
 	'emcc': (
 		'c', 'c++', 'objective-c', 'objective-c++',
@@ -184,6 +184,7 @@ def python_bytecode_domain(paths):
 	# Python executable = python source executed in __main__
 	# Python extension = maybe python source executed in a library?
 	# Python fragment = source file
+
 	pyexe = select(paths, ['python3', 'python3.4', 'python3.5', 'python3.6'], ['python3'])
 	pyname, pycommand = pyexe
 
@@ -206,40 +207,57 @@ def python_bytecode_domain(paths):
 
 def javascript_domain(paths):
 	"""
-	# Initialize the javascript subject for JavaScript file compilation.
+	# Initialize the javascript domain for JavaScript file compilation.
 
 	# This primarily means "minification" and mere concatenation, but languages
 	# targeting JavaScript can be added.
 	"""
-	jscat = select(paths, ['uglifyjs'], javascript_combiners_preference)
+
+	jscat = select(paths, ['uglifyjs', 'cat'], javascript_combiners_preference)
 	if jscat is None:
 		return None
 	jscname, jsc = jscat
 
-	return {
-		'encoding': 'utf-8',
-		'target-file-extensions': {None:'.js'},
+	# Currently a transparent copy for raw javascript.
+	transforms = {
+		'interface': libdev.__name__ + '.transparent',
+		'type': 'transparent',
+		'command': '/bin/cp',
+	}
 
-		'formats': {
-			'library': 'js',
-			'fragment': 'js',
-		},
-
-		'integrations': {
+	if jscname == 'uglifyjs':
+		ints = {
 			'library': {
 				'interface': web.__name__ + '.javascript_uglify',
 				'type': 'linker',
 				'name': jscname,
 				'command': str(jsc),
 			},
+		}
+	else:
+		ints = {
+			'library': {
+				'interface': libdev.__name__ + '.catenation',
+				'type': 'linker',
+				'name': 'cat',
+				'command': str(cat),
+			}
+		}
+
+	return {
+		'encoding': 'utf-8',
+		'target-file-extensions': {None:'.js'},
+
+		'formats': {
+			'executable': 'js',
+			'library': 'js',
+			'fragment': 'js',
 		},
 
+		'integrations': ints,
+
 		'transformations': {
-			'javascript': {
-				'interface': libdev.__name__ + '.transparent',
-				'type': 'transparent',
-				'command': '/bin/cp',
-			},
+			'javascript': transforms
 		}
 	}
 
@@ -247,6 +265,7 @@ def css_domain(paths):
 	"""
 	# Initialize the CSS subject for CSS compilation.
 	"""
+
 	css_combine = select(paths, ['cleancss', 'cat'], ('cleancss', 'cat',))
 	if css_combine is None:
 		return None
