@@ -315,12 +315,18 @@ def xml_domain(paths):
 	"""
 	# Construct the subject for XML files.
 	"""
+
 	xml = {
 		'encoding': 'ascii',
-		'target-file-extensions': {None:'.xml'},
+		'target-file-extensions': {
+			'executable': '.xml',
+			'fragment': '.xml',
+			'library': '.d',
+		},
 
 		'formats': {
 			'executable': 'xml',
+			'fragment': 'xml',
 			'library': 'xml',
 		},
 
@@ -333,11 +339,18 @@ def xml_domain(paths):
 				'method': 'python',
 			},
 
-			'library': {
+			'fragment': {
 				'interface': web.__name__ + '.xml',
 				'name': 'integrate',
 				'command': __package__ + '.xml',
 				'root': 'root.xml',
+				'method': 'python',
+			},
+
+			'library': {
+				'interface': web.__name__ + '.xml_link',
+				'name': 'integrate',
+				'command': 'fault.xml.bin.ld',
 				'method': 'python',
 			},
 		},
@@ -349,6 +362,14 @@ def xml_domain(paths):
 				'method': 'python',
 				'command': __package__ + '.xml',
 			},
+
+			'txt': {
+				'interface': libdev.__name__ + '.standard_io',
+				'name': 'transform',
+				'method': 'python',
+				'command': 'fault.text.bin.xml',
+				'redirect': 'io',
+			},
 		}
 	}
 
@@ -358,6 +379,7 @@ def source_domain(paths):
 	"""
 	# Initialize a (ctx:ftype)`resource` subject for inclusion in a context.
 	"""
+
 	mech = {
 		'target-file-extensions': {None:''},
 
@@ -383,6 +405,7 @@ def resource_domain(paths):
 	"""
 	# Initialize a (ctx:ftype)`resource` subject for inclusion in a context.
 	"""
+
 	mech = {
 		'target-file-extensions': {None:''}, # Resources manage their own.
 
@@ -411,6 +434,7 @@ def inspect(reqs, ctx, paths):
 	"""
 	# Initialize a (libdev:context)`inspect` context.
 	"""
+
 	iempty = {
 		'command': 'fault.development.bin.empty_introspection',
 		'interface': libdev.__name__ + '.empty',
@@ -769,6 +793,7 @@ def static(reqs, ctx, paths):
 	"""
 	# Platform independent processing.
 	"""
+
 	core = {
 		'source': source_domain(paths),
 		'resource': resource_domain(paths),
@@ -801,6 +826,7 @@ def host(reqs, ctx, paths):
 	"""
 	# Initialize a (libdev:context)`host` context.
 	"""
+
 	core = {
 		'system': host_system_domain(reqs, paths),
 		# Move to static.
