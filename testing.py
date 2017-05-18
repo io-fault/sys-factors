@@ -126,15 +126,11 @@ class Harness(object):
 
 		f = libdev.Factor(route, None, None)
 		ctx = libdev.Context.from_environment()
-		if ctx:
-			vars, mech = ctx.select(f.domain)
-			refs = libdev.references(f.dependencies())
-			(sp, (vl, key, loc)), = f.link(dict(vars), ctx, mech, refs, ())
+		vars, mech = ctx.select(f.domain)
+		refs = libdev.references(f.dependencies())
+		(sp, (vl, key, loc)), = f.link(dict(vars), ctx, mech, refs, ())
 
-			dll = loc['integral'] / 'pf.lnk'
-		else:
-			# The context was empty, so fallback to inducted DLL.
-			dll = f.integral(key=None) / 'pf.lnk'
+		dll = loc['integral'] / 'pf.lnk'
 
 		name = libfactor.extension_access_name(str(route))
 
