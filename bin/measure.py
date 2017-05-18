@@ -11,15 +11,27 @@ import itertools
 import pickle
 
 from .. import metrics
+from .. import library as libdev
 from ...system import libfactor
 
 from ...llvm import instr
 from ...routes import library as libroutes
 from ...system import corefile
-from ...system import libsys
+from ...system import library as libsys
 from ...computation import library as libc
 
 RangeSet = libc.range.Set
+
+MetricsContext = libdev.Context.from_environment()
+
+def get_metrics_target(route):
+	f = libdev.Factor(route, None, None)
+	vars, mech = MetricsContext.select(f.domain)
+	refs = libdev.references(f.dependencies())
+	(sp, (vl, key, loc)), = f.link(dict(vars), MetricsContext, mech, refs, ())
+	dll = loc['integral'] / 'pf.lnk'
+
+	return dll
 
 def main(target_dir, packages):
 	global instr
@@ -62,11 +74,7 @@ def main(target_dir, packages):
 		prefix_len = len(prefix) - 1
 		module = ci.module()
 
-		if libfactor.python_extension(module):
-			so = libfactor.inducted(ci)
-		else:
-			so = libfactor.inducted(ci)
-
+		so = get_metrics_target(ci)
 		xc = dict(instr.extract_counters(str(so), str(x)))
 		xz = dict(instr.extract_zero_counters(str(so), str(x)))
 
@@ -109,7 +117,7 @@ def main(target_dir, packages):
 			data['traversed'] = RangeSet.from_normal_sequence(traversed_inc)
 			with open(str(path), 'rb') as f:
 				lc = len(f.readlines())
-			data['traversable'] = RangeSet.from_normal_sequence([librange.IRange((1, lc))])
+			data['traversable'] = RangeSet.from_normal_sequence([libc.range.IRange((1, lc))])
 
 			with target_fsdict.route(covkey).open('wb') as f:
 				pickle.dump(data, f)

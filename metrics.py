@@ -606,7 +606,7 @@ class Harness(testing.Harness):
 		self.flush_extensions(llmetrics)
 
 		faten = test.fate.__class__.__name__.lower()
-		profile, coverage = trace.measure(events)
+		profile, coverage = tracing.measure(events)
 
 		for path, counters in self.instrumentation_metrics(llmetrics):
 			coverage[path].update({
