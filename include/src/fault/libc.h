@@ -21,37 +21,37 @@
 #define FACTOR_PACKAGE_STR STRING_FROM_IDENTIFIER(FACTOR_PACKAGE)
 #define FACTOR_PATH(NAME) FACTOR_QNAME_STR "." NAME
 
-#ifndef F_PURPOSE
-	#warning Compilation driver was not given a F_PURPOSE preprocessor definition
+#ifndef F_INTENTION
+	#warning Compilation driver was not given a F_INTENTION preprocessor definition
 	#warning Presuming 'optimal' build.
-	#define F_PURPOSE optimal
+	#define F_INTENTION optimal
 #endif
 
-#define F_PURPOSE_STR STRING_FROM_IDENTIFIER(F_PURPOSE)
+#define F_INTENTION_STR STRING_FROM_IDENTIFIER(F_INTENTION)
 
-#define F_PURPOSE_optimal 1
-#define F_PURPOSE_debug 2
+#define F_INTENTION_optimal 1
+#define F_INTENTION_debug 2
 
-#define F_PURPOSE_test 5
-#define F_PURPOSE_metrics 10
+#define F_INTENTION_test 5
+#define F_INTENTION_metrics 10
 
-#define F_PURPOSE_profiling 4
-#define F_PURPOSE_coverage 9
+#define F_INTENTION_profiling 4
+#define F_INTENTION_coverage 9
 
-#define _F_PURPOSE_PREFIX() F_PURPOSE_
-#define _F_PURPOSE_REF() F_PURPOSE
-#undef F_PURPOSE_ID
-#define F_PURPOSE_ID CONCAT_REFERENCES(_F_PURPOSE_PREFIX(),_F_PURPOSE_REF())
+#define _F_INTENTION_PREFIX() F_INTENTION_
+#define _F_INTENTION_REF() F_INTENTION
+#undef F_INTENTION_ID
+#define F_INTENTION_ID CONCAT_REFERENCES(_F_INTENTION_PREFIX(),_F_INTENTION_REF())
 
 #define F_TRACE(y) 0
 
-#define FV_OPTIMAL(y) (F_PURPOSE_ID == F_PURPOSE_optimal)
-#define FV_DEBUG(y) (F_PURPOSE_ID == F_PURPOSE_debug)
+#define FV_OPTIMAL(y) (F_INTENTION_ID == F_INTENTION_optimal)
+#define FV_DEBUG(y) (F_INTENTION_ID == F_INTENTION_debug)
 
-#define FV_TEST(y) (F_PURPOSE_ID == F_PURPOSE_test)
-#define FV_METRICS(y) (F_PURPOSE_ID == F_PURPOSE_metrics)
+#define FV_TEST(y) (F_INTENTION_ID == F_INTENTION_test)
+#define FV_METRICS(y) (F_INTENTION_ID == F_INTENTION_metrics)
 
-#define FV_COVERAGE(y) (F_PURPOSE_ID == F_PURPOSE_coverage)
-#define FV_PROFILING(y) (F_PURPOSE_ID == F_PURPOSE_profiling)
+#define FV_COVERAGE(y) (F_INTENTION_ID == F_INTENTION_coverage)
+#define FV_PROFILING(y) (F_INTENTION_ID == F_INTENTION_profiling)
 
 #endif

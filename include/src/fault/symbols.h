@@ -7,9 +7,6 @@
 #ifndef _FAULT_SYMBOLS_H_included_
 #define _FAULT_SYMBOLS_H_included_
 
-/*
- * It is possible for some repetition to appear in 
- */
 #if defined(_MSC_VER)
 	#ifdef CONFIG_DISABLE_SYMBOL
 		#define _fault_symbol
