@@ -7,11 +7,11 @@
 
 # Common usage:
 
-## !/pl/python
-	# collector, events = trace.prepare()
-	# with collector:
-		# ...
-	# aggregate = trace.measure(events)
+#!/pl/python
+	collector, events = trace.prepare()
+	with collector:
+		...
+	aggregate = trace.measure(events)
 
 # [ Development Tasks ]
 
