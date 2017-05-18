@@ -59,7 +59,7 @@ class Metrics(libschema.Interface):
 				for ctx, measures in report.items()
 			]),
 			('timestamp', (timestamp or libtime.now()).select('iso')),
-			('xmlns', namespace),
+			('xmlns', namespaces['metrics']),
 			('xmlns:key', 'http://fault.io/xml/key'),
 		)
 
@@ -91,7 +91,7 @@ class Metrics(libschema.Interface):
 				for ctx, measures in report.items()
 			]),
 			('timestamp', (timestamp or libtime.now()).select('iso')),
-			('xmlns', namespace),
+			('xmlns', namespaces['metrics']),
 			('xmlns:key', 'http://fault.io/xml/key'),
 		)
 
@@ -120,5 +120,5 @@ class Test(libschema.Interface):
 				for ctx, tests in report.items()
 			]),
 			('timestamp', (timestamp or libtime.now()).select('iso')),
-			('xmlns', namespace),
+			('xmlns', namespaces['test']),
 		)

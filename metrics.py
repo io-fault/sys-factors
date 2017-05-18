@@ -30,7 +30,7 @@ from ..filesystem import library as libfs
 from ..computation import library as libc
 
 from . import python
-from . import trace
+from . import tracing
 from . import testing
 
 def statistics(
@@ -113,7 +113,7 @@ def source_file_map(interests:typing.Sequence[libroutes.Import]) -> typing.Mappi
 
 	return sfm
 
-def reorient(container:str, sfm:dict, input:trace.Measurements, output:trace.Measurements):
+def reorient(container:str, sfm:dict, input:tracing.Measurements, output:tracing.Measurements):
 	"""
 	# Transform per-test measurements produced by &measure
 	# into per-file measurements. This essentially swaps the &container with
@@ -568,7 +568,7 @@ class Harness(testing.Harness):
 			# Each file in this directory is the profile emitted by an extension.
 			yield from instr.extract_nonzero_counters(mod.__file__, str(data))
 
-	def seal(self, test, prepare=trace.prepare):
+	def seal(self, test, prepare=tracing.prepare):
 		"""
 		# Perform the test and store its report and measurements into
 		# the configured metrics directory.

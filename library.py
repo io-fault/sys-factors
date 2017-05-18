@@ -830,6 +830,7 @@ class Mechanism(object):
 		elif redirect:
 			return ('execute-redirection', sequence, logfile, (sources, route))
 		else:
+			# No redirect.
 			return ('execute', sequence, logfile, (sources, route))
 
 	def integrate(self, build, filtered=rebuild, sys_platform=sys.platform):
@@ -1907,6 +1908,7 @@ class Construction(libio.Context):
 				# The context parameters for rendering FPI.
 				b_src_params = [
 					('F_INTENTION', variants['intention']),
+					('F_FACTOR_DOMAIN', factor.domain),
 					('F_FACTOR_TYPE', factor.type),
 				] + src_params
 
@@ -2013,8 +2015,8 @@ class Construction(libio.Context):
 			stdin = str(io[0][0]) # Catenate for integrations?
 			iostr = ' <' + str(stdin) + ' >' + stdout
 		elif typ == 'execute-redirection':
-			stdout = str(io[0][0])
-			iostr = ' >' + str(stdout)
+			stdout = str(io[1])
+			iostr = ' >' + stdout
 		else:
 			iostr = ''
 
