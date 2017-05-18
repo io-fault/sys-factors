@@ -56,7 +56,6 @@ linkers = {
 		'objects',
 	),
 }
-
 linker_preference = ('lld', 'ld')
 
 assemblers = {
@@ -528,6 +527,7 @@ def host_system_domain(reqs, paths):
 	if platform in {'darwin', 'macos'}:
 		target_file_extensions['library'] = '.dylib'
 		target_file_extensions['extension'] = '.dylib'
+		linker_preference = ('ld', 'lld')
 	elif platform in {'win', 'msw'}:
 		target_file_extensions['library'] = '.dll'
 		target_file_extensions['extension'] = '.dll'
@@ -648,8 +648,9 @@ def host_system_domain(reqs, paths):
 	found, missing = probe.search(libdirs, runtime_objects)
 	prepare = lambda x: tuple(map(str, [y for y in x if y]))
 	system = {
-		# subject data
+		# domain data
 		'platform': target,
+		'architecture': arch,
 		'target-file-extensions': target_file_extensions,
 		'ignore-extensions': {'h', 'hh', 'hpp'},
 
