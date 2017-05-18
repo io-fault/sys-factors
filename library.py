@@ -1412,6 +1412,10 @@ def unix_compiler_collection(
 
 	command.extend([id_flag + str(x) for x in sid])
 
+	arch = build.mechanism.descriptor.get('architecture', None)
+	if arch is not None:
+		command.append(define_flag + 'F_TARGET_ARCHITECTURE=' + arch)
+
 	# -D defines.
 	sp = [
 		define_flag + '='.join(x)
