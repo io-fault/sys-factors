@@ -588,6 +588,12 @@ class Harness(testing.Harness):
 				cancel()
 
 		if isinstance(test.fate, self.libtest.Fail):
+			import traceback
+			import sys
+			fate = test.fate
+			tb = traceback.format_exception(fate.__class__, fate, fate.__traceback__)
+			tb = ''.join(tb)
+			sys.stderr.write(tb)
 			from ..xml.python import Serialization
 			xml = Serialization(xml_prefix='py:', xml_encoding='ascii')
 			error = list(xml.exception(test.fate, attributes=[
