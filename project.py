@@ -1,7 +1,7 @@
-identity = 'http://fault.io/python/development'
+identity = 'http://fault.io/src/fault.development'
 name = 'development'
-abstract = 'Construction, coverage, testing for software development'
-icon = '🐜'
+abstract = 'Construction, coverage, and testing for software projects'
+icon = '🛠'
 
 fork = 'bootstraps'
 versioning = 'continuous'

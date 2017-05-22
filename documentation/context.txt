@@ -10,7 +10,7 @@ Index of terms used organized into subsections describing their context.
 	&..development.
 
 /Project
-	A Factor consisting of a set of factors making up a &Product.
+	A Factor consisting of a set of Factors making up a &Product.
 
 /Product
 	The conceptual effect of a Project. Often Project and Product can be used
@@ -18,14 +18,20 @@ Index of terms used organized into subsections describing their context.
 	of factors.
 
 /Context Factor
-	A collection of &Project factors.
+	A collection of &Project Factors.
 
 /Fraction
-	A part of a Factor. For C/C++, this usually maps to an individual
+	A subfactor of a Composite Factor.
+	For C/C++, this usually maps to an individual
 	translation unit. A source file inside a Composite Factor.
 
-/Factor Type
-	A string describing the abstract target.
+/Composite Factor
+	A Factor consisting of a set files, called Fractions, that are intended
+	to compose the Factor.
+
+/Fragment
+	An internal part of a Factor or Fraction. A Python class could be a
+	Fragment of a Factor. Anything that is addressable within a Factor's Module.
 
 [ Glossary >> Construction ]
 
@@ -51,10 +57,9 @@ Index of terms used organized into subsections describing their context.
 	The, currently, conceptual phase of forming the Product. This is
 	an implicit step between Inductance and Installation.
 
-/Factor Dynamics
+/Factor Type
 	The application or use of the target.
-	Executable, Library, Extension, or Fragment. Somewhat metaphoric with
-	respect to motion and physics.
+	Executable, Library, Extension, or Fragment.
 
 [ Glossary >> Testing ]
 
