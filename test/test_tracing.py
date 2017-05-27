@@ -1,6 +1,6 @@
 import itertools
 import collections
-from .. import trace as module
+from .. import tracing as module
 
 class RandomClass(object):
 	def rc_method(self):
