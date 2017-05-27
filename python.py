@@ -32,4 +32,6 @@ def lines(path):
 
 if __name__ == '__main__':
 	import sys
-	print(lines(sys.argv[1]))
+	from ..computation.range import Set
+	rs = Set.from_set(lines(sys.argv[1]))
+	print(str(rs))
