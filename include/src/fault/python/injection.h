@@ -1,13 +1,14 @@
 /**
-	Support for failure injection for coverage purposes.
-*/
+	# Support for failure injection for coverage purposes.
+**/
+
 #if FV_TEST() || FV_METRICS()
 extern PyObj __ERRNO_RECEPTACLE__;
 extern PyObj __PYTHON_RECEPTACLE__;
 
 /**
-	Reclaiming the GIL is rather time consuming in some contexts,
-	so if the dictionary is zero, don't bother.
+	# Reclaiming the GIL is rather time consuming in some contexts,
+	# so if the dictionary is zero, don't bother.
 
 	#!/pl/c
 		ERRNO_RECEPTACLE(0, &r, open, ...)
@@ -15,7 +16,7 @@ extern PyObj __PYTHON_RECEPTACLE__;
 		{
 
 		}
-*/
+**/
 #define ERRNO_RECEPTACLE(ERROR_STATUS, RETURN, SYSCALL, ...) \
 do { \
 	PyObj _er_entry; \
