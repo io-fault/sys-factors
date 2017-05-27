@@ -1,6 +1,6 @@
 /**
 	fault C Preprocessor interfaces and macros.
-*/
+**/
 #ifndef _FAULT_LIBC_H_
 #define _FAULT_LIBC_H_
 
@@ -38,6 +38,8 @@
 #define F_INTENTION_profiling 4
 #define F_INTENTION_coverage 9
 
+#define F_INTENTION_inspect (-1)
+
 #define _F_INTENTION_PREFIX() F_INTENTION_
 #define _F_INTENTION_REF() F_INTENTION
 #undef F_INTENTION_ID
@@ -54,4 +56,6 @@
 #define FV_COVERAGE(y) (F_INTENTION_ID == F_INTENTION_coverage)
 #define FV_PROFILING(y) (F_INTENTION_ID == F_INTENTION_profiling)
 
-#endif
+#define FV_INSPECT(y) (F_INTENTION_ID == F_INTENTION_inspect)
+
+#endif /* guard */
