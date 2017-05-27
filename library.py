@@ -553,7 +553,10 @@ class Factor(object):
 		for p in references[(self.domain, type)]:
 			build_params, params, pfactors = p.report(context, mechanism, self)
 			src_params.extend(params)
-			variants.update(build_params)
+			if variants.get('name') != 'inspect':
+				# XXX: temporary filter for keeping inspect ambiguous
+				# so that the data may be selected without knowledge of probes.
+				variants.update(build_params)
 
 			# Attach origin for build debugging.
 			for ifactor in pfactors:
