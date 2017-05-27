@@ -1012,8 +1012,8 @@ extensions = {
 	'haskell': ('hs', 'hsc'),
 	'd': ('d',),
 	'rust': ('rs',),
-	'header': ('h',), # Purposefully ambiguous. (Can be C/C++/Obj-C)
-	'c++.header': ('H', 'hpp', 'hxx'),
+	'c-header': ('h',), # Purposefully ambiguous. (Can be C/C++/Obj-C)
+	'c++-header': ('H', 'hpp', 'hxx'),
 
 	'python': ('py',),
 	'bytecode.python': ('pyo', 'pyc',),
