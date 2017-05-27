@@ -376,7 +376,7 @@ def xml_domain(paths):
 
 def source_domain(paths):
 	"""
-	# Initialize a (ctx:ftype)`resource` subject for inclusion in a context.
+	# Initialize (factor/domain)`resource` for inclusion in a context.
 	"""
 
 	mech = {
@@ -431,7 +431,7 @@ def resource_domain(paths):
 
 def inspect(reqs, ctx, paths):
 	"""
-	# Initialize a (libdev:context)`inspect` context.
+	# Initialize an `inspect` context.
 	"""
 
 	iempty = {
@@ -456,46 +456,54 @@ def inspect(reqs, ctx, paths):
 		},
 	}
 
+	python = {
+		'target-file-extensions': {None:'.xml'},
+		'formats': formats,
+
+		'transformations': {
+			'python': {
+				'command': __package__ + '.delineate',
+				'interface': libdev.__name__ + '.package_module_parameter',
+				'method': 'python',
+				'name': 'delineate-python-source',
+				'redirect': 'stdout'
+			},
+		}
+	}
+
+	llvm = {
+		'command': 'fault.llvm.bin.inspect',
+		'interface': libdev.__name__ + '.compiler_collection',
+		'method': 'python',
+		'redirect': 'stdout',
+	}
+
+	system = {
+		'formats': formats,
+		'target-file-extensions': {None:'.xml'},
+		'platform': 'xml-inspect-' + sys.platform,
+		'transformations': {
+			None: {
+				'command': 'fault.development.bin.empty_introspection',
+				'interface': libdev.__name__ + '.empty',
+				'method': 'python',
+				'redirect': 'stdout',
+			},
+			'objective-c': llvm,
+			'c++[rtti exceptions]': llvm,
+			'c++': llvm,
+			'c': llvm,
+			'c-header': llvm,
+			'c++-header': llvm,
+		}
+	}
+
 	core = {
 		'[trap]': unsupported,
+		'bytecode.python': python,
 
-		'system': {
-			'formats': formats,
-			'target-file-extensions': {None:'.xml'},
-			'platform': 'xml-inspect-' + sys.platform,
-			'transformations': {
-				None: {
-					'command': 'fault.development.bin.empty_introspection',
-					'interface': libdev.__name__ + '.empty',
-					'method': 'python',
-					'redirect': 'stdout',
-				},
-				'objective-c': {
-					'command': 'fault.llvm.bin.inspect',
-					'interface': libdev.__name__ + '.compiler_collection',
-					'method': 'python',
-					'redirect': 'stdout',
-				},
-				'c++[rtti exceptions]': {
-					'command': 'fault.llvm.bin.inspect',
-					'interface': libdev.__name__ + '.compiler_collection',
-					'method': 'python',
-					'redirect': 'stdout',
-				},
-				'c++': {
-					'command': 'fault.llvm.bin.inspect',
-					'interface': libdev.__name__ + '.compiler_collection',
-					'method': 'python',
-					'redirect': 'stdout',
-				},
-				'c': {
-					'command': 'fault.llvm.bin.inspect',
-					'interface': libdev.__name__ + '.compiler_collection',
-					'method': 'python',
-					'redirect': 'stdout',
-				},
-			}
-		}
+		'system': system,
+		'source': system,
 	}
 
 	S = libxml.Serialization()
