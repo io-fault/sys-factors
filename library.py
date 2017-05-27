@@ -33,6 +33,7 @@ import typing
 from . import include
 from . import library as libdev
 
+from ..computation import library as libc
 from ..chronometry import library as libtime
 from ..routes import library as libroutes
 from ..io import library as libio
@@ -1227,7 +1228,7 @@ def identity(module):
 	# Discover the base identity of the target.
 
 	# Primarily, used to identify the proper basename of a library.
-	# The (python:attribute)`name` attribute on a target module provides an explicit
+	# The (python/attribute)`name` attribute on a target module provides an explicit
 	# override. If the `name` is not present, then the first `'lib'` prefix
 	# is removed from the module's name if any. The result is returned as the identity.
 	# The removal of the `'lib'` prefix only occurs when the target factor is a
@@ -1558,9 +1559,8 @@ def macos_link_editor(
 		libs = [f for f in build.references[(factor.domain, 'library')]]
 		libs.sort(key=lambda x: (getattr(x, '_position', 0), x.name))
 
-		dirs = set([x.integral() for x in libs])
-		dirs.discard(None)
-		command.extend([libdir_flag+filepath(x) for x in dirs])
+		dirs = (x.integral() for x in libs)
+		command.extend([libdir_flag+filepath(x) for x in libc.unique(dirs, None)])
 
 		support = mech['objects'][ftype][format]
 		if support is not None:
@@ -1735,14 +1735,13 @@ def unix_link_editor(
 		# fragment is an incremental link. Most options are irrelevant.
 		command.extend(map(filepath, inputs))
 	else:
-		lfactors = [f for f in build.references[(factor.domain, 'library')]]
-
-		dirs = set([x.integral() for x in lfactors])
-		dirs.discard(None)
-		libdirs = [libdir_flag + filepath(x) for x in dirs]
-
-		libs = [link_flag + y for y in set([x.name for x in lfactors])]
+		libs = [f for f in build.references[(factor.domain, 'library')]]
 		libs.sort(key=lambda x: (getattr(x, '_position', 0), x.name))
+
+		dirs = (x.integral() for x in libs)
+		libdirs = [libdir_flag+filepath(x) for x in libc.unique(dirs, None)]
+
+		link_parameters = [link_flag + y for y in set([x.name for x in libs])]
 
 		if False:
 			command.extend((soname_flag, sys['abi']))
@@ -1757,7 +1756,7 @@ def unix_link_editor(
 		command.extend(map(filepath, inputs))
 		command.extend(libdirs)
 		command.append('-(')
-		command.extend(libs)
+		command.extend(link_parameters)
 		command.append('-)')
 
 		resources = mech['transformations'][None]['resources']
