@@ -1269,6 +1269,35 @@ def standard_io(build, adapter, o_type, output, i_type, inputs, verbose=True):
 	"""
 	return [None]
 
+def standard_out(build, adapter, o_type, output, i_type, inputs, verbose=True, root=False):
+	"""
+	# Takes the set of files as the initial parameters and emits
+	# the processed result to standard output.
+	"""
+
+	return [None] + list(inputs)
+
+def package_module_parameter(build, adapter, o_type, output, i_type, inputs,
+		verbose=True,
+		root=False,
+		filepath=str,
+	):
+	"""
+	# Reconstruct the qualified module path from the inputs and
+	# the build's factor route.
+	"""
+	f = build.factor
+	ir = f.route
+
+	src, = inputs
+	modname = src.identifier[:-3]
+	if modname != '__init__':
+		modpath = ir / modname
+	else:
+		modpath = ir
+
+	return [None, str(modpath)]
+
 def concatenation(build, adapter, o_type, output, i_type, inputs,
 		verbose=True,
 	):
