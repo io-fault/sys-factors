@@ -290,8 +290,7 @@ def coverage(module, counts, RangeSet=libc.range.Set, irs=libc.range.inclusive_r
 
 	# Use the AST walker in python.
 	traversable = python.lines(module.spec().origin)
-	traversable = list(irs(traversable))
-	traversable = RangeSet.from_normal_sequence(traversable)
+	traversable = RangeSet.from_set(traversable)
 
 	traversed = RangeSet.from_set(counts)
 	traversable = traversed.union(traversable)
