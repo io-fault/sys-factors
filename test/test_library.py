@@ -36,14 +36,17 @@ def test_unix_compiler_collection(test):
 	import types
 	Build = library.Build
 	Factor = library.Factor
+	Mechanism = library.Mechanism
 
 	cc_function = library.unix_compiler_collection
 	m = {
 		'type': 'collection',
+		'descriptor': {},
 	}
 	adapter = {
 		'language': 'c',
 	}
+
 	def cc(ctx, outfile, inputs, mechanism=m, language=None):
 		fm = types.ModuleType("__imaginary__")
 		fm.__file__ = '/dev/null'
@@ -56,7 +59,7 @@ def test_unix_compiler_collection(test):
 		include_set = ctx['system'].get('include.set', ())
 		if 'standards' in ctx['system']:
 			fm.standards = ctx['system']['standards']
-		b = Build((ctx, mechanism, f, refs, {}, ctx['variants'], None, bp))
+		b = Build((ctx, Mechanism(mechanism), f, refs, {}, ctx['variants'], None, bp))
 		return cc_function(b, adapter, None, outfile, language, inputs, options=opts, includes=include_set)
 
 	stdhead = [None, '-c', '-v', '-fvisibility=hidden', '-fcolor-diagnostics', '-O3', '-g']
