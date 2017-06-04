@@ -1,0 +1,245 @@
+[ executable ]
+
+A system executable.
+
+/__init__.py
+	#!/pl/python
+		__factor_domain__ = 'system'
+		__factor_type__ = 'executable'
+
+/src
+	/test.c
+		#!/pl/c
+			#include <fault/libc.h>
+			#include <fault/internal.h>
+			#include <fault/python/environ.h>
+
+			#include "test.h"
+
+			#include <fault/external.h>
+
+			int
+			main(int argc, char *argv[])
+			{
+				printf("A test executable.\n");
+				return(0);
+			}
+
+[ library ]
+
+A system library target. The selected mechanisms determines whether this is
+dynamic or static. For some contexts, this is may be equivalent to a &[fragment].
+
+/__init__.py
+	#!/pl/python
+		__factor_domain__ = 'system'
+		__factor_type__ = 'library'
+
+/src
+	/test.c
+		#!/pl/c
+			#include "test.h"
+
+			#include <fault/libc.h>
+			#include <fault/internal.h>
+			#include <fault/python/environ.h>
+
+			#include <fault/external.h>
+			int
+			main(int argc, char *argv[])
+			{
+				return(0);
+			}
+
+[ fragment ]
+
+A system fragment intended for compilation into other targets.
+
+/__init__.py
+	#!/pl/python
+		__factor_domain__ = 'system'
+		__factor_type__ = 'library'
+
+/src
+	/partial.c
+		#!/pl/c
+			int
+			sum(int x, int y)
+			{
+				return x + y;
+			}
+
+[ python-extension ]
+
+A system (process) extension intended to be loaded into Python.
+
+/__init__.py
+	#!/pl/python
+		__factor_domain__ = 'system'
+		__factor_type__ = 'extension'
+
+		# Provides the necessary flags for compiling an extension.
+		from fault.development.probes import python
+
+/src
+	/module.c
+		#!/pl/c
+			#include <fault/libc.h>
+			#include <fault/internal.h>
+			#include <fault/python/environ.h>
+
+			struct Class {
+				PyObject_HEAD
+				char data;
+			};
+			typedef struct Class *Class;
+
+			static PyObj
+			class_call(PyObj self, PyObj args, PyObj kw)
+			{
+				static char *kwlist[] = {"keyword", NULL,};
+				Class inv = (Class) self;
+
+				if (!PyArg_ParseTupleAndKeywords(args, kw, "|s", kwlist, &keyword))
+					return(NULL);
+
+				Py_RETURN_NONE;
+			}
+
+			static PyObj
+			class_new(PyTypeObject *subtype, PyObj args, PyObj kw)
+			{
+				static char *kwlist[] = {"keyword", NULL};
+				Class inv;
+				PyObj rob = NULL;
+
+				PyObj env = NULL, cargs;
+
+				if (!PyArg_ParseTupleAndKeywords(args, kw, "|s", kwlist, &kw))
+					return(NULL);
+
+				rob = subtype->tp_alloc(subtype, 0);
+				if (rob == NULL)
+					goto error;
+
+				inv = (Class) rob;
+				inv->data = '.';
+
+				return(rob);
+
+				error:
+					Py_XDECREF(rob);
+					return(NULL);
+			}
+
+			static void
+			class_dealloc(PyObj self)
+			{
+				Class inv = (Class) self;
+
+				if (inv->class_field != NULL)
+					free(inv->class_field);
+			}
+
+			static PyMethodDef
+			class_methods[] = {
+				{NULL,},
+			};
+
+			PyDoc_STRVAR(class_doc, "Class Documentation String.");
+
+			PyTypeObject
+			ClassType = {
+				PyVarObject_HEAD_INIT(NULL, 0)
+				MODULE_QPATH("Class"),      /* tp_name */
+				sizeof(struct Class),       /* tp_basicsize */
+				0,                          /* tp_itemsize */
+				class_dealloc,              /* tp_dealloc */
+				NULL,                       /* tp_print */
+				NULL,                       /* tp_getattr */
+				NULL,                       /* tp_setattr */
+				NULL,                       /* tp_compare */
+				NULL,                       /* tp_repr */
+				NULL,                       /* tp_as_number */
+				NULL,                       /* tp_as_sequence */
+				NULL,                       /* tp_as_mapping */
+				NULL,                       /* tp_hash */
+				class_call,                 /* tp_call */
+				NULL,                       /* tp_str */
+				NULL,                       /* tp_getattro */
+				NULL,                       /* tp_setattro */
+				NULL,                       /* tp_as_buffer */
+				Py_TPFLAGS_BASETYPE|
+				Py_TPFLAGS_DEFAULT,         /* tp_flags */
+				class_doc,                  /* tp_doc */
+				NULL,                       /* tp_traverse */
+				NULL,                       /* tp_clear */
+				NULL,                       /* tp_richcompare */
+				0,                          /* tp_weaklistoffset */
+				NULL,                       /* tp_iter */
+				NULL,                       /* tp_iternext */
+				class_methods,              /* tp_methods */
+				NULL,                       /* tp_members */
+				NULL,                       /* tp_getset */
+				NULL,                       /* tp_base */
+				NULL,                       /* tp_dict */
+				NULL,                       /* tp_descr_get */
+				NULL,                       /* tp_descr_set */
+				0,                          /* tp_dictoffset */
+				NULL,                       /* tp_init */
+				NULL,                       /* tp_alloc */
+				class_new,                  /* tp_new */
+			};
+
+			static PyObj
+			module_level_function(PyObj mod, PyObj parameter)
+			{
+				Py_RETURN_NONE;
+			}
+
+			/*
+				# The PYTHON_TYPES() macro is internally used by the INIT() macro below
+				# in order to initialize the types defined by the extension module.
+			*/
+			#define PYTHON_TYPES() \
+				ID(Class)
+
+			/*
+				# The MODULE_FUNCTIONS() macro is internally used by the INIT() macro
+				# below. It's used because the macro needs to fill in the module functions
+				# entry and depending on the compilation intention, additional functions
+				# may be present (coverage control).
+			*/
+			#define MODULE_FUNCTIONS() \
+				PYMETHOD( \
+					module_level_function, module_level_function, METH_O, \
+					"Documentation string." \
+				) \
+				PYMETHOD( \
+					trace, trace, METH_VARARGS, \
+					"Documentation string." \
+				)
+
+			#include <fault/python/module.h>
+			INIT(PyDoc_STR("Module Documentation String"))
+			{
+				PyObj mod = NULL;
+
+				CREATE_MODULE(&mod);
+				if (mod == NULL)
+					return(NULL);
+
+				#define ID(NAME) \
+					if (PyType_Ready((PyTypeObject *) &( NAME##Type ))) \
+						goto error; \
+					if (PyModule_AddObject(mod, #NAME, (PyObj) &( NAME##Type )) < 0) \
+						goto error;
+					PYTHON_TYPES()
+				#undef ID
+
+				return(mod);
+
+				error:
+					DROP_MODULE(mod);
+					return(NULL);
+			}
