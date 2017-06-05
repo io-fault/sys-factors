@@ -6,12 +6,9 @@ from ...system import library as libsys
 from ...routes import library as libroutes
 from ...xml import lxml
 from ...text import library as libtxt
+from ...text import xml as txtxml
 from ...system import libfactor
 from .. import templates
-
-namespaces = {
-	'txt': 'http://fault.io/xml/text'
-}
 
 def emit(route, elements):
 	element = None
@@ -27,13 +24,11 @@ def emit(route, elements):
 			lines = ('\n'.join(lines).encode('utf-8'))
 			route.init('file')
 			route.store(lines)
-		elif name == 'paragraph':
-			print(repr(element))
 		else:
 			pass
 
 def process(document, route, target):
-	element = lxml.Query(document, namespaces)
+	element = lxml.Query(document, txtxml.namespaces)
 	chapter = element.first('/txt:chapter')
 
 	p = "/txt:chapter/txt:section[@identifier='%s']" %(target[0],)
@@ -53,7 +48,7 @@ def main(invocation:libsys.Invocation) -> None:
 
 	r = libfactor.selected(libroutes.Import.from_module(templates))
 	document = r / (template + '.xml')
-	doc = lxml.etree.parse(str(document), lxml.parser)
+	doc = lxml.readfile(str(document))
 
 	process(doc, route, path)
 	invocation.exit(libsys.Exit.exiting_from_success)
