@@ -20,7 +20,7 @@ def emit(route, elements):
 			for e, eid, values in element.select('txt:item', 'txt:key/text()', 'txt:value'):
 				emit(route/eid, values.select('*'))
 		elif name == 'literals':
-			lines = [x[0] if x else '' for x in [x.text() for x in element]]
+			lines = [x if x else '' for x in [x.first('text()') for x in element]]
 			lines = ('\n'.join(lines).encode('utf-8'))
 			route.init('file')
 			route.store(lines)
