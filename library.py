@@ -190,7 +190,7 @@ def update_bytecode_cache(src, induct, condition,
 	# /induct
 		# Compiled bytecode &File to install.
 
-	# [ Return ]
+	# [ Returns ]
 	# /&bool
 		# Whether the file was updated or not.
 	# /&str
@@ -1060,11 +1060,10 @@ def simulate_composite(route):
 	# Given a Python package route, fabricate a composite factor in order
 	# to process Python module sources.
 
-	# [ Return ]
+	# [ Returns ]
 
 	# A pair consisting of the fabricated module and the next set of packages to process.
 	"""
-	global libfactor
 	pkgs, modules = route.subnodes()
 
 	if not route.exists():
@@ -1080,7 +1079,7 @@ def simulate_composite(route):
 
 	mod = types.ModuleType(str(route), "Simulated composite factor for bytecode compilation")
 	mod.__factor_domain__ = 'bytecode.python'
-	mod.__factor_type__ = 'library' # Truthfully, a [python] Package.
+	mod.__factor_type__ = 'library' # Truthfully, a [python] Package Module.
 	mod.__factor_sources__ = sources # Modules in the package.
 	mod.__factor_context__ = bytecode_triplet
 	mod.__file__ = str(pkgfile)
