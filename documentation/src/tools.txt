@@ -1,0 +1,31 @@
+[ Current Working Context ]
+
+The current working context is a (term)`Construction Context` selected for use with factor
+processing instructions. The processing instructions use the abstraction layer to identify
+the actual commands to run in order to acquire a product. Must like a user's current
+working directory, it allows for focus to be managed.
+
+/Commands
+	/&.bin.cwctx
+		View the current working context.
+	/&.bin.chctx
+		Change the current working context.
+
+[ Current Working Factors ]
+
+The set of factors that factor processing instructions apply to.
+
+ - f +fault.system[scan cwd or designate path to pkg];
+ - f -fault
+ - f induct, construct.
+
+[ System Contexts ]
+
+The current working context and current working factors have to be recorded in some way
+in order to recall them in subsequent commands.
+Environment variables alone would work excepting that it may be desirable to share the
+configuration across sessions, and that it may be desirable for the configuration
+to be used across session restarts.
+
+! PENDING:
+	&..system.libcontext does not yet exist, and will be used to support cwx and cwf.

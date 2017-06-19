@@ -1,0 +1,31 @@
+Fault factors use directory protocols to organize software. While most package modules are
+also explicitly typed, the subfactor types are often interpreted based on their name.
+
+This chapter documents these protocols and describes why the names were chosen.
+
+[ Project ]
+
+Project Factors employ a large number special entries to encourage consistency across
+projects and to simplify project processing.
+
+/`documentation`
+	A collection of &..text files making up a project's documentation. A long name is used
+	for clarity and to avoid conflicting with shorter variations. It's rare that documentation
+	will ever be directly imported, so an inconveniently large name was chosen.
+
+/`test`
+	The modules and factors providing test cases to validate that project's functionality.
+
+/`bin`
+	A collection of executable factors intended for direct use.
+
+/`extensions`
+	A collection of extension factors whose subfactors' integral will be positioned
+	adjacent to the `extensions` package. Concretely, these are Python Extension Modules.
+
+/`core`
+	A common foundation factor, usually a Python module.
+
+/`library`
+	The primary exported functionality of the project if any. This entry is only treated
+	specially conceptually.

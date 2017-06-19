@@ -4,25 +4,33 @@ Index of terms used organized into subsections describing their context.
 
 [ Glossary >> Project Structure ]
 
+/Corpus
+	The entire collection of software that is of interest.
+	Usually, a collection of (term)`Context Factor` and (term)`Project`.
+
+	Potentially, a given entity may have multiple corpuses and their locations
+	being part of some greater structure; structure outside of the corpus
+	is not within the scope of &..development and will rarely be mentioned.
+
 /Factor
-	A part of a &Product. An addressable part of a project. Usually used
-	to refer to Composite Factors as they are of primary interest to
-	&..development.
+	An addressable part of a &Product. For most corpuses, this will be a Python
+	module or a (term)`Composite Factor`
 
 /Project
 	A Factor consisting of a set of Factors making up a &Product.
 
 /Product
-	The conceptual effect of a Project. Often Project and Product can be used
-	interchangeably, but Product is usually referring to the conceptual collection
-	of factors.
+	A set of (term)`Factor` combined in an abstract fashion.
+	Products, with respect to project structures, are referred to conceptually
+	and a given (term)`Corpus` may have multiple Products. Usually, the term
+	is used to independently refer to an abstract entry point into a Corpus.
 
 /Context Factor
 	A collection of &Project Factors.
 
 /Fraction
-	A subfactor of a Composite Factor.
-	For C/C++, this usually maps to an individual
+	A contributing subfactor of a Composite Factor.
+	For C/C++, this would be an individual
 	translation unit. A source file inside a Composite Factor.
 
 /Composite Factor
@@ -31,9 +39,14 @@ Index of terms used organized into subsections describing their context.
 
 /Fragment
 	An internal part of a Factor or Fraction. A Python class could be a
-	Fragment of a Factor. Anything that is addressable within a Factor's Module.
+	Fragment of a Factor. Anything that is addressable within the (term)`Delineated Form`.
+
+	This meaning is where &.schemas.fragments derives its name.
 
 [ Glossary >> Construction ]
+
+/Delineated Form
+	A &.schemas.fragments instance describing the (term)`Factor`.
 
 /Target
 	The files constructed by a, usually, Composite Factor.
@@ -83,6 +96,9 @@ Index of terms used organized into subsections describing their context.
 	Often prior to installation and potentially excluding Unit Tests.
 
 [ Glossary >> Build Intentions ]
+
+Intentions are used to select a Construction Context that can properly process
+the factors of a Corpus.
 
 /Optimal
 	Factors built for optimal, subjective, performance.
