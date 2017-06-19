@@ -60,7 +60,7 @@ def main():
 				cf.replace(induct)
 				print(str(induct), '->', cf)
 
-	# Composites and Python Extensions
+	# Python Extensions (factors) are composites which are package modules.
 	candidates = []
 	for route in roots:
 		if not route.exists():
