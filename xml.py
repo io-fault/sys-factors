@@ -1,10 +1,7 @@
 """
 # XML interface set for &..development.
 
-# [ Properties ]
-
-# /(&typing.Mapping)namespaces
-	# The namespace label (schema module basename) associated with the namespace URI.
+# Provides serialization methods for project metrics: profiling, coverage, and testing.
 """
 import itertools
 import typing
@@ -34,14 +31,13 @@ class Metrics(libxml.document.Interface):
 	"""
 
 	@staticmethod
-	def serialize_profile(serialization, report,
+	def serialize_profile(xml, report,
 			timestamp=None, keys=None, prefix='',
 			chain=itertools.chain.from_iterable
 		):
 		"""
 		# Serialize the profiling measurements.
 		"""
-		xml = serialization
 		key_strings = keys
 
 		yield from xml.element('report',
@@ -64,7 +60,7 @@ class Metrics(libxml.document.Interface):
 		)
 
 	@staticmethod
-	def serialize_coverage(serialization, report,
+	def serialize_coverage(xml, report,
 			timestamp=None, keys=None, prefix='',
 			chain=itertools.chain.from_iterable
 		):
@@ -74,7 +70,6 @@ class Metrics(libxml.document.Interface):
 		# Essentially the same as &profile, but the line count data is structured
 		# differently, so run the measures through &map_coverage_data.
 
-		xml = serialization
 		key_strings = keys
 
 		yield from xml.element('report',
@@ -96,13 +91,16 @@ class Metrics(libxml.document.Interface):
 		)
 
 class Test(libxml.document.Interface):
-	def serialize(serialization, report, timestamp=None,
+	"""
+	# XML Document describing the fates of executed tests.
+	"""
+
+	def serialize(xml, report, timestamp=None,
 			chain=itertools.chain.from_iterable
 		):
 		"""
 		# Serialize the test &report.
 		"""
-		xml = serialization
 
 		yield from xml.element('report',
 			chain([
