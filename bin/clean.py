@@ -1,5 +1,5 @@
 """
-# Construct the targets of a package hierarchy for the selected context and role.
+# Remove the factor processing instruction directory from the cache directory.
 """
 import os
 import sys
