@@ -28,8 +28,8 @@ from ..system import libfactor
 from ..routes import library as libroutes
 from ..filesystem import library as libfs
 from ..computation import library as libc
+from ..python import syntax
 
-from . import python
 from . import tracing
 from . import testing
 
@@ -288,8 +288,7 @@ def coverage(module, counts, RangeSet=libc.range.Set, irs=libc.range.inclusive_r
 		# prior to this point.
 	"""
 
-	# Use the AST walker in python.
-	traversable = python.lines(module.spec().origin)
+	traversable = syntax.apply(module.spec().origin, syntax.coverable)
 	traversable = RangeSet.from_set(traversable)
 
 	traversed = RangeSet.from_set(counts)
