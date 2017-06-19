@@ -162,49 +162,56 @@ Modules raise exceptions to force editing.
 				libtest.execute(sys.modules[__name__])
 
 /documentation
-	/introduction.txt
-		#!text
-			Startup documentation. Probably avoid describing usage outside of
-			supportive illustrations.
+	/__init__.py
+		#!/pl/python
+			__factor_domain__ = 'xml'
+			__factor_type__ = 'library'
+			__path__ = ()
 
-			[ Concepts ]
+	/src
+		/introduction.txt
+			#!text
+				Startup documentation. Probably avoid describing usage outside of
+				supportive illustrations.
 
-			Describe project concepts here. Generally written for audiences unfamiliar
-			with the project and its concerns.
+				[ Concepts ]
 
-			[ Goals ]
+				Describe project concepts here. Generally written for audiences unfamiliar
+				with the project and its concerns.
 
-			Note explicit goals and direction of the project.
+				[ Goals ]
 
-	/context.txt
-		#!text
-			[ References ]
-			...
+				Note explicit goals and direction of the project.
 
-			[ Glossary ]
+		/context.txt
+			#!text
+				[ References ]
+				...
 
-			The section whose first-level dictionaries are considered
-			referencable terms throughout the project.
+				[ Glossary ]
 
-			/term
-				Colloquial definition of (term)&term.
+				The section whose first-level dictionaries are considered
+				referencable terms throughout the project.
 
-	/usage.txt
-		#!text
-			Primary narrative.
+				/term
+					Colloquial definition of (term)&term.
 
-			[ Hello, World! ]
+		/usage.txt
+			#!text
+				Primary narrative.
 
-			Information about the hello world interfaces.
+				[ Hello, World! ]
 
-	/mechanics.txt
-		#!text
-			Discuss project mechanics here if at all.
-			Often well positioned comments suffice, but given reasonably complicated
-			implementations, highlights of the mechanical concepts are useful.
+				Information about the hello world interfaces.
 
-			[ Internal Patterns ]
-			...
+		/mechanics.txt
+			#!text
+				Discuss project mechanics here if at all.
+				Often well positioned comments suffice, but given reasonably complicated
+				implementations, highlights of the mechanical concepts are useful.
+
+				[ Internal Patterns ]
+				...
 
 /bin
 	/__init__.py
