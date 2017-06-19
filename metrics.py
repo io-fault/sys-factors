@@ -595,7 +595,7 @@ class Harness(testing.Harness):
 			from ..xml.python import Serialization
 			xml = Serialization(xml_prefix='py:', xml_encoding='ascii')
 			error = list(xml.exception(test.fate, attributes=[
-					('xmlns:py', 'http://fault.io/xml/python')
+					('xmlns:py', 'http://fault.io/xml/data')
 				], traversed=set((id(test.fate), id(events), id(xml), id(test), id(view), id(self))))
 			)
 		else:
