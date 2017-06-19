@@ -8,10 +8,10 @@
 # Common usage:
 
 #!/pl/python
-	collector, events = trace.prepare()
+	collector, events = tracing.prepare()
 	with collector:
 		...
-	aggregate = trace.measure(events)
+	aggregate = tracing.measure(events)
 
 # [ Development Tasks ]
 
@@ -31,9 +31,9 @@ import functools
 import typing
 
 try:
-	from . import trace # C based collector.
+	from ..python import instr # C based collector.
 except ImportError:
-	trace = None
+	instr = None
 
 # Measure uses the integer form.
 event_integers = {
@@ -49,7 +49,7 @@ event_integers = {
 
 class Collector(object):
 	"""
-	# Python collector. &trace.Collector is used when available.
+	# Python collector. &instr.Collector is used when available.
 	"""
 
 	def __init__(self, endpoint, time_delta):
@@ -121,7 +121,7 @@ sequence = (
 def prepare(
 		Sequence=list,
 		Chronometer=None,
-		Collector=(Collector if trace is None else trace.Collector),
+		Collector=(Collector if instr is None else instr.Collector),
 	) -> typing.Tuple[Collector, typing.Sequence]:
 	"""
 	# Construct trace event collection using a &list instance
@@ -153,15 +153,15 @@ Measurements = typing.Tuple[
 def measure(
 		events:typing.Sequence,
 
-		TRACE_LINE = trace.TRACE_LINE,
+		TRACE_LINE = instr.TRACE_LINE,
 
-		TRACE_CALL = trace.TRACE_CALL,
-		TRACE_RETURN = trace.TRACE_RETURN,
-		TRACE_EXCEPTION = trace.TRACE_EXCEPTION,
+		TRACE_CALL = instr.TRACE_CALL,
+		TRACE_RETURN = instr.TRACE_RETURN,
+		TRACE_EXCEPTION = instr.TRACE_EXCEPTION,
 
-		TRACE_C_CALL = trace.TRACE_C_CALL,
-		TRACE_C_RETURN = trace.TRACE_C_RETURN,
-		TRACE_C_EXCEPTION = trace.TRACE_C_EXCEPTION,
+		TRACE_C_CALL = instr.TRACE_C_CALL,
+		TRACE_C_RETURN = instr.TRACE_C_RETURN,
+		TRACE_C_EXCEPTION = instr.TRACE_C_EXCEPTION,
 
 		IntegerSequence=list,
 		deque=collections.deque,
