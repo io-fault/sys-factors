@@ -1619,7 +1619,7 @@ def web_link_editor(context,
 	"""
 	# Command constructor for the emcc link editor.
 
-	# [Parameters]
+	# [ Parameters ]
 
 	# /output
 		# The file system location to write the linker output to.
@@ -1691,13 +1691,13 @@ def unix_link_editor(
 		use_shared='-Bdynamic',
 	):
 	"""
-	# Command constructor for the unix link editor. For platforms other than &(Darwin) and
-	# &(Windows), this is the default interface indirectly selected by &.development.bin.configure.
+	# Command constructor for the unix link editor. For platforms other than Darwin and
+	# Windows, this is the default interface indirectly selected by &.development.bin.configure.
 
 	# Traditional link editors have an insane characteristic that forces the user to decide what
 	# the appropriate order of archives are. The
-	# (system:command)`lorder` command was apparently built long ago to alleviate this while
-	# leaving the interface to (system:command)`ld` to be continually unforgiving.
+	# (system/command)`lorder` command was apparently built long ago to alleviate this while
+	# leaving the interface to (system/command)`ld` to be continually unforgiving.
 
 	# [Parameters]
 
