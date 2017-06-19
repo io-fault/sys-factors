@@ -448,6 +448,27 @@ def inspect(reqs, ctx, paths):
 		None: 'xml',
 	}
 
+	# For XML, the documents are embedded.
+	xml_domain = {
+		'formats': formats,
+		'target-file-extensions': {None:'.xml'},
+		'transformations': {
+			None: {
+				'command': 'fault.xml.bin.delineate',
+				'interface': libdev.__name__ + '.standard_out',
+				'method': 'python',
+				'redirect': 'stdout',
+			},
+
+			'txt': {
+				'interface': libdev.__name__ + '.standard_out',
+				'method': 'python',
+				'command': 'fault.text.bin.delineate',
+				'redirect': 'stdout',
+			},
+		}
+	}
+
 	unsupported = {
 		'target-file-extensions': {None:'.void'},
 		'formats': formats,
@@ -462,7 +483,7 @@ def inspect(reqs, ctx, paths):
 
 		'transformations': {
 			'python': {
-				'command': __package__ + '.delineate',
+				'command': 'fault.python.bin.delineate',
 				'interface': libdev.__name__ + '.package_module_parameter',
 				'method': 'python',
 				'name': 'delineate-python-source',
@@ -472,7 +493,7 @@ def inspect(reqs, ctx, paths):
 	}
 
 	llvm = {
-		'command': 'fault.llvm.bin.inspect',
+		'command': 'fault.llvm.bin.delineate',
 		'interface': libdev.__name__ + '.compiler_collection',
 		'method': 'python',
 		'redirect': 'stdout',
@@ -502,6 +523,7 @@ def inspect(reqs, ctx, paths):
 		'[trap]': unsupported,
 		'bytecode.python': python,
 
+		'xml': xml_domain,
 		'system': system,
 		'source': system,
 	}
