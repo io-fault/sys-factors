@@ -120,3 +120,105 @@ class Test(libxml.document.Interface):
 			('timestamp', (timestamp or libtime.now()).select('iso')),
 			('xmlns', namespaces['test']),
 		)
+
+# function set for cleaning up the profile data keys for serialization.
+profile_key_processor = {
+	'call': lambda x: x[0] if x[1] != '<module>' else 0,
+	'outercall': lambda x: ':'.join(map(str, x)),
+	'test': lambda x: x.decode('utf-8'),
+	'area': str,
+}
+
+def load_metrics(metrics, key):
+	import pickle
+	pdata = cdata = tdata = None
+	p = b'profile:' + key
+	c = b'coverage:' + key
+
+	if metrics.has_key(p):
+		with metrics.route(p).open('rb') as f:
+			try:
+				pdata = pickle.load(f)
+			except EOFError:
+				pdata = None
+
+	if metrics.has_key(c):
+		with metrics.route(c).open('rb') as f:
+			try:
+				cdata = pickle.load(f)
+			except EOFError:
+				cdata = None
+
+	return pdata, cdata
+
+def materialize_metrics(xml, snapshot, test, project, cname, key, len=len):
+	import pickle
+	profile, coverage = load_metrics(snapshot, key)
+
+	if coverage is not None:
+		# Complete coverage data.
+		untraversed = coverage.pop('untraversed', '')
+		traversed = coverage.pop('traversed', '')
+		traversable = coverage.pop('traversable', '')
+		# instrumentation coverage data.
+		fc = coverage.pop('full_counters', None)
+		zc = coverage.pop('zero_counters', None)
+
+		covxml = Metrics.serialize_coverage(xml, coverage, prefix="coverage..")
+
+		ntravb = len(traversable)
+		ntravd = len(traversed)
+
+		coverage = xml.element(
+			'coverage', covxml,
+			('untraversed', str(untraversed)),
+			('traversed', str(traversed)),
+			('traversable', str(traversable)),
+
+			('n-traversed', ntravd),
+			('n-traversable', ntravb),
+		)
+	else:
+		coverage = ()
+
+	if profile is not None:
+		# Complete measurements. Parts are still going to be referenced.
+		profile = xml.element('profile',
+			Metrics.serialize_profile(
+				xml, profile, keys=profile_key_processor, prefix="profile.."),
+		)
+	else:
+		profile = ()
+
+	# Currently this is inconsistent from the above as
+	# the tests are consolidated in the project key prefixed with 'tests:'
+	# Measurements needs to be adjusted to duplicate the test data into
+	# the individual test modules to avoid the extra scans.
+	tests = ()
+
+	if test or cname == project:
+		tk = b'tests:' + project.encode('utf-8')
+
+		if cname == project:
+			# full test report included in project.
+			data = snapshot.get(tk)
+			if data is not None:
+				data = pickle.loads(data)
+				tests = xml.element('test',
+					Test.serialize(xml, data)
+				)
+		else:
+			# test report for the specific module.
+			sub = cname
+			data = snapshot.get(tk)
+			if data is not None:
+				data = pickle.loads(data)
+				tests = xml.element('test',
+					Test.serialize(xml, {
+							k: v for k, v in data.items()
+							if str(k).startswith(sub)
+						}
+					)
+				)
+
+	return coverage, profile, tests
