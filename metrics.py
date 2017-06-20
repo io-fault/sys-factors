@@ -30,7 +30,7 @@ from ..filesystem import library as libfs
 from ..computation import library as libc
 from ..python import syntax
 
-from . import tracing
+from ..python import trace as tracing
 from . import testing
 
 def statistics(
