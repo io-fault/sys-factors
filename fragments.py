@@ -23,14 +23,14 @@ def source_element(xml, route):
 		cs = b""
 		lc = 0
 
-	yield from xml.element('source',
+	yield from xml.prefixed('source',
 		itertools.chain(
-			xml.element('hash',
+			xml.prefixed('hash',
 				[hash.encode('utf-8')],
 				('type', 'sha512'),
 				('format', 'hex'),
 			),
-			xml.element('data',
+			xml.prefixed('data',
 				[codecs.encode(cs, 'base64')],
 				('type', None),
 				('format', 'base64'),
