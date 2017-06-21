@@ -431,15 +431,16 @@ def resource_domain(paths):
 
 def inspect(reqs, ctx, paths):
 	"""
-	# Initialize an `inspect` context.
+	# Initialize an `inspect` context for managing delineation adaptions.
 	"""
 
 	iempty = {
-		'command': 'fault.development.bin.empty_introspection',
+		'command': 'fault.development.bin.delineate',
 		'interface': libdev.__name__ + '.empty',
 		'method': 'python',
 		'redirect': 'stdout',
 	}
+
 	formats = {
 		'library': 'xml',
 		'executable': 'xml',
@@ -461,9 +462,9 @@ def inspect(reqs, ctx, paths):
 			},
 
 			'txt': {
+				'command': 'fault.text.bin.delineate',
 				'interface': libdev.__name__ + '.standard_out',
 				'method': 'python',
-				'command': 'fault.text.bin.delineate',
 				'redirect': 'stdout',
 			},
 		}
@@ -504,12 +505,7 @@ def inspect(reqs, ctx, paths):
 		'target-file-extensions': {None:'.xml'},
 		'platform': 'xml-inspect-' + sys.platform,
 		'transformations': {
-			None: {
-				'command': 'fault.development.bin.empty_introspection',
-				'interface': libdev.__name__ + '.empty',
-				'method': 'python',
-				'redirect': 'stdout',
-			},
+			None: iempty,
 			'objective-c': llvm,
 			'c++[rtti exceptions]': llvm,
 			'c++': llvm,
