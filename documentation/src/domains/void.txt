@@ -1,0 +1,3 @@
+Factors without explicitly defined domains exist within the void domain that essentially inhibits
+construction and identification of sources. These factors, however, may have a Factor Type
+associated with them in order to define their meaning. Notably, contexts and projects.
