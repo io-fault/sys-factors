@@ -11,8 +11,8 @@ from ...routes import library as libroutes
 from ...xml import library as libxml
 from .. import fragments
 
-prefix = b'<factor xmlns="http://fault.io/xml/fragments">'
-suffix = b'<void/></factor>\n'
+prefix = b'<factor xmlns="http://fault.io/xml/fragments"><void>'
+suffix = b'</void></factor>\n'
 
 def main(inv):
 	filepath, = inv.args

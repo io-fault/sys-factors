@@ -470,6 +470,32 @@ def inspect(reqs, ctx, paths):
 		}
 	}
 
+	js_domain = {
+		'formats': formats,
+		'target-file-extensions': {None:'.xml'},
+		'transformations': {
+			None: {
+				'command': 'fault.development.bin.delineate',
+				'interface': libdev.__name__ + '.standard_out',
+				'method': 'python',
+				'redirect': 'stdout',
+			},
+		},
+	}
+
+	css_domain = {
+		'formats': formats,
+		'target-file-extensions': {None:'.xml'},
+		'transformations': {
+			None: {
+				'command': 'fault.development.bin.delineate',
+				'interface': libdev.__name__ + '.standard_out',
+				'method': 'python',
+				'redirect': 'stdout',
+			},
+		},
+	}
+
 	unsupported = {
 		'target-file-extensions': {None:'.void'},
 		'formats': formats,
@@ -522,6 +548,8 @@ def inspect(reqs, ctx, paths):
 		'xml': xml_domain,
 		'system': system,
 		'source': system,
+		'javascript': js_domain,
+		'css': css_domain,
 	}
 
 	S = libxml.Serialization()
