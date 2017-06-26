@@ -974,7 +974,6 @@ class Context(object):
 		variants = {}
 		context = {}
 
-		# XInclude is how imports/refs to other contexts are managed.
 		xml.xinclude()
 		d = xml.xpath('/lc:libconstruct/lc:context', namespaces=xml_namespaces)
 
@@ -1115,6 +1114,7 @@ def link_extension(route, factor):
 	# /route
 		# The &Import selecting the composite factor to induct.
 	"""
+
 	# system.extension being built for this Python
 	# construct links to optimal.
 	# ece's use a special context derived from the Python install
@@ -1699,7 +1699,7 @@ def unix_link_editor(
 	# (system/command)`lorder` command was apparently built long ago to alleviate this while
 	# leaving the interface to (system/command)`ld` to be continually unforgiving.
 
-	# [Parameters]
+	# [ Parameters ]
 
 	# /output
 		# The file system location to write the linker output to.

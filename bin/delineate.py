@@ -1,9 +1,9 @@
 """
-# Emit an empty xml/fragments instance.
+# Emit an empty (xml/fragments)`instance`.
 
 # In cases where language introspection is not supported, a fallback must be
 # available for making product snapshots possible. &.bin.configure uses
-# this when a given language is not supported.
+# this as the default when a given language is not supported.
 """
 import sys
 from ...system import library as libsys
