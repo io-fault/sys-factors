@@ -219,6 +219,7 @@ Modules raise exceptions to force editing.
 			"""
 			# Project Executables.
 			"""
+			__factor_type__ = 'executables'
 
 	/execute.py
 		#!/pl/python
