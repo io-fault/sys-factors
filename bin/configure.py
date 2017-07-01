@@ -8,6 +8,7 @@ import subprocess
 
 from ...routes import library as libroutes
 from ...xml import library as libxml
+from ...system import library as libsys
 from .. import probe
 from .. import library as libdev
 from .. import web
@@ -1016,7 +1017,8 @@ def web_context(reqs, ctx, paths):
 
 	intentions(corefile)
 
-def main(name, args, paths=None):
+def main(inv):
+	args = inv.args
 	reqs = dict(zip(args[0::2], args[1::2]))
 
 	if 'FAULT_DIRECTORY' in os.environ:
@@ -1025,8 +1027,7 @@ def main(name, args, paths=None):
 	else:
 		fpi = libroutes.File.home() / '.fault' / 'fpi'
 
-	if paths is None:
-		paths = probe.environ_paths()
+	paths = probe.environ_paths()
 
 	host(reqs, init(fpi / 'host'), paths)
 	static(reqs, init(fpi / 'static'), paths)
@@ -1043,6 +1044,7 @@ def main(name, args, paths=None):
 	devexe.store(dev_script)
 	os.chmod(str(devexe), 0o722)
 
+	sys.exit(0)
+
 if __name__ == '__main__':
-	import sys
-	main(sys.argv[0], sys.argv[1:])
+	libsys.control(main, libsys.Invocation.system())
