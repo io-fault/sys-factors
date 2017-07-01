@@ -14,7 +14,8 @@ from .. import metrics
 from .. import library as libdev
 from ...system import libfactor
 
-from ...llvm import instr
+from fragments.llvm import instr
+
 from ...routes import library as libroutes
 from ...system import corefile
 from ...system import library as libsys

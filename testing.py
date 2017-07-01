@@ -81,7 +81,7 @@ class Harness(object):
 			mod = self.preload_extension(tid, x)
 
 		if 'context' in dir(module):
-			module.context()
+			module.context(self)
 
 		module.__tests__ = [
 			(x.fullname, self.module_test)

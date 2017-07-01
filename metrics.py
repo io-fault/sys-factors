@@ -28,10 +28,10 @@ from ..system import libfactor
 from ..routes import library as libroutes
 from ..filesystem import library as libfs
 from ..computation import library as libc
-from ..python import syntax
-
-from ..python import trace as tracing
 from . import testing
+
+from fragments.python import syntax
+from fragments.python import trace as tracing
 
 def statistics(
 		data,
@@ -555,7 +555,7 @@ class Harness(testing.Harness):
 		# Iterate over the merged profile data in the given &directory
 		# to collect the per-file measurements.
 		"""
-		from ..llvm import instr
+		from fragments.llvm import instr
 
 		for mod in self.instrumentation_set:
 			basename = mod.__name__

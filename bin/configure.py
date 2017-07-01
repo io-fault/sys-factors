@@ -511,7 +511,7 @@ def inspect(reqs, ctx, paths):
 
 		'transformations': {
 			'python': {
-				'command': 'fault.python.bin.delineate',
+				'command': 'fragments.python.bin.delineate',
 				'interface': libdev.__name__ + '.package_module_parameter',
 				'method': 'python',
 				'name': 'delineate-python-source',
@@ -521,7 +521,7 @@ def inspect(reqs, ctx, paths):
 	}
 
 	llvm = {
-		'command': 'fault.llvm.bin.delineate',
+		'command': 'fragments.llvm.bin.delineate',
 		'interface': libdev.__name__ + '.compiler_collection',
 		'method': 'python',
 		'redirect': 'stdout',
