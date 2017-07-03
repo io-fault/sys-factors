@@ -5,7 +5,6 @@
 # Enables special cases for Python extension modules for relocatable targets; this is only
 # used given that the corresponding includes are properly used.
 """
-__factor_domain__ = 'system'
 __factor_type__ = 'probe'
 
 import sys

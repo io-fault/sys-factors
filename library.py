@@ -372,6 +372,9 @@ class Factor(object):
 
 	@property
 	def domain(self):
+		if self.type == 'probe':
+			return None
+
 		try:
 			return self.module.__factor_domain__
 		except AttributeError:
@@ -518,16 +521,17 @@ class Factor(object):
 		"""
 
 		is_composite = libfactor.composite
-		is_probe = libfactor.probe
 		ModuleType = types.ModuleType
 
 		refs = set(x for x in factor.module.__dict__.values() if isinstance(x, ModuleType))
 		for v in refs:
-			if not hasattr(v, '__factor_domain__'):
-				continue
 			if not hasattr(v, '__factor_type__'):
 				# Factor, but no type means that
 				# it has no transformation to perform.
+				continue
+			if v.__factor_type__ == 'probe':
+				pass
+			elif not hasattr(v, '__factor_domain__'):
 				continue
 
 			yield Factor(None, v, None)
@@ -551,7 +555,7 @@ class Factor(object):
 		variants = {}
 		factors = []
 
-		for p in references[(self.domain, type)]:
+		for p in references[(None, type)]:
 			build_params, params, pfactors = p.report(context, mechanism, self)
 			src_params.extend(params)
 			if variants.get('name') != 'inspect':
@@ -1924,7 +1928,7 @@ class Construction(libio.Context):
 		fm = factor.module
 		refs = references[factor]
 
-		if factor.pair == ('system', 'probe'):
+		if factor.type == 'probe':
 			# Needs to be transformed into a work set.
 			# Probes are deployed per dependency.
 			if hasattr(fm, 'deploy') and getattr(fm, 'reflective', False) == False:
