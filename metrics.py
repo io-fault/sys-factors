@@ -3,7 +3,7 @@
 
 # Used in conjunction with &.bin.measure and &..factors to report the collected trace data.
 
-# [ Development Tasks ]
+# [ Engineering ]
 
 # This is heavily Python specific, and &..development needs to be able to support arbitrary
 # languages. The structure of the module may need significant refactoring in order
@@ -17,7 +17,6 @@ import itertools
 import pickle
 import os
 import os.path
-import resource
 import subprocess
 import types
 
@@ -189,14 +188,13 @@ def isolate(measures) -> dict:
 	"""
 	# Construct a mapping that isolates each project's tests from each other.
 
-	# [ Effects ]
+	# [ Returns ]
 
-	# /Product
-		# A dictionary instance whose keys are &libroutes.Import instances referring
-		# to the project containing the test. The values are a triple containing
-		# the &libroutes.Import referring to the test module, the attributes that
-		# select the test from the module, and the key used to access the entry
-		# in the given &measures dictionary.
+	# A dictionary instance whose keys are &libroutes.Import instances referring
+	# to the project containing the test. The values are a triple containing
+	# the &libroutes.Import referring to the test module, the attributes that
+	# select the test from the module, and the key used to access the entry
+	# in the given &measures dictionary.
 	"""
 
 	project_tests = collections.defaultdict(list)
@@ -235,8 +233,6 @@ def merge(perspective, sfm, project_entry, measures):
 	}
 
 def aggregate(item, islice=itertools.islice):
-	global statistics
-
 	ctimes = statistics(islice(item[1], 0, None, 2))
 	rtimes = statistics(islice(item[1], 1, None, 2))
 
@@ -247,12 +243,14 @@ def aggregate(item, islice=itertools.islice):
 
 def group(times, counts):
 	"""
-	# Construct the set of groupings for the times and counts.
+	# &collapse the given &times and &counts providing a ceiling key.
 
 	# [ Parameters ]
 
-	# /measures
-		# A mapping of test results produced by &.bin.measure.
+	# /times
+		# .
+	# /counts
+		# .
 	"""
 
 	# recollect stored coverage data and orient them relative to the project
@@ -274,18 +272,6 @@ def group(times, counts):
 def coverage(module, counts, RangeSet=libc.range.Set, irs=libc.range.inclusive_range_set):
 	"""
 	# Identify the uncovered units (lines) from the line counts.
-
-	# ! DEVELOPER:
-		# This is hardcoded to Python. fault.development being multi-lingual needs
-		# to be able to find the necessary coverage information for arbitrary languages.
-
-		# For gcov, the diagnostic files produced during tests runs were processed
-		# and the traversed-traversable information was available at the end of the test.
-		# Currently, the measurements do not collect this information as the structure of
-		# extension modules have changed to a multi-file configuration.
-
-		# Potentially, traversable information should be made available
-		# prior to this point.
 	"""
 
 	traversable = syntax.apply(module.spec().origin, syntax.coverable)
@@ -299,7 +285,8 @@ def coverage(module, counts, RangeSet=libc.range.Set, irs=libc.range.inclusive_r
 	return traversable, traversed, untraversed
 
 def process(measures, item,
-		defaultdict=collections.defaultdict, chain=itertools.chain,
+		defaultdict=collections.defaultdict,
+		chain=itertools.chain,
 		list=list, zip=zip, map=map,
 	):
 	"""
