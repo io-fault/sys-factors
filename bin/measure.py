@@ -23,6 +23,7 @@ from ...computation import library as libc
 
 RangeSet = libc.range.Set
 
+# Expecting metrics intention to be configured.
 MetricsContext = libdev.Context.from_environment()
 
 def get_metrics_target(route):
@@ -35,8 +36,6 @@ def get_metrics_target(route):
 	return dll
 
 def main(target_dir, packages):
-	global instr
-
 	target_fsdict = metrics.libfs.Dictionary.create(
 		metrics.libfs.Hash('fnv1a_32', depth=1), target_dir
 	)
