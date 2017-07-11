@@ -19,10 +19,15 @@ import_from_module = libroutes.Import.from_module
 
 def set_exit_code(cxn, unit=None):
 	"""
-	# Report the number of failures.
+	# Report failure and not exit status.
 	"""
-	# Restrict revealed count to 201. The exit code is rather small.
-	unit.result = min(cxn.failures, 201)
+	fcount = cxn.failures
+	sys.stderr.write('! SUMMARY: %d factor processing instructions failed.\n' %(fcount,))
+
+	if fcount:
+		unit.result = 70 # EX_SOFTWARE
+	else:
+		unit.result = 0
 
 def main():
 	"""
