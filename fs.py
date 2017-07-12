@@ -5,6 +5,7 @@
 # the stored concepts. This module provides classes for both as they are often
 # related
 """
+import typing
 from ..filesystem import library as libfs
 
 class Corpus(libfs.Protocol):
@@ -15,7 +16,15 @@ class Corpus(libfs.Protocol):
 	# The parts of a Corpus on the file system may be completely made up from
 	# symbolic links allowing the use of shared Contexts and factor instances.
 	"""
-	pass
+
+	def factors(self) -> typing.Sequence[str]:
+		"""
+		# Return the set of root factors that make up the corpus.
+		"""
+		return set([
+			x for x in os.listdir(str(self.route / 'factors'))
+			if x[0:1] != '.'
+		])
 
 class Context(libfs.Protocol):
 	"""
@@ -25,4 +34,14 @@ class Context(libfs.Protocol):
 	# It provides the adaptors necessary for processing Factors for
 	# use by the Context's target system for a particular intention.
 	"""
-	pass
+
+	def mechanisms(self, names:typing.Sequence[str]):
+		"""
+		# Return the routes to the mechanisms with the given &names.
+		# Usually, &names contains `'host'`, `'static'`.
+		"""
+
+		return [
+			self.route / 'mechanisms' / x
+			for x in names
+		]

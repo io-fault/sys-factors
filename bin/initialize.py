@@ -1,5 +1,5 @@
 """
-# Formulate the developer construction contexts.
+# Initialize a Construction Context for preparing factors for use.
 """
 import os
 import sys
@@ -9,6 +9,7 @@ import subprocess
 from ...routes import library as libroutes
 from ...xml import library as libxml
 from ...system import library as libsys
+from ...system import libfactor
 from .. import probe
 from .. import library as libdev
 from .. import web
@@ -81,13 +82,6 @@ haskell_compilers = {
 }
 
 platform = sys.platform.strip('0123456789')
-
-def init(ctx):
-	# Initialize lib directory for context libraries.
-	for x in ('bin', 'lib', 'include'):
-		(ctx / x).init('directory')
-
-	return ctx
 
 def debug_isolate(self, target):
 	dtarget = target + '.dSYM'
@@ -1017,32 +1011,53 @@ def web_context(reqs, ctx, paths):
 
 	intentions(corefile)
 
+binding = b"""
+import sys
+import os
+import os.path
+corpus = os.environ.get('CORPUS')
+if corpus and corpus != fpath:
+	fpath = fpath + ':' + corpus
+os.environ['PYTHONPATH'] = fpath
+path = os.path.realpath(os.path.dirname(sys.argv[0]))
+os.execv(sys.executable, [
+		sys.executable, '-m', 'fault.development.bin.interface', 'context', path
+	] + sys.argv[1:]
+)
+"""
+
 def main(inv):
-	args = inv.args
+	target, *args = inv.args
 	reqs = dict(zip(args[0::2], args[1::2]))
 
-	if 'FAULT_DIRECTORY' in os.environ:
-		fd = os.environ['FAULT_DIRECTORY']
-		fpi = libroutes.File.from_absolute(fd) / 'fpi'
-	else:
-		fpi = libroutes.File.home() / '.fault' / 'fpi'
+	ctx = libroutes.File.from_path(target)
+	mechdir = ctx / 'mechanisms'
+	measures = ctx / 'measurements'
+	lib = ctx / 'lib'
+	work = ctx / 'work'
+
+	for x in mechdir, measures, lib, work:
+		x.init('directory')
+
+	for x in 'host', 'static', 'inspect', 'web':
+		(mechdir / x).init('directory')
+
+	# Initialize entry point for context.
+	initial = __package__.split('.')[0]
+	fault = sys.modules[initial]
+	pypath = os.path.dirname(os.path.dirname(fault.__file__))
+	pypath = '\nfpath = ' + repr(pypath)
+
+	dev = (ctx / 'develop')
+	dev.init('file')
+	dev.store(b'#!' + sys.executable.encode('utf-8') + pypath.encode('utf-8') + binding)
+	os.chmod(str(dev), 0o744)
 
 	paths = probe.environ_paths()
-
-	host(reqs, init(fpi / 'host'), paths)
-	static(reqs, init(fpi / 'static'), paths)
-	inspect(reqs, init(fpi / 'inspect'), paths)
-	web_context(reqs, init(fpi / 'web'), paths)
-
-	i = libroutes.Import.from_fullname(__package__) ** 2
-	ctxdir = (i / 'context').file().container
-	devsh = ctxdir / 'dev.sh'
-	dev_script = devsh.load()
-
-	fbin = fpi.container / 'env' / 'bin'
-	devexe = fbin / 'dev'
-	devexe.store(dev_script)
-	os.chmod(str(devexe), 0o722)
+	host(reqs, mechdir / 'host', paths)
+	static(reqs, mechdir / 'static', paths)
+	inspect(reqs, mechdir / 'inspect', paths)
+	web_context(reqs, mechdir / 'web', paths)
 
 	sys.exit(0)
 
