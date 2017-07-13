@@ -22,7 +22,12 @@ def set_exit_code(cxn, unit=None):
 	# Report failure and not exit status.
 	"""
 	fcount = cxn.failures
-	sys.stderr.write('! SUMMARY: %d factor processing instructions failed.\n' %(fcount,))
+	exits = cxn.exits
+	sys.stderr.write('! SUMMARY: %d factor processing instructions executed; %d failed.\n' %(
+			exits,
+			fcount,
+		)
+	)
 
 	if fcount:
 		unit.result = 70 # EX_SOFTWARE

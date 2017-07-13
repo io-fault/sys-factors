@@ -1867,6 +1867,7 @@ class Construction(libio.Context):
 		):
 		self.reconstruct = reconstruct
 		self.failures = 0
+		self.exits = 0
 
 		self.c_context = context # series of context resources for supporting subjects
 		self.c_factors = factors
@@ -2105,6 +2106,7 @@ class Construction(libio.Context):
 		pid, status = processor.only
 		exit_method, exit_code, core_produced = status
 
+		self.exits += 1
 		if exit_code != 0:
 			self.failures += 1
 
