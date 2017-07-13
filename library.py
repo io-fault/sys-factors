@@ -666,7 +666,8 @@ def merge(parameters, source, operations = merge_operations):
 class Mechanism(object):
 	"""
 	# The mechanics used to produce an Integral from a set of Sources associated
-	# with a Factor.
+	# with a Factor. &Mechanism instances are usually created by &Context instances
+	# using &Context.select.
 
 	# [ Properties ]
 
@@ -951,6 +952,7 @@ class Context(object):
 
 	@functools.lru_cache(8)
 	def select(self, fdomain):
+		# Scan the data set for the domain instantiating a mechanism.
 		for x in self.sequence:
 			if fdomain in x:
 				return x['variants'], Mechanism(x[fdomain])
@@ -1922,7 +1924,16 @@ class Construction(libio.Context):
 
 	def collect(self, factor, references, dependents=()):
 		"""
-		# Collect all the work to be done for processing the factor.
+		# Collect all the work to be done for processing the &factor.
+
+		# [ Parameters ]
+		# /factor
+			# The &Factor being built.
+		# /references
+			# The set of factors referred to by &factor. Often, the
+			# dependencies that need to be built in order to build the factor.
+		# /dependents
+			# The set of factors that refer to &factor.
 		"""
 		tracks = self.tracking[factor]
 		ctx = self.c_context
