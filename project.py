@@ -1,4 +1,4 @@
-identity = 'http://fault.io/src/fault.development'
+identity = 'http://fault.io/src/python/development'
 name = 'development'
 abstract = 'Construction, coverage, and testing for software projects'
 icon = '🛠'
