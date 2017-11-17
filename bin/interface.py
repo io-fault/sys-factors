@@ -48,7 +48,7 @@ def main(inv:libsys.Invocation):
 			break
 		elif opt == '--help':
 			sys.stderr.write("develop [-HWI] [-OgtM]\n")
-			libsys.exit(64)
+			sys.exit(64)
 
 		index += 1
 		for char in opt[1:]:
@@ -59,7 +59,7 @@ def main(inv:libsys.Invocation):
 				parameters[field] = setting
 			else:
 				sys.stderr.write("unknown option %r\n" %(char,))
-				libsys.exit(64) # EX_USAGE
+				sys.exit(64) # EX_USAGE
 
 	x = i.mechanisms((parameters['name'], 'static'))
 	os.environ['FPI_MECHANISMS'] = ':'.join(map(str, [y/(parameters['intention']+'.xml') for y in x]))
@@ -84,7 +84,7 @@ def main(inv:libsys.Invocation):
 			parameters['python'], '-m', parameters['prefix'] + '.' + command[0]] + command[1:]
 		)
 
-	libsys.exit(1)
+	sys.exit(1)
 
 if __name__ == '__main__':
 	libsys.control(main, libsys.Invocation.system())
