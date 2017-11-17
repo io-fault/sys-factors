@@ -17,17 +17,24 @@ from ...io import library as libio
 import_from_fullname = libroutes.Import.from_fullname
 import_from_module = libroutes.Import.from_module
 
+def report(cxn, unit=None):
+	"""
+	# Report failure and not exit status.
+	"""
+	fcount = cxn.failures
+	sys.stderr.write('! SUMMARY: %d factor processing instructions failed.\n' %(fcount,))
+
+	if fcount:
+		unit.result = 70 # EX_SOFTWARE
+	else:
+		unit.result = 0
+
 def set_exit_code(cxn, unit=None):
 	"""
 	# Report failure and not exit status.
 	"""
 	fcount = cxn.failures
-	exits = cxn.exits
-	sys.stderr.write('! SUMMARY: %d factor processing instructions executed; %d failed.\n' %(
-			exits,
-			fcount,
-		)
-	)
+	sys.stderr.write('! SUMMARY: %d factor processing instructions failed.\n' %(fcount,))
 
 	if fcount:
 		unit.result = 70 # EX_SOFTWARE
@@ -38,11 +45,16 @@ def main():
 	"""
 	# Prepare the entire package building factor targets and writing bytecode.
 	"""
+	import builtins
+	isinstance = builtins.isinstance
+	import_module = importlib.import_module
+	ModuleType = types.ModuleType
+
 	call = libio.context()
 	sector = call.sector
 	proc = sector.context.process
 
-	args = proc.invocation.parameters['system']['arguments']
+	args = proc.invocation.args
 	env = proc.invocation.parameters['system'].get('environment')
 	if not env:
 		env = os.environ
@@ -76,8 +88,8 @@ def main():
 		packages.append(route)
 
 		for target in packages:
-			tm = importlib.import_module(str(target))
-			if isinstance(tm, types.ModuleType) and libfactor.composite(target):
+			tm = import_module(str(target))
+			if isinstance(tm, ModuleType) and libfactor.composite(target):
 				root_system_modules.append(libdev.Factor(target, tm, None))
 
 		# Controls process execution queue.
