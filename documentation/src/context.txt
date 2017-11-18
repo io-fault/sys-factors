@@ -5,25 +5,22 @@ Index of terms used organized into subsections describing their context.
 [ Glossary >> Project Structure ]
 
 /Corpus
-	The entire collection of software that is of interest.
-	Usually, a collection of (term)`Context Factor` and (term)`Project`.
+	An entire collection of source.
 
-	Potentially, a given entity may have multiple corpuses and their locations
-	being part of some greater structure; structure outside of the corpus
-	is not within the scope of &..development and will rarely be mentioned.
+	A Corpus is arbitrarily defined, but usually refers the entire collection of data and
+	source code used to build the &Products produced by an entity. An entity may
+	choose to organize their source code in multiple corpuses, but usually the interest
+	lies in the entire set.
 
 /Factor
-	An addressable part of a &Product. For most corpuses, this will be a Python
+	An addressable part of a &Product. For most &Products, this will be a Python
 	module or a (term)`Composite Factor`
 
 /Project
-	A Factor consisting of a set of Factors making up a &Product.
+	A set of interdependent &Factors managed within a single delta stream.
 
 /Product
-	A set of (term)`Factor` combined in an abstract fashion.
-	Products, with respect to project structures, are referred to conceptually
-	and a given (term)`Corpus` may have multiple Products. Usually, the term
-	is used to independently refer to an abstract entry point into a Corpus.
+	A set of processed &Factors.
 
 /Context Factor
 	A collection of &Project Factors.
