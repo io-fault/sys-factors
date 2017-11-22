@@ -1015,9 +1015,9 @@ binding = b"""
 import sys
 import os
 import os.path
-corpus = os.environ.get('CORPUS')
-if corpus and corpus != fpath:
-	fpath = fpath + ':' + corpus
+factors = os.environ.get('FACTORS')
+if factors and factors != fpath:
+	fpath = fpath + ':' + factors
 os.environ['PYTHONPATH'] = fpath
 path = os.path.realpath(os.path.dirname(sys.argv[0]))
 os.execv(sys.executable, [
