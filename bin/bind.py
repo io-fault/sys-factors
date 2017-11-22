@@ -1,5 +1,5 @@
 """
-Create a Python executable bound to the execution of a particular module.
+# Create a Python executable bound to the execution of a particular module.
 """
 
 csource = r"""
@@ -34,11 +34,16 @@ main(int argc, char *argv[])
 		fpsetmask(m & ~FP_X_OFL);
 	#endif
 
+	Py_DebugFlag = 0;
+	Py_NoUserSiteDirectory = 1;
+	Py_IgnoreEnvironmentFlag = 1;
+	Py_DontWriteBytecodeFlag = 1;
+
 	Py_SetProgramName(xname);
 	Py_Initialize();
 	if (!Py_IsInitialized())
 	{
-		fprintf(stderr, "could not initialize python\n");
+		fprintf(stderr, "! ERROR: could not initialize python\n");
 		return(200);
 	}
 	_PyRandom_Init();
@@ -47,7 +52,7 @@ main(int argc, char *argv[])
 	wargv = PyMem_RawMalloc(nbytes);
 	if (wargv == NULL)
 	{
-		fprintf(stderr, "failed to allocate %d bytes of memory for system arguments\n", nbytes);
+		fprintf(stderr, "! ERROR: failed to allocate %d bytes of memory for system arguments\n", nbytes);
 		return(210);
 	}
 
@@ -56,7 +61,7 @@ main(int argc, char *argv[])
 		wargv[r] = Py_DecodeLocale(argv[r], NULL);
 		if (wargv[r] == NULL)
 		{
-			fprintf(stderr, "failed to decode system arguments\n");
+			fprintf(stderr, "! ERROR: failed to decode system arguments\n");
 			return(210);
 		}
 	}
@@ -66,14 +71,14 @@ main(int argc, char *argv[])
 	PyEval_InitThreads();
 	if (!PyEval_ThreadsInitialized())
 	{
-		fprintf(stderr, "failed to initialize threading\n");
+		fprintf(stderr, "! ERROR: failed to initialize threading\n");
 		return(199);
 	}
 
 	ob = PySys_GetObject("path");
 	if (ob == NULL)
 	{
-		fprintf(stderr, "failed to initialize execution context\n");
+		fprintf(stderr, "! ERROR: failed to initialize execution context\n");
 		return(198);
 	}
 
@@ -83,7 +88,7 @@ main(int argc, char *argv[])
 	mod = PyImport_ImportModule(MODULE_NAME);
 	if (mod == NULL)
 	{
-		fprintf(stderr, "failed to import implementation module: " MODULE_NAME "\n");
+		fprintf(stderr, "! ERROR: failed to import implementation module: " MODULE_NAME "\n");
 		return(197);
 	}
 	else
@@ -100,13 +105,6 @@ main(int argc, char *argv[])
 		{
 			r = (int) PyLong_AsLong(ob);
 		}
-		else
-		{
-			fprintf(stderr, "implementation, "
-				MODULE_NAME "." CALL_NAME
-				", did not return an integer\n");
-			r = 190;
-		}
 
 		Py_DECREF(ob);
 		ob = NULL;
@@ -119,7 +117,7 @@ main(int argc, char *argv[])
 			PyErr_Fetch(&exc, &val, &tb);
 			PyObject *pi;
 
-			if ((PyObject *) val->ob_type == PyExc_SystemExit)
+			if (val)
 			{
 				pi = PyObject_GetAttrString(val, "code");
 				if (pi)
@@ -128,15 +126,12 @@ main(int argc, char *argv[])
 					Py_DECREF(pi);
 				}
 			}
-			else
-			{
-				pi = val;
-				r = (int) PyLong_AsLong(pi);
-			}
 
 			Py_DECREF(exc);
 			Py_XDECREF(val);
 			Py_XDECREF(tb);
+
+			PyErr_Clear();
 		}
 		else
 		{
@@ -147,17 +142,14 @@ main(int argc, char *argv[])
 		}
 	}
 
-	Py_Finalize();
-	#if 0
-		_Py_ReleaseInternedUnicodeStrings();
-	#endif
+	Py_Exit(r);
 	return(r);
 }
 """
 
 def buildcall(target, filename):
 	"""
-	Construct the parameters to be used to compile and link the new executable.
+	# Construct the parameters to be used to compile and link the new executable.
 	"""
 	import sysconfig
 
@@ -192,10 +184,11 @@ def bind(target, module_path, call_name, prepend_paths = [], append_paths = []):
 		f.write(csource)
 		f.flush()
 		f.seek(0)
-		p = subprocess.Popen(buildcall(target, f.name))
+		syscall = buildcall(target, f.name)
+		p = subprocess.Popen(syscall)
 		p.wait()
 
 if __name__ == '__main__':
 	import sys
-	target, module_path, call_name = sys.argv[1:]
-	bind(target, module_path, call_name)
+	target, module_path, call_name, *paths = sys.argv[1:]
+	bind(target, module_path, call_name, prepend_paths = paths)
