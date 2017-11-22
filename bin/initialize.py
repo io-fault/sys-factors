@@ -1026,6 +1026,18 @@ os.execv(sys.executable, [
 )
 """
 
+configure = b"""
+import sys
+import os
+import os.path
+os.environ['PYTHONPATH'] = fpath
+path = os.path.realpath(os.path.dirname(sys.argv[0]))
+os.environ['CONTEXT'] = path
+args = sys.argv[1:]
+if args:
+	os.execv(sys.executable, [sys.executable, '-m'] + args)
+"""
+
 def main(inv):
 	target, *args = inv.args
 	reqs = dict(zip(args[0::2], args[1::2]))
@@ -1052,6 +1064,11 @@ def main(inv):
 	dev.init('file')
 	dev.store(b'#!' + sys.executable.encode('utf-8') + pypath.encode('utf-8') + binding)
 	os.chmod(str(dev), 0o744)
+
+	cfg = (ctx / 'configure')
+	cfg.init('file')
+	cfg.store(b'#!' + sys.executable.encode('utf-8') + pypath.encode('utf-8') + configure)
+	os.chmod(str(cfg), 0o744)
 
 	paths = probe.environ_paths()
 	host(reqs, mechdir / 'host', paths)
