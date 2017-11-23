@@ -10,8 +10,8 @@ __factor_type__ = 'probe'
 import sys
 import sysconfig
 
-from .. import library as libdev
-from ...system import libfactor
+from . import library as libdev
+from ..system import libfactor
 
 # Marker used by libconstruct to identify that
 # it is an extension module for *this* Python.

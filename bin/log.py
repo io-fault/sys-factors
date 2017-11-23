@@ -7,7 +7,7 @@ import os
 import importlib
 import collections
 
-from ..probes import libpython
+from .. import ipython
 from .. import library as libdev
 
 from ...system import libfactor
