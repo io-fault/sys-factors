@@ -10,11 +10,13 @@ from ..filesystem import library as libfs
 
 class Corpus(libfs.Protocol):
 	"""
-	# Directory representing a Software Corpus.
+	# Directory containing a Software Corpus.
+	"""
+	pass
 
-	# The Corpus contains a reference to a &Context and a set of root factors.
-	# The parts of a Corpus on the file system may be completely made up from
-	# symbolic links allowing the use of shared Contexts and factor instances.
+class Product(libfs.Protocol):
+	"""
+	# Directory containing a set of factors.
 	"""
 
 	def factors(self) -> typing.Sequence[str]:

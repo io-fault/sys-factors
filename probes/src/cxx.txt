@@ -1,0 +1,78 @@
+[ probe ]
+
+Temporary compensation until contexts can manage and use sensor data.
+
+/__init__.py
+	#!/pl/python
+		__factor_type__ = 'probe'
+		from fault.development import library as libdev
+		cxxlib = libdev.iFactor(
+			domain = 'system',
+			type = 'library',
+			integral = None,
+			name = 'c++',
+		)
+		reflective = True
+		def defines(fn, tfn):
+			return ()
+
+		def report(probe, context, mechanisms, factor):
+			return {}, [], (cxxlib,)
+
+[ executable ]
+
+C++ executable using cout.
+
+/__init__.py
+	#!/pl/python
+		__factor_domain__ = 'system'
+		__factor_type__ = 'executable'
+		from .. import probe
+
+/src
+	/program.cxx
+		#!/pl/cxx
+			#include <iostream>
+			int
+			main(int argc, char *argv[])
+			{
+				int i = 5;
+				std::cout << "i=" << i << std::endl;
+
+				if (argc > 1)
+					std::cout << "a=" << argv[1] << std::endl;
+				return(200);
+			}
+
+[ library ]
+
+/__init__.py
+	#!/pl/python
+		__factor_domain__ = 'system'
+		__factor_type__ = 'library'
+
+/src
+	/main.cxx
+		#!/pl/cxx
+			int
+			exported_symbol(int args, char *argv[])
+			{
+				int i;
+			}
+
+[ extension ]
+
+/__init__.py
+	#!/pl/python
+		__factor_domain__ = 'system'
+		__factor_type__ = 'extension'
+
+/src
+	/main.cxx
+		#!/pl/cxx
+			int
+			main(int args, char *argv[])
+			{
+				int i;
+			}
+

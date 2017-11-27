@@ -1011,31 +1011,25 @@ def web_context(reqs, ctx, paths):
 
 	intentions(corefile)
 
-binding = b"""
+prefix = b"""
 import sys
 import os
 import os.path
 factors = os.environ.get('FACTORS')
 if factors and factors != fpath:
 	fpath = fpath + ':' + factors
+ctx_path = os.path.realpath(os.path.dirname(sys.argv[0]))
+os.environ['CONTEXT'] = ctx_path
+dev_bin = %s
+""" %(repr(__package__).encode('utf-8'),)
+
+ep_template = prefix + b"""
 os.environ['PYTHONPATH'] = fpath
-path = os.path.realpath(os.path.dirname(sys.argv[0]))
 os.execv(sys.executable, [
-		sys.executable, '-m', 'fault.development.bin.interface', 'context', path
+		sys.executable, '-m', %s,
+		'context', ctx_path,
 	] + sys.argv[1:]
 )
-"""
-
-configure = b"""
-import sys
-import os
-import os.path
-os.environ['PYTHONPATH'] = fpath
-path = os.path.realpath(os.path.dirname(sys.argv[0]))
-os.environ['CONTEXT'] = path
-args = sys.argv[1:]
-if args:
-	os.execv(sys.executable, [sys.executable, '-m'] + args)
 """
 
 def main(inv):
@@ -1062,12 +1056,18 @@ def main(inv):
 
 	dev = (ctx / 'develop')
 	dev.init('file')
-	dev.store(b'#!' + sys.executable.encode('utf-8') + pypath.encode('utf-8') + binding)
+	src = ep_template % (
+		repr(__package__ + '.interface').encode('utf-8'),
+	)
+	dev.store(b'#!' + sys.executable.encode('utf-8') + pypath.encode('utf-8') + src)
 	os.chmod(str(dev), 0o744)
 
 	cfg = (ctx / 'configure')
 	cfg.init('file')
-	cfg.store(b'#!' + sys.executable.encode('utf-8') + pypath.encode('utf-8') + configure)
+	src = ep_template % (
+		repr(__package__ + '.configure').encode('utf-8'),
+	)
+	cfg.store(b'#!' + sys.executable.encode('utf-8') + pypath.encode('utf-8') + src)
 	os.chmod(str(cfg), 0o744)
 
 	paths = probe.environ_paths()
@@ -1075,6 +1075,13 @@ def main(inv):
 	static(reqs, mechdir / 'static', paths)
 	inspect(reqs, mechdir / 'inspect', paths)
 	web_context(reqs, mechdir / 'web', paths)
+
+	# Initialze default scanner probes.
+	sa = (ctx / 'scanner')
+	probed = (sa / 'probes')
+	from .. import probes
+	pid = os.spawnv(os.P_WAIT, sys.executable, [sys.executable, '-m', probes.__name__, str(probed)])
+	(probed / '__init__.py').init('file')
 
 	sys.exit(0)
 
