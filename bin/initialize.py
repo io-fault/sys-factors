@@ -231,7 +231,7 @@ def javascript_domain(paths):
 	else:
 		ints = {
 			'library': {
-				'interface': libdev.__name__ + '.catenation',
+				'interface': libdev.__name__ + '.concatenation',
 				'type': 'linker',
 				'name': 'cat',
 				'command': str(jsc),
