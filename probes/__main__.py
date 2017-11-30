@@ -46,6 +46,7 @@ def main(invocation:libsys.Invocation) -> None:
 
 	route = libroutes.File.from_path(route)
 	documents = libfactor.selected(libroutes.Import.from_fullname(__name__))
+
 	dirs, files = documents.tree()
 	for f in files:
 		doc = lxml.readfile(str(f))
