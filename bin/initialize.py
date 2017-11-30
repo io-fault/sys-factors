@@ -234,7 +234,7 @@ def javascript_domain(paths):
 				'interface': libdev.__name__ + '.catenation',
 				'type': 'linker',
 				'name': 'cat',
-				'command': str(cat),
+				'command': str(jsc),
 			}
 		}
 
