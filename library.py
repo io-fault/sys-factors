@@ -1308,7 +1308,9 @@ def package_module_parameter(build, adapter, o_type, output, i_type, inputs,
 	return [None, str(modpath)]
 
 def concatenation(build, adapter, o_type, output, i_type, inputs,
+		fragments, libraries,
 		verbose=True,
+		filepath=str,
 	):
 	"""
 	# Create the factor by concatenating the files. Only used in cases
