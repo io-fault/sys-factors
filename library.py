@@ -1762,6 +1762,7 @@ def unix_link_editor(
 		command.extend(libdirs)
 		command.append('-(')
 		command.extend(link_parameters)
+		command.append('-lc')
 		command.append('-)')
 
 		resources = mech['transformations'][None]['resources']
@@ -1949,7 +1950,12 @@ class Construction(libio.Context):
 				probe_set = [('probe', factor, x) for x in dependents]
 				tracks.append(probe_set)
 		else:
-			variants, mech = ctx.select(factor.domain)
+			selection = ctx.select(factor.domain)
+			if selection is not None:
+				variants, mech = selection
+			else:
+				pass
+
 			variant_set = factor.link(variants, ctx, mech, refs, dependents)
 
 			for src_params, (vl, key, locations) in variant_set:
