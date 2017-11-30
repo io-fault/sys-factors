@@ -576,10 +576,13 @@ def host_system_domain(reqs, paths):
 	if platform in {'darwin', 'macos'}:
 		target_file_extensions['library'] = '.dylib'
 		target_file_extensions['extension'] = '.dylib'
-		linker_preference = ('ld', 'lld')
+		linker_pref = ('ld', 'lld')
 	elif platform in {'win', 'msw'}:
 		target_file_extensions['library'] = '.dll'
 		target_file_extensions['extension'] = '.dll'
+		linker_pref = linker_preference
+	else:
+		linker_pref = linker_preference
 
 	# default command
 	if 'cc' in reqs:
@@ -591,7 +594,7 @@ def host_system_domain(reqs, paths):
 	else:
 		ccname, cc = select(paths,
 			compiler_collections, compiler_collection_preference)
-	ldname, ld = select(paths, linkers, linker_preference)
+	ldname, ld = select(paths, linkers, linker_pref)
 
 	bindir = cc.container
 	ccprefix = bindir.container
