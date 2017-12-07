@@ -1,6 +1,6 @@
-/*
- * Included once by the source file defining module initialization.
- */
+/**
+	# Included once by the source file defining module initialization.
+*/
 #include "../symbols.h"
 
 #ifndef MODULE_FUNCTIONS

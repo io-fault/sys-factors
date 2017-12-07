@@ -10,10 +10,6 @@
 # /selections
 	# A mapping providing the selected role to use for the factor module.
 
-# /python_triplet
-	# The `-` separated strings representing the currently executing Python context.
-	# Used to construct directories for Python extension builds.
-
 # /bytecode_triplet
 	# The `-` separated strings representing the bytecode used by the executing Python
 	# context.
@@ -78,11 +74,6 @@ def python_context(implementation, version_info, abiflags, platform):
 	pyversion = ''.join(map(str, version_info[:2]))
 	return '-'.join((implementation, pyversion + abiflags, platform))
 
-# Used as the context name for extension modules.
-python_triplet = python_context(
-	sys.implementation.name, sys.version_info, sys.abiflags, sys.platform
-)
-
 bytecode_triplet = python_context(
 	sys.implementation.name, sys.version_info, '', 'bytecode'
 )
@@ -96,8 +87,8 @@ def select(module, role, context=None):
 	"""
 	# Designate that the given role should be used for the identified &package and its content.
 
-	# &select should only be used during development or development related operations. Notably,
-	# selecting the role for a given package during the testing of a project.
+	# &select should only be used during development or development related operations.
+	# Notably, selecting the role for a given package during the testing of a project.
 
 	# It can also be used for one-off debugging purposes where a particular target is of interest.
 	"""
@@ -218,10 +209,11 @@ def references(factors):
 		container[f.pair].add(f)
 	return container
 
-class iFactor(object):
+class SystemFactor(object):
 	"""
-	# Imaginary Factor. Used by probes to create virtual dependencies representing
-	# an already constructed Factor.
+	# Factor structure used to provide access to include and library directories.
+	# Instances are normally stored in &Build.references which is populated by
+	# the a factor's requirements list.
 	"""
 
 	@classmethod
@@ -254,6 +246,7 @@ class iFactor(object):
 
 	def integral(self):
 		return self.__dict__['_integral']
+iFactor = SystemFactor
 
 class Factor(object):
 	"""
@@ -900,6 +893,7 @@ class Mechanism(object):
 xml_namespaces = {
 	'lc': 'http://fault.io/xml/dev/fpi',
 	'd': 'http://fault.io/xml/data',
+	'ctx': 'http://fault.io/xml/dev/ctx',
 }
 
 class Build(tuple):
@@ -920,10 +914,17 @@ class Context(object):
 	# A sequence of mechanism sets, Construction Context, that
 	# can be used to supply a given build with tools for factor
 	# processing.
+
+	# [ Engineering ]
+	# This class is actually a Context implementation and should be relocated
+	# to make room for a version that interacts with an arbitrary context
+	# for use in scripts that perform builds. Direct use is not actually
+	# intended as it's used to house the mechanisms.
 	"""
 
-	def __init__(self, sequence):
+	def __init__(self, sequence, parameters):
 		self.sequence = sequence or ()
+		self.parameters = parameters
 
 	@functools.lru_cache(8)
 	def intention(self, fdomain):
@@ -994,15 +995,78 @@ class Context(object):
 
 		return xml, context
 
+	@staticmethod
+	@functools.lru_cache(16)
+	def load_reference_xml(route:File):
+		"""
+		# Load the reference parameter required by a factor.
+		"""
+
+		with route.open('r') as f:
+			xml = lxml.etree.parse(f)
+		params = {}
+
+		xml.xinclude()
+		d = xml.xpath('/ctx:reference/d:dictionary', namespaces=xml_namespaces)
+
+		# Merge context data in the order they appear.
+		for x in d:
+			# Attributes on the context element define the variant.
+			data = libxml.Data.structure(x)
+			merge(params, data)
+
+		authority = xml.xpath('/ctx:reference/@authority', namespaces=xml_namespaces)[0]
+		name = route.identifier.split('.', 1)[0]
+
+		return (name, authority, params)
+
+	def factors(self, *parameter) -> typing.Sequence[iFactor]:
+		"""
+		# Return the factors of the given reference parameter.
+		"""
+
+		*suffix, name = parameter
+		name = name + '.xml'
+
+		for path in self.parameters:
+			f = path.extend(suffix)
+			f = f / name
+			if f.exists():
+				break
+		else:
+			return parameters[-1], None, {}
+
+		return self.load_reference_xml(f)[-1]['factors']
+
+	@staticmethod
+	def serialize_parameter(xml:libxml.Serialization, authority:str, data):
+		"""
+		# Construct an iterator producing the serialized form of a reference
+		# parameter for storage in a construction context.
+		"""
+		sdata = libxml.Data.serialize(xml, data)
+
+		x = xml.root("ctx:reference", sdata,
+			('xmlns:ctx', 'http://fault.io/xml/dev/ctx'),
+			('authority', authority),
+			namespace=libxml.Data.namespace
+		)
+
+		return x
+
 	@classmethod
-	def from_environment(Class, envvar="FPI_MECHANISMS"):
+	def from_environment(Class, envvar='FPI_MECHANISMS', pev='FPI_PARAMETERS'):
 		mech_refs = os.environ.get(envvar, '').split(os.pathsep)
 		seq = []
 		for mech in mech_refs:
 			xml, ctx = Class.load_xml(File.from_absolute(mech))
 			seq.append(ctx)
 
-		return Class(seq)
+		param_paths = os.environ.get(pev, '').split(os.pathsep)
+		param_paths = [libroutes.File.from_absolute(x) for x in param_paths if x]
+
+		r = Class(seq, param_paths)
+		return r
 
 # Specifically for identifying files to be compiled and how.
 extensions = {
@@ -1448,7 +1512,8 @@ def unix_compiler_collection(
 	# Get the source libraries referenced by the module.
 	srclib = build.references.get(('source', 'library'), ())
 	for x in srclib:
-		sid.append(x.integral())
+		path = x.integral()
+		sid.append(path)
 
 	command.extend([id_flag + str(x) for x in sid])
 
@@ -1851,17 +1916,13 @@ class Construction(libio.Context):
 	# Construction process manager. Maintains the set of target modules to construct and
 	# dispatches the work to be performed for completion in the appropriate order.
 
-	# ! DEVELOPMENT: Pending
-		# - Rewrite as a Context maintaining a Flow.
+	# [ Engineering ]
+		# - Rewrite as a (Transaction) Context maintaining a Flow.
 		# - Generalize; flow accepts jobs and emits FlowControl events
 			# describing the process. (rusage, memory, etc of process)
 
-	# ! DEVELOPER:
-		# Primarily, this class traverses the directed graph constructed by imports
-		# performed by the target modules being built.
-
-		# Refactoring could yield improvements; notably moving the work through a Flow
-		# in order to leverage obstruction signalling.
+	# Primarily, this class traverses the directed graph constructed by imports
+	# performed by the target modules being built.
 	"""
 
 	def __init__(self,
@@ -1927,7 +1988,7 @@ class Construction(libio.Context):
 
 	def collect(self, factor, references, dependents=()):
 		"""
-		# Collect all the work to be done for processing the &factor.
+		# Collect the parameters and work to be done for processing the &factor.
 
 		# [ Parameters ]
 		# /factor
@@ -1942,6 +2003,19 @@ class Construction(libio.Context):
 		ctx = self.c_context
 		fm = factor.module
 		refs = references[factor]
+
+		common_src_params = initial_factor_defines(fm.__name__)
+		if libfactor.python_extension(fm):
+			# Initialize source parameters declaring the extension module's
+			# access name so that full names can be properly initialized in types.
+			ean = libfactor.extension_access_name(fm.__name__)
+			mp = fm.__name__.rfind('.')
+			tp = ean.rfind('.')
+
+			common_src_params += [
+				('MODULE_QNAME', ean),
+				('MODULE_PACKAGE', ean[:tp]),
+			]
 
 		if factor.type == 'probe':
 			# Needs to be transformed into a work set.
@@ -1958,6 +2032,23 @@ class Construction(libio.Context):
 			else:
 				pass
 
+			# Populate system factors in refs from factor requirements.
+			reqs = getattr(fm, 'requirements', ())
+			sf_factor_id = 0
+			for sf_name in reqs:
+				sf = ctx.factors(*sf_name.split('/'))
+				for domain, types in sf.items():
+					for ft, sf in types.items():
+						for sf_int in sf:
+							sf_route = libroutes.File.from_absolute(sf_int)
+							for sf_name in sf[sf_int]:
+								refs[(domain, ft)].add(SystemFactor(
+									domain = domain,
+									type = ft,
+									integral = sf_route,
+									name = sf_name
+								))
+
 			variant_set = factor.link(variants, ctx, mech, refs, dependents)
 
 			for src_params, (vl, key, locations) in variant_set:
@@ -1968,7 +2059,7 @@ class Construction(libio.Context):
 					('F_INTENTION', variants['intention']),
 					('F_FACTOR_DOMAIN', factor.domain),
 					('F_FACTOR_TYPE', factor.type),
-				] + src_params
+				] + src_params + common_src_params
 
 				if not mech.integrates() or factor.reflective:
 					# For mechanisms that do not specify reductions,
@@ -2062,9 +2153,10 @@ class Construction(libio.Context):
 			self.continued = True
 			self.ctx_enqueue_task(self.continuation)
 
-	def process_execute(self, instruction):
+	def process_execute(self, instruction, f_target_path=(lambda x: str(x))):
 		factor, ins = instruction
 		typ, cmd, log, io, *tail = ins
+		target = io[1]
 
 		stdout = stdin = os.devnull
 
@@ -2093,9 +2185,11 @@ class Construction(libio.Context):
 				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
 				sp = libio.Subprocess(pid)
 
-		path = factor.module.__name__ + ' '
+		fpath = factor.module.__name__ + ' '
 		pidstr = ' #' + str(pid)
-		message = path + ' '.join(strcmd) + iostr
+		formatted = {str(target): f_target_path(target)}
+		printed_command = tuple(formatted.get(x, x) for x in map(str, cmd))
+		message = fpath + ' '.join(printed_command) + iostr
 		print(message + pidstr)
 
 		self.sector.dispatch(sp)

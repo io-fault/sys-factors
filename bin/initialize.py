@@ -1,5 +1,5 @@
 """
-# Initialize a Construction Context for preparing factors for use.
+# Initialize a Construction Context for building factors for the host system.
 """
 import os
 import sys
@@ -692,7 +692,10 @@ def host_system_domain(reqs, paths):
 					# clang, but no libclang_rt.
 					builtins = None
 
-	libdirs = [libroutes.File.from_relative(root, str(x).strip('/')) for x in search_dirs_data['libraries']]
+	libdirs = [
+		libroutes.File.from_relative(root, str(x).strip('/'))
+		for x in search_dirs_data['libraries']
+	]
 	libdirs.extend(map(libroutes.File.from_absolute,
 		('/lib', '/usr/lib',))) # Make sure likely directories are included.
 
@@ -877,7 +880,7 @@ def static(reqs, ctx, paths):
 
 def host(reqs, ctx, paths):
 	"""
-	# Initialize a (libdev:context)`host` context.
+	# Initialize a (libdev/context)`host` context.
 	"""
 
 	core = {
@@ -1035,6 +1038,46 @@ os.execv(sys.executable, [
 )
 """
 
+def sysconfig_python_parameters():
+	"""
+	# Collect the python reference parameter from the &sysconfig module.
+	"""
+	import sysconfig
+
+	version = '.'.join(map(str, sys.version_info[:2]))
+	abi = sys.abiflags
+	triplet = \
+		sys.implementation.name + \
+		'-' + version.replace('.', '') + abi + \
+		'-' + sys.platform
+
+	libsuffix = version + abi
+	libname = 'python' + libsuffix
+
+	incdir = sysconfig.get_config_var('INCLUDEPY')
+	libdir = sysconfig.get_config_var('LIBDIR')
+
+	return {
+		'identifier': triplet,
+
+		'implementation': sys.implementation.name,
+		'version': version,
+		'abi': abi,
+
+		'factors': {
+			'source': {
+				'library': {
+					str(incdir): {None},
+				}
+			},
+			'system': {
+				'library': {
+					str(libdir): {libname},
+				}
+			},
+		}
+	}
+
 def main(inv):
 	target, *args = inv.args
 	reqs = dict(zip(args[0::2], args[1::2]))
@@ -1044,6 +1087,7 @@ def main(inv):
 	measures = ctx / 'measurements'
 	lib = ctx / 'lib'
 	work = ctx / 'work'
+	params = ctx / 'parameters'
 
 	for x in mechdir, measures, lib, work:
 		x.init('directory')
@@ -1073,6 +1117,17 @@ def main(inv):
 	cfg.store(b'#!' + sys.executable.encode('utf-8') + pypath.encode('utf-8') + src)
 	os.chmod(str(cfg), 0o744)
 
+	# Initialize context/parameters and store the Python parameter.
+	params.init('directory')
+	python = (params / 'python.xml')
+	python.init('file')
+	xml = libxml.Serialization()
+	x = libdev.Context.serialize_parameter(xml,
+		'http://protocol.fault.io/factor/python',
+		sysconfig_python_parameters()
+	)
+	python.store(b''.join(x))
+
 	paths = probe.environ_paths()
 	host(reqs, mechdir / 'host', paths)
 	static(reqs, mechdir / 'static', paths)
@@ -1083,7 +1138,9 @@ def main(inv):
 	sa = (ctx / 'scanner')
 	probed = (sa / 'probes')
 	from .. import probes
-	pid = os.spawnv(os.P_WAIT, sys.executable, [sys.executable, '-m', probes.__name__, str(probed)])
+	status = os.spawnv(os.P_WAIT, sys.executable, [
+		sys.executable, '-m', probes.__name__, str(probed)
+	])
 	(probed / '__init__.py').init('file')
 
 	sys.exit(0)

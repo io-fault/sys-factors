@@ -62,7 +62,18 @@ def main(inv:libsys.Invocation):
 				sys.exit(64) # EX_USAGE
 
 	x = i.mechanisms((parameters['name'], 'static'))
-	os.environ['FPI_MECHANISMS'] = ':'.join(map(str, [y/(parameters['intention']+'.xml') for y in x]))
+	os.environ['FPI_MECHANISMS'] = ':'.join(
+		map(str, [y/(parameters['intention']+'.xml') for y in x])
+	)
+
+	# Initialize imaginary for subcommands.
+	ifactors = os.environ.get('FPI_PARAMETERS', '')
+	if ifactors.strip():
+		prefix = ':'
+	else:
+		prefix = ''
+		ifactors = ''
+	os.environ['FPI_PARAMETERS'] = ifactors + prefix + str(i.route/'parameters')
 
 	# Usually factors.
 	command = args[index:]

@@ -1,9 +1,9 @@
 """
 # Python extension environment probe module.
 
-# libpython provides the necessary imaginary factors for building an extension depending on Python.
-# Enables special cases for Python extension modules for relocatable targets; this is only
-# used given that the corresponding includes are properly used.
+# libpython provides the necessary imaginary factors for building an extension depending
+# on Python. Enables special cases for Python extension modules for relocatable targets;
+# this is only used given that the corresponding includes are properly used.
 """
 __factor_type__ = 'probe'
 
@@ -13,7 +13,7 @@ import sysconfig
 from . import library as libdev
 from ..system import libfactor
 
-# Marker used by libconstruct to identify that
+# Marker used by libdev to identify that
 # it is an extension module for *this* Python.
 context_extension_probe = True
 reflective = True

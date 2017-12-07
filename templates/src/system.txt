@@ -79,7 +79,9 @@ A system (process) extension intended to be loaded into Python.
 		__factor_type__ = 'extension'
 
 		# Provides the necessary flags for compiling an extension.
-		from fault.development import ipython
+		requirements = (
+			'python',
+		)
 
 /src
 	/module.c
