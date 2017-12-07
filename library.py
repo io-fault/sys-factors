@@ -1009,7 +1009,7 @@ extensions = {
 	'txt': ('txt',),
 
 	'c': ('c',),
-	'c++': ('c++', 'cpp', 'hh'),
+	'c++': ('c++', 'cpp'),
 	'objective-c': ('m',),
 
 	# C++ without rtti and exceptions.
@@ -1022,7 +1022,7 @@ extensions = {
 	'd': ('d',),
 	'rust': ('rs',),
 	'c-header': ('h',), # Purposefully ambiguous. (Can be C/C++/Obj-C)
-	'c++-header': ('H', 'hpp', 'hxx'),
+	'c++-header': ('hpp', 'hxx'),
 
 	'python': ('py',),
 	'bytecode.python': ('pyo', 'pyc',),
