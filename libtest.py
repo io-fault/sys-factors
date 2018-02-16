@@ -8,7 +8,9 @@ import functools
 import contextlib
 
 def get_test_index(tester, int=int, set=set, AttributeError=AttributeError):
-	"Returns the first line number of the underlying code object."
+	"""
+	# Returns the first line number of the underlying code object.
+	"""
 
 	try:
 		return int(tester.__test_order__)
@@ -60,7 +62,9 @@ def gather(container, prefix = 'test_', key=test_order, getattr=getattr):
 	return tests
 
 class Absurdity(Exception):
-	"Exception raised by &Contention instances."
+	"""
+	# Exception raised by &Contention instances designating a failed assertion.
+	"""
 
 	# for re-constituting the expression
 	operator_names_mapping = {
