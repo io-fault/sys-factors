@@ -32,13 +32,12 @@ def main(inv:libsys.Invocation):
 		'python': sys.executable,
 		'prefix': __package__,
 		'intention': 'optimal',
-		'name': 'host',
-
 		'rebuild': False,
 		'quiet': False,
 	}
 
 	os.environ['PYTHON'] = sys.executable
+	entry_point = inv.parameters['system']['name']
 
 	index = 0
 	for opt in args:
@@ -47,8 +46,8 @@ def main(inv:libsys.Invocation):
 			# No need to push or pop anything.
 			break
 		elif opt == '--help':
-			sys.stderr.write("develop [-HWI] [-OgtM]\n")
-			sys.exit(64)
+			sys.stderr.write(entry_point + " [-HWI] [-OgtM]\n")
+			return inv.exit(64)
 
 		index += 1
 		for char in opt[1:]:
@@ -59,12 +58,10 @@ def main(inv:libsys.Invocation):
 				parameters[field] = setting
 			else:
 				sys.stderr.write("unknown option %r\n" %(char,))
-				sys.exit(64) # EX_USAGE
+				return inv.exit(64) # EX_USAGE
 
-	x = i.mechanisms((parameters['name'], 'static'))
-	os.environ['FPI_MECHANISMS'] = ':'.join(
-		map(str, [y/(parameters['intention']+'.xml') for y in x])
-	)
+	x = i.mechanisms(('intent.xml', 'static.xml'))
+	os.environ['FPI_MECHANISMS'] = ':'.join(map(str, x))
 
 	# Initialize imaginary for subcommands.
 	ifactors = os.environ.get('FPI_PARAMETERS', '')
@@ -79,7 +76,7 @@ def main(inv:libsys.Invocation):
 	command = args[index:]
 	if not command:
 		sys.stderr.write('no command specified\n')
-		sys.exit(64) # EX_USAGE
+		return inv.exit(64) # EX_USAGE
 
 	if parameters['rebuild']:
 		os.environ['FPI_REBUILD'] = '1'
@@ -95,7 +92,7 @@ def main(inv:libsys.Invocation):
 			parameters['python'], '-m', parameters['prefix'] + '.' + command[0]] + command[1:]
 		)
 
-	sys.exit(1)
+	return inv.exit(1)
 
 if __name__ == '__main__':
 	libsys.control(main, libsys.Invocation.system())

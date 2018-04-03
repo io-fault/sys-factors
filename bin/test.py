@@ -40,8 +40,8 @@ class Harness(testing.Harness):
 	"""
 	concurrently = staticmethod(libsys.concurrently)
 
-	def __init__(self, package, status, role='test'):
-		super().__init__(package, role=role)
+	def __init__(self, context, package, status, intent='test'):
+		super().__init__(context, package, intent=intent)
 		self.status = status
 		self.selectors = []
 
@@ -181,10 +181,15 @@ class Harness(testing.Harness):
 		if division is None:
 			self.status.write(bottom_fate_messages + '\n')
 
-def main(package, modules, role='test'):
-	role = os.environ.get('FAULT_ROLE', role)
+def main(package, modules, intent='test'):
+	intent = os.environ.get('FAULT_ROLE', intent)
 
-	p = Harness(package, sys.stderr, role=role)
+	# Expecting metrics intention to be configured.
+	from .. import cc
+	ctx = cc.Context.from_environment()
+	ctx_route = libroutes.File.from_absolute(os.environ.get('CONTEXT'))
+
+	p = Harness(ctx, package, sys.stderr, intent=intent)
 	p.execute(p.root(libroutes.Import.from_fullname(package)), modules)
 
 	raise SystemExit(0)

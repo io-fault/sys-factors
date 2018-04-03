@@ -1,6 +1,6 @@
 /**
-	fault C Preprocessor interfaces and macros.
-**/
+	# fault C construction context environment support.
+*/
 #ifndef _FAULT_LIBC_H_
 #define _FAULT_LIBC_H_
 
@@ -22,8 +22,7 @@
 #define FACTOR_PATH(NAME) FACTOR_QNAME_STR "." NAME
 
 #ifndef F_INTENTION
-	#warning Compilation driver was not given a F_INTENTION preprocessor definition
-	#warning Presuming 'optimal' build.
+	#warning Compiler was not given an F_INTENTION preprocessor definition; presuming 'optimal'.
 	#define F_INTENTION optimal
 #endif
 

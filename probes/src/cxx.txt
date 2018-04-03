@@ -1,24 +1,3 @@
-[ probe ]
-
-Temporary compensation until contexts can manage and use sensor data.
-
-/__init__.py
-	#!/pl/python
-		__factor_type__ = 'probe'
-		from fault.development import library as libdev
-		cxxlib = libdev.iFactor(
-			domain = 'system',
-			type = 'library',
-			integral = None,
-			name = 'c++',
-		)
-		reflective = True
-		def defines(fn, tfn):
-			return ()
-
-		def report(probe, context, mechanisms, factor):
-			return {}, [], (cxxlib,)
-
 [ executable ]
 
 C++ executable using cout.
@@ -27,11 +6,11 @@ C++ executable using cout.
 	#!/pl/python
 		__factor_domain__ = 'system'
 		__factor_type__ = 'executable'
-		from .. import probe
+		requirements = ('c++',)
 
 /src
 	/program.cxx
-		#!/pl/cxx
+		#!/pl/c++
 			#include <iostream>
 			int
 			main(int argc, char *argv[])
@@ -44,6 +23,53 @@ C++ executable using cout.
 				return(200);
 			}
 
+[ exceptions ]
+
+C++ executable throwing and catching exceptions.
+
+/__init__.py
+	#!/pl/python
+		__factor_domain__ = 'system'
+		__factor_type__ = 'executable'
+		requirements = ('c++',)
+		pl = {
+			'c++': (None, {'exceptions'})
+		}
+
+/src
+	/program.cxx
+		#!/pl/c++
+			#include <iostream>
+			#include <exception>
+
+			class LocalException : public std::exception {};
+
+			void
+			throwing(void)
+			{
+				std::cout << "! EVENT: throwing exception" << std::endl;
+				throw LocalException();
+			}
+			void
+			catching(void)
+			{
+				try {
+					throwing();
+				} catch (const LocalException& e) {
+					std::cout << "! EVENT: caught exception" << std::endl;
+					return;
+				}
+
+				std::cout << "! FATAL: exception not caught" << std::endl;
+			}
+
+			int
+			main(int argc, char *argv[])
+			{
+				catching();
+				return(200);
+			}
+
 [ library ]
 
 /__init__.py
@@ -53,7 +79,7 @@ C++ executable using cout.
 
 /src
 	/main.cxx
-		#!/pl/cxx
+		#!/pl/c++
 			int
 			exported_symbol(int args, char *argv[])
 			{
@@ -69,10 +95,9 @@ C++ executable using cout.
 
 /src
 	/main.cxx
-		#!/pl/cxx
+		#!/pl/c++
 			int
 			main(int args, char *argv[])
 			{
 				int i;
 			}
-

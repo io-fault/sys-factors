@@ -53,7 +53,7 @@ def gather(container, prefix = 'test_', key=test_order, getattr=getattr):
 	"""
 
 	tests = [
-		('.'.join((container.__name__, name)), getattr(container, name))
+		('#'.join((container.__name__, name)), getattr(container, name))
 		for name in dir(container)
 		if name.startswith(prefix)
 	]

@@ -14,11 +14,25 @@ def main(inv:libsys.Invocation):
 	i = Imp(libroutes.File.from_path(path))
 
 	ctx = os.environ['CONTEXT']
-	dev = os.path.join(ctx, 'develop')
-	os.chdir(os.path.join(ctx, 'scanner'))
-	args = sys.argv[1:]
-	os.spawnv(os.P_WAIT, dev, [dev, '-g', 'construct', 'probes'])
-	os.spawnv(os.P_WAIT, dev, [dev, '-g', 'induct', 'probes'])
+	dev = os.path.join(ctx, 'execute')
+
+	if args:
+		subject = args[0]
+	else:
+		subject = 'check'
+
+	if subject == 'check':
+		os.chdir(os.path.join(ctx, 'scanner'))
+		os.spawnv(os.P_WAIT, dev, [dev, 'construct', 'probes'])
+		os.spawnv(os.P_WAIT, dev, [dev, 'induct', 'probes'])
+	elif subject == 'instrumentation':
+		target = os.path.join(ctx, 'lib', 'python', 'instrumentation')
+		if not os.path.exists(target):
+			os.spawnv(os.P_WAIT, dev, [dev, 'template', str(target), 'context', 'instrumentation'])
+
+		tools = args[1:]
+		if tools:
+			pass
 
 	sys.exit(0)
 

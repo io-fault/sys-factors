@@ -7,7 +7,7 @@ import types
 import importlib.util
 
 from .. import include # Minimum modification time.
-from .. import library as libdev
+from .. import cc
 from ...system import libfactor
 
 from ...routes import library as libroutes
@@ -60,21 +60,13 @@ def main():
 		env = os.environ
 
 	rebuild = env.get('FPI_REBUILD') == '1'
-	ctx = libdev.Context.from_environment()
+	ctx = cc.Context.from_environment()
 
 	# collect packages to prepare from positional parameters
 	roots = [import_from_fullname(x) for x in args]
 
 	# Collect Python packages in the roots to build bytecode.
-	simulations = []
-	next_set = list(roots)
-	while next_set:
-		current_set = next_set
-		next_set = []
-		for pkg in current_set:
-			mod, adds = libdev.simulate_composite(pkg)
-			next_set.extend(adds)
-			simulations.append(libdev.Factor(pkg, mod, None))
+	simulations = list(cc.gather_simulations(list(roots)))
 
 	for route, ref in zip(roots, args):
 		if not route.exists():
@@ -90,7 +82,7 @@ def main():
 		for target in packages:
 			tm = import_module(str(target))
 			if isinstance(tm, ModuleType) and libfactor.composite(target):
-				root_system_modules.append(libdev.Factor(target, tm, None))
+				root_system_modules.append(cc.Factor(target, tm, None))
 
 		# Controls process execution queue.
 		ncpu = 2
@@ -101,12 +93,12 @@ def main():
 			pass
 
 		ii = import_from_module(include)
-		cxn = libdev.Construction(
+		cxn = cc.Construction(
 			ctx, simulations + root_system_modules,
 			processors = max(8, ncpu),
 			reconstruct = rebuild,
 			# Age requirement based on global includes.
-			requirement = libdev.scan_modification_times(ii),
+			requirement = cc.scan_modification_times(ii),
 		)
 
 		sector.dispatch(cxn)

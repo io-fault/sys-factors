@@ -1,0 +1,76 @@
+[ instrumentation ]
+
+Instrumentation project instantiated by metrics contexts to manage executables and extension modules
+used to collect and translate coverage data into a local form.
+
+/__init__.py
+	#!/pl/python
+		"""
+		# Instrumentation support project for context dependent tools.
+		"""
+
+/project.py
+	#!/pl/python
+		identity = 'context/instrumentation'
+		name = 'instrumentation'
+		abstract = 'Coverage data collection tools'
+		icon = '🛠'
+
+		fork = None
+		versioning = 'irrelevant'
+		status = None
+
+		controller = 'fault.io'
+		contact = 'mailto:critical@fault.io'
+
+/bin
+	/__init__.py
+		#!/pl/python
+			"""
+			# Executables supporting coverage data collection for a given tool.
+			"""
+
+/extensions
+	/__init__.py
+		#!/pl/python
+			"""
+			# Python extensions supporting coverage data collection for a given tool.
+			"""
+
+[ inspection ]
+
+Inspection project for context dependent tools.
+
+/__init__.py
+	#!/pl/python
+		"""
+		# Inspection support project for context dependent tooling.
+		"""
+
+/project.py
+	#!/pl/python
+		identity = 'context/inspection'
+		name = 'inspection'
+		abstract = "Inspection support tools"
+		icon = '🛠'
+
+		fork = None
+		versioning = 'irrelevant'
+		status = None
+
+		controller = 'fault.io'
+		contact = 'mailto:critical@fault.io'
+
+/bin
+	/__init__.py
+		#!/pl/python
+			"""
+			# Executables supporting inspection.
+			"""
+
+/extensions
+	/__init__.py
+		#!/pl/python
+			"""
+			# Extensions supporting inspection.
+			"""

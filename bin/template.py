@@ -10,7 +10,7 @@ from ...text import xml as txtxml
 from ...system import libfactor
 from .. import templates
 
-def emit(route, elements):
+def emit(route, elements, context=None):
 	element = None
 
 	for element in elements:
@@ -39,19 +39,19 @@ def main(invocation:libsys.Invocation) -> None:
 	try:
 		route, template, *path = invocation.args
 	except:
-		invocation.exit(libsys.Exit.exiting_from_bad_usage)
+		return invocation.exit(libsys.Exit.exiting_from_bad_usage)
 
 	route = libroutes.File.from_path(route)
 	if route.exists():
 		sys.stderr.write("ERROR: path %s already exists.\n" %(str(route),))
-		invocation.exit(libsys.Exit.exiting_from_output_inaccessible)
+		return invocation.exit(libsys.Exit.exiting_from_output_inaccessible)
 
 	r = libfactor.selected(libroutes.Import.from_module(templates))
 	document = r / (template + '.xml')
 	doc = lxml.readfile(str(document))
 
 	process(doc, route, path)
-	invocation.exit(libsys.Exit.exiting_from_success)
+	return invocation.exit(libsys.Exit.exiting_from_success)
 
 if __name__ == '__main__':
 	libsys.control(main, libsys.Invocation.system())

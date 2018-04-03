@@ -1,6 +1,6 @@
 import os.path
 import types
-from .. import library
+from .. import cc as library
 from ...routes import library as libroutes
 
 def test_Factor(test):

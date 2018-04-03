@@ -19,11 +19,11 @@ def map_coverage_data(measures):
 	for measure in measures:
 		key = measure.pop(None)
 		if key:
-			for line, count in measure.items():
-				yield (('line', line), ('test', key)), (('count', count),)
+			for area, count in measure:
+				yield (('area', line), ('source', key)), (('count', count),)
 		else:
 			for line, count in measure.items():
-				yield (('line', line),), (('count', count),)
+				yield (('area', line),), (('count', count),)
 
 class Metrics(libxml.document.Interface):
 	"""
@@ -125,100 +125,49 @@ class Test(libxml.document.Interface):
 profile_key_processor = {
 	'call': lambda x: x[0] if x[1] != '<module>' else 0,
 	'outercall': lambda x: ':'.join(map(str, x)),
-	'test': lambda x: x.decode('utf-8'),
+	'source': str, # test identifier (origin of data)
 	'area': str,
 }
 
-def load_metrics(metrics, key):
-	import pickle
-	pdata = cdata = tdata = None
-	p = b'profile:' + key
-	c = b'coverage:' + key
+def coverage(xml, data):
+	missed, covered, possible, zeros, total, counters = data
+	covxml = Metrics.serialize_coverage(xml, counters, prefix="coverage..")
 
-	if metrics.has_key(p):
-		with metrics.route(p).open('rb') as f:
-			try:
-				pdata = pickle.load(f)
-			except EOFError:
-				pdata = None
+	ntravb = len(possible)
+	ntravd = len(covered)
 
-	if metrics.has_key(c):
-		with metrics.route(c).open('rb') as f:
-			try:
-				cdata = pickle.load(f)
-			except EOFError:
-				cdata = None
+	fragment = xml.element(
+		'coverage', covxml,
+		('untraversed', str(missed)),
+		('traversed', str(covered)),
+		('traversable', str(possible)),
 
-	return pdata, cdata
+		('zeros', zeros),
+		('total', total),
+	)
 
-def materialize_metrics(xml, snapshot, test, project, cname, key, len=len):
-	import pickle
-	profile, coverage = load_metrics(snapshot, key)
+	return fragment
 
-	if coverage is not None:
-		# Complete coverage data.
-		untraversed = coverage.pop('untraversed', '')
-		traversed = coverage.pop('traversed', '')
-		traversable = coverage.pop('traversable', '')
-		# instrumentation coverage data.
-		fc = coverage.pop('full_counters', None)
-		zc = coverage.pop('zero_counters', None)
+def join_metrics(xml, query, metrics, test, project, cname, key):
+	test_element = xml.element('test', Test.serialize(xml, data))
+	coverage_element = Metrics.serialize_coverage(xml, coverage, prefix="coverage..")
+	profile_element = xml.element('profile',
+		Metrics.serialize_profile(
+			xml, profile, keys=profile_key_processor, prefix="profile.."),
+	)
 
-		covxml = Metrics.serialize_coverage(xml, coverage, prefix="coverage..")
+	r = query.first('/f:factor')
+	if r is None:
+		return
+	r = r.first('f:module|f:chapter|f:document|f:void')
+	if r is None:
+		return
 
-		ntravb = len(traversable)
-		ntravd = len(traversed)
+	r = r.element
 
-		coverage = xml.element(
-			'coverage', covxml,
-			('untraversed', str(untraversed)),
-			('traversed', str(traversed)),
-			('traversable', str(traversable)),
+	for x in elements:
+		if x:
+			sub = query.structure(b''.join(x))
+			r.addprevious(sub)
 
-			('n-traversed', ntravd),
-			('n-traversable', ntravb),
-		)
-	else:
-		coverage = ()
-
-	if profile is not None:
-		# Complete measurements. Parts are still going to be referenced.
-		profile = xml.element('profile',
-			Metrics.serialize_profile(
-				xml, profile, keys=profile_key_processor, prefix="profile.."),
-		)
-	else:
-		profile = ()
-
-	# Currently this is inconsistent from the above as
-	# the tests are consolidated in the project key prefixed with 'tests:'
-	# Measurements needs to be adjusted to duplicate the test data into
-	# the individual test modules to avoid the extra scans.
-	tests = ()
-
-	if test or cname == project:
-		tk = b'tests:' + project.encode('utf-8')
-
-		if cname == project:
-			# full test report included in project.
-			data = snapshot.get(tk)
-			if data is not None:
-				data = pickle.loads(data)
-				tests = xml.element('test',
-					Test.serialize(xml, data)
-				)
-		else:
-			# test report for the specific module.
-			sub = cname
-			data = snapshot.get(tk)
-			if data is not None:
-				data = pickle.loads(data)
-				tests = xml.element('test',
-					Test.serialize(xml, {
-							k: v for k, v in data.items()
-							if str(k).startswith(sub)
-						}
-					)
-				)
-
-	return coverage, profile, tests
+	return dq

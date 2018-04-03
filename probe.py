@@ -10,7 +10,7 @@ import collections.abc
 import typing
 import types
 
-from . import library as libdev
+from . import cc
 
 from ..routes import library as libroutes
 from ..io import library as libio
@@ -77,7 +77,7 @@ def search(
 
 def executables(xset:typing.Set[str]):
 	"""
-	# Query the (env)`PATH` for executables with the exact name.
+	# Query the (system/envvar)`PATH` for executables with the exact name.
 	# Returns a pair whose first item is the matches that currently exist,
 	# and the second is the set of executables that were not found in the path.
 	"""
@@ -96,14 +96,14 @@ def prepare(
 			'c++': 'cxx',
 			'objective-c': 'm',
 		}
-	) -> typing.Tuple[libroutes.File, libdev.Construction]:
+	) -> typing.Tuple[libroutes.File, cc.Construction]:
 	"""
 	# Prepare a probe by initializing the given &directory as a composite factor
 	# containing a single source file whose content is defined by &source. Often, &directory
 	# is a temporary directory created by &..routes.library.File.temporary.
 
 	# The reduction of the composite (executable file) with respect to the &context and the
-	# &libdev.Construction instance are returned in a &tuple. After construction is
+	# &cc.Construction instance are returned in a &tuple. After construction is
 	# complete, the executable reduction should be executed in order to retrieve the data
 	# collected by the sensors.
 	"""
@@ -129,7 +129,7 @@ def prepare(
 		('source', 'library'): set(include_directories),
 	}
 
-	f = libdev.Factor(r, mod, None)
+	f = cc.Factor(r, mod, None)
 	fsrc.store(source.encode('utf-8'))
 
 	return f
@@ -157,8 +157,8 @@ def runtime(mechanisms, language, source, **parameters):
 		unit.place(s, "bin", "construction")
 		unit.context.enqueue(s.actuate)
 		f = prepare(tr, language, source, **parameters)
-		cc = libdev.Construction(mechanisms, [f])
-		s.dispatch(cc)
+		c = cc.Construction(mechanisms, [f])
+		s.dispatch(c)
 
 	with libroutes.File.temporary() as tr:
 		with libio.parallel(init) as u:

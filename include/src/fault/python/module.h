@@ -13,10 +13,10 @@
 	void __llvm_profile_reset_counters(void);
 	void __llvm_profile_set_filename(const char *);
 
-	static PyObj _instr_flush(PyObj self) { __llvm_profile_write_file(); Py_RETURN_NONE; }
-	static PyObj _instr_clear(PyObj self) { __llvm_profile_reset_counters(); Py_RETURN_NONE; }
+	static PyObj _fault_metrics_flush(PyObj self) { __llvm_profile_write_file(); Py_RETURN_NONE; }
+	static PyObj _fault_metrics_clear(PyObj self) { __llvm_profile_reset_counters(); Py_RETURN_NONE; }
 
-	static PyObj _instr_file(PyObj self, PyObj filepath)
+	static PyObj _fault_metrics_file(PyObj self, PyObj filepath)
 	{
 		static char ifbuf[2048] = {0,}; /* buf must be valid after exit */
 
@@ -37,9 +37,9 @@
 	}
 
 	#define FAULT_MODULE_FUNCTIONS() \
-		PYMETHOD(_instrumentation_set_path, _instr_file, METH_O, "set file path to write to" ) \
-		PYMETHOD(_instrumentation_write, _instr_flush, METH_NOARGS, "save counters to disk" ) \
-		PYMETHOD(_instrumentation_reset, _instr_clear, METH_NOARGS, "clear in memory counters" )
+		PYMETHOD(_fault_metrics_set_path, _fault_metrics_file, METH_O, "set file path to write to" ) \
+		PYMETHOD(_fault_metrics_write, _fault_metrics_flush, METH_NOARGS, "save counters to disk" ) \
+		PYMETHOD(_fault_metrics_reset, _fault_metrics_clear, METH_NOARGS, "clear in memory counters" )
 #elif FV_METRICS()
 	#warning (metrics): No suitable instrumentation for coverage and profiling.
 	#define FAULT_MODULE_FUNCTIONS()
@@ -47,7 +47,10 @@
 	#define FAULT_MODULE_FUNCTIONS()
 #endif
 
-/* Used to destroy the module in error cases. */
+/**
+	# Used to destroy the module in error cases.
+	# This clears the global __dict__ as well.
+*/
 #define DROP_MODULE(MOD) \
 do { \
 	Py_DECREF(MOD); \
@@ -89,7 +92,9 @@ do { \
 #define _py_INIT_FUNC _py_INIT_FUNC_X(FACTOR_BASENAME)
 
 #if PY_MAJOR_VERSION > 2
-/* Python 3.x */
+/*
+	# Python 3.x
+*/
 #define INIT(DOCUMENTATION) \
 	DEFINE_MODULE_GLOBALS \
 	static PyMethodDef methods[] = { \
@@ -139,13 +144,15 @@ do { \
 	} \
 } while(0)
 #else
-/* Python 2.x */
+/*
+	# Python 2.x
+*/
 #define _py_INIT_COMPAT CONCAT_IDENTIFIER(init, FACTOR_BASENAME)
 
-/*
- * Invoke the new signature.
- * Allows the user to return(NULL) regardless of Python version.
- */
+/**
+	# Invoke the new signature.
+	# Allows the user to return(NULL) regardless of Python version.
+*/
 #define INIT(DOCUMENTATION) \
 	DEFINE_MODULE_GLOBALS \
 	static PyMethodDef methods[] = { \

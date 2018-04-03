@@ -3,14 +3,15 @@
 
 # harness provides management tools for the execution of tests and
 # the destination of their resulting status. Status being both the fate
-# of the test and any collected coverage or profile data.
+# of the test and any collected metrics about the runtime.
 
-# ! DEVELOPER:
-	# Future model: run tests with a specified concurrency level,
-	# failures are enqueued and processed by the (human) controller.
-	# Tests are not ran when queue is full; developer chooses to exit
-	# or pop/debug the failure.
-	# Concise failure is reported to the text log.
+# [ Engineering ]
+
+# Future model should run tests with a specified concurrency level,
+# failures are enqueued and processed by the (human) controller.
+# Tests are not ran when queue is full; developer chooses to exit
+# or pop/debug the failure.
+# Concise failure is reported to the text log.
 """
 import os
 import sys
@@ -22,7 +23,7 @@ import collections
 from ..routes.library import Import
 from ..system import libfactor
 
-from . import library as libdev
+from . import cc
 
 class Harness(object):
 	"""
@@ -42,9 +43,10 @@ class Harness(object):
 	Test = libtest.Test
 	gather = staticmethod(libtest.gather)
 
-	def __init__(self, package, role=None):
+	def __init__(self, context, package, intent=None):
+		self.context = context
 		self.package = package
-		self.role = role
+		self.intent = intent
 		self.extensions = collections.defaultdict(list)
 
 	def module_test(self, test):
@@ -69,16 +71,22 @@ class Harness(object):
 		# Method used to implement the test package test that divides
 		# into the set of &module_test executions.
 		"""
+
 		# The package module
 		module = importlib.import_module(test.identity)
 		test/module.__name__ == test.identity
 		ir = Import.from_fullname(module.__name__)
 		tid = str(ir.floor())
 
+		# Initialize the project attribute and imports set.
+		self.project = tid
+
 		# Preload all extensions inside the package.
-		# Empty when .role is None
-		for x in self.extensions.get(tid, ()):
-			mod = self.preload_extension(tid, x)
+		# Empty when .intent is None
+		if not self.imports:
+			for x in self.extensions.get(tid, ()):
+				mod = self.preload_extension(tid, x)
+				self.imports.add(mod)
 
 		if 'context' in dir(module):
 			module.context(self)
@@ -110,12 +118,13 @@ class Harness(object):
 		"""
 		for tid, tcall in getattr(container, '__tests__', ()):
 			test = self.Test(tid, tcall)
+			self.test = tid
 			self.dispatch(test)
 
 	def preload_extension(self, test_id, route:Import):
 		"""
-		# Given an extension route, &route, import the module using
-		# the configured &role.
+		# Given a Python extension, &route, import the module using
+		# the configured &self.context.
 
 		# Used by the harness to import extensions that are being tested in a fashion
 		# that allows for coverage and profile data to be collected and for injection
@@ -124,11 +133,10 @@ class Harness(object):
 
 		env = os.environ
 
-		f = libdev.Factor(route, None, None)
-		ctx = libdev.Context.from_environment()
-		vars, mech = ctx.select(f.domain)
-		refs = libdev.references(f.dependencies())
-		(sp, (vl, key, loc)), = f.link(dict(vars), ctx, mech, refs, ())
+		f = cc.Factor(route, None, None)
+		vars, mech = self.context.select(f.domain)
+		refs = cc.references(f.dependencies())
+		(sp, (vl, key, loc)), = f.link(dict(vars), self.context, mech, refs, ())
 
 		dll = loc['integral'] / 'pf.lnk'
 
@@ -162,6 +170,9 @@ class Harness(object):
 		# stage identically to how divisions are handled at later stages.
 		"""
 
+		self.imports = set()
+		self.project = None
+
 		# pseudo-module for absolute root; the initial divisions are built
 		# here and placed in test.root.
 		tr = types.ModuleType("test.root")
@@ -171,13 +182,13 @@ class Harness(object):
 
 		if ft == 'project':
 			extpkg = route / 'extensions'
-			if extpkg.exists() and self.role is not None:
+			if extpkg.exists() and self.intent is not None:
 				self.extensions[str(route)].extend(self._collect_targets(extpkg))
 
 			tr.__tests__ = [(route.fullname + '.test', self.package_test)]
 		elif ft == 'context':
 			pkg, mods = route.subnodes()
-			if self.role is not None:
+			if self.intent is not None:
 				for x in pkg:
 					extpkg = x / 'extensions'
 					if extpkg.exists():
@@ -190,6 +201,10 @@ class Harness(object):
 			]
 		else:
 			# Presume specific test module
+			extpkg = route.floor() / 'extensions'
+			if extpkg.exists():
+				self.extensions[str(route)].extend(self._collect_targets(extpkg))
+
 			tr.__tests__ = [(str(route), self.module_test)]
 
 		return tr

@@ -1,7 +1,8 @@
 """
-# Test coverage data aggregation and serialization.
+# Metrics data aggregation and serialization.
 
-# Used in conjunction with &.bin.measure and &..factors to report the collected trace data.
+# Used in conjunction with &.bin.measure and &..factors to report the collected measurements
+# along side the tests that produced them.
 
 # [ Engineering ]
 
@@ -19,6 +20,7 @@ import os
 import os.path
 import subprocess
 import types
+import contextlib
 
 from ..system import library as libsys
 from ..system import corefile
@@ -27,10 +29,192 @@ from ..system import libfactor
 from ..routes import library as libroutes
 from ..filesystem import library as libfs
 from ..computation import library as libc
-from . import testing
 
-from fragments.python import syntax
-from fragments.python import trace as tracing
+from . import testing
+from . import cc
+from ..syntax import library as libsyntax
+
+def target(context, route):
+	"""
+	# Identify the route to the binary produced by a composite factor using the given &context.
+	"""
+	return context.f_target(cc.Factor(route, None, None))
+
+class SyntaxLocator(object):
+	"""
+	# Data structure used to identify fragments or concepts created therein.
+	# &SyntaxLocator is a base class for locations that need to be inverted in
+	# order to identify and connect references to their Factor fragments.
+
+	# [ Properties ]
+	# /location
+		# The area of syntax that identifies the referenced concept.
+	# /precision
+		# Whether the &location is exact. Defaults to &True.
+	"""
+	location:(libsyntax.Area) = None
+	precision:(bool) = True
+
+	def __init__(self, area:libsyntax.Area):
+		self.location = area
+
+	def __str__(self):
+		return "SL(%s)" %(self.location,)
+
+	def __hash__(self):
+		return self.location.__hash__()
+
+class SymbolQualifiedLocator(SyntaxLocator):
+	"""
+	# Imprecise locator used to invert Python traceback frames.
+	"""
+	symbol:(str) = None
+	precision = False
+
+	def __init__(self, area:libsyntax.Area, symbol:str, lambda_type:str):
+		self.location = area
+		self.symbol = symbol
+		self.lambda_type = lambda_type
+
+	def __str__(self):
+		return "SL(%s[%s]:%s)" %(self.symbol, self.lambda_type, self.location)
+
+	def __repr__(self):
+		return str(self)
+
+	def __hash__(self):
+		return hash((self.location, self.symbol, self.lambda_type))
+
+	def __eq__(self, ob):
+		return (self.location, self.symbol, self.lambda_type) == (ob.location, ob.symbol, ob.lambda_type)
+
+class Probe(object):
+	"""
+	# Context manager set used by tools to manage environment variables and dependencies.
+	"""
+	def __init__(self, name, trap=None):
+		self.name = name
+
+	def join(self, measures):
+		"""
+		# Select all the collected data files from a measurements directory using the tool name.
+		"""
+		for x in [m_route/self.name for (m_typ, m_id, m_route) in measures]:
+			yield from [(y.identifier, y) for y in x.files()]
+
+	def setup(self, harness, data):
+		"""
+		# Global initialization for tool probes. Context manager used once per invocation
+		# of &.bin.measure.
+		"""
+		return contextlib.ExitStack()
+
+	def connect(self, harness, measures):
+		"""
+		# Per-test context manager used to connect to the counters managed by the tool.
+		"""
+		return contextlib.ExitStack()
+
+class Measurements(object):
+	"""
+	# Measurement storage and access interface for &Harness instances.
+
+	# An instance of &Measurements contains physical divisions that contains
+	# the actual measurements collected. Usually physical is referring to the process
+	# that caused the emission of measurement data.
+	"""
+	route = None
+
+	def __init__(self, route):
+		self.route = route
+
+	def __eq__(self, ob):
+		return isinstance(ob, self.__class__) and ob.route == self.route
+
+	def init(self):
+		"""
+		# Select and create a root measurement directory.
+		"""
+		r = self.route
+		if not r.exists():
+			r.init('directory')
+
+		return r
+
+	def event(self, identifier=None, type='process-executed'):
+		"""
+		# Initialize a space for the process' data; a capture event.
+		# Measurement events are the physical (metaphoric) windows of data
+		# that make up the set.
+		"""
+		if identifier is None:
+			pid = os.getpid()
+		else:
+			pid = identifier
+
+		pr = self.route / (type + '.' + str(pid))
+		pr.init('directory')
+
+		pe = pr / '.enter'
+		pe.store(b'')
+
+		return pr
+
+	def __iter__(self):
+		"""
+		# Produce the set of capture events that contributed to the measurements.
+		"""
+
+		# Directories are measurement capture events.
+		return (
+			(y[0][0], int(y[0][1]), y[1])
+			for y in (
+				(x.identifier.rsplit('.', 1), x) for x in self.route.subnodes()[0]
+			)
+		)
+
+class Telemetry(object):
+	"""
+	# The complete set of measurements collected from a set probes(usually tests).
+
+	# A telemetry directory contains a set of &Measurements which represent the tests
+	# performed by an invocation of &.bin.measure. Each &Measurement instance contains
+	# process (UNIX system process) divisions which hold raw tool specific measurements.
+	"""
+	route = None
+	Measurements = Measurements
+
+	def __init__(self, route):
+		self.route = route
+
+	def __eq__(self, ob):
+		return isinstance(ob, self.__class__) and ob.route == self.route
+
+	def init(self):
+		"""
+		# Create the telemetry directory.
+		"""
+		self.route.init('directory')
+
+	def __iter__(self):
+		"""
+		# Produce the &Measurements instances associated with their directory name.
+		# Emits pairs in the form `(directory_name, Measurement(route))`.
+		"""
+		return (
+			(x.identifier, self.Measurements(x))
+			for x in self.route.subnodes()[0]
+			if x.identifier.startswith('test_')
+		)
+
+	def event(self, identifier):
+		"""
+		# Initialize a new set of measurements using the given identifier as the directory name.
+		# Returns the created &Measurements instance.
+		"""
+		m = self.Measurements(self.route.container / identifier)
+		m.init()
+		return m
 
 def statistics(
 		data,
@@ -42,7 +226,7 @@ def statistics(
 		Counter=collections.Counter,
 	):
 	"""
-	# Calculate basic statistics useful for analyzing time measurements.
+	# Calculate basic statistics occasionally useful for analyzing (profile) time data.
 	"""
 
 	timings = Sequence(data)
@@ -83,9 +267,10 @@ def source_file_map(interests:typing.Sequence[libroutes.Import]) -> typing.Mappi
 
 	# [Return]
 	# /key
-		# The sources contained within the package's (filesystem/relative)`src/` directory.
+		# The sources contained within the package's (system/file)`src` directory and
+		# the Python module sources found within the &interests packages.
 	# /value
-		# The factor's Python module path with the source's relative path appended.
+		# The factor's path with the source's relative path appended.
 		# For example: `'project.libcpkg/main.c'`.
 	"""
 
@@ -112,54 +297,6 @@ def source_file_map(interests:typing.Sequence[libroutes.Import]) -> typing.Mappi
 
 	return sfm
 
-def reorient(container:str, sfm:dict, input:tracing.Measurements, output:tracing.Measurements):
-	"""
-	# Transform per-test measurements produced by &measure
-	# into per-file measurements. This essentially swaps the &container with
-	# the file path while restructuring the key to be collapsible.
-
-	# [ Parameters ]
-
-	# /container
-		# Expected to be a string identifying the source
-		# of the trace data. Usually, the identity of the test,
-		# the qualified name.
-	# /sfm
-		# A dictionary produced by &source_file_map for resolving
-		# the module from the source file. This is what determines
-		# which data is kept. Events from lines that do not
-		# exist in any of these files are removed.
-	# /output
-		# The &trace.Measurements that will be updated.
-	# /input
-		# The source &trace.Measurements produced by &trace.Measure.
-	"""
-	out_times, out_counts = output
-	times, counts = input
-
-	for file, count in counts.items():
-		if file not in sfm:
-			continue
-		out_counts[(sfm[file], container)].update(count)
-
-	for keys, data in times.items():
-		file = keys[1][0]
-		if file not in sfm:
-			# filter data outside of interests set.
-			continue
-
-		parent, local = keys
-		if parent[0] in sfm:
-			# rewrite parent to module if in map
-			parent = (sfm[parent[0]], parent[1], parent[2])
-		else:
-			# Arguably resonable to see if the module is in our context
-			# but that's not necessarily in our set of interests.
-			pass
-
-		call = local[1:]
-		out_times[(sfm[file], call, parent, container)].extend(data)
-
 def collapse(data:typing.Mapping, merge:typing.Callable, dimensions:int=1) -> typing.Mapping:
 	"""
 	# Collapse dimensions in the given &data by removing
@@ -177,262 +314,231 @@ def collapse(data:typing.Mapping, merge:typing.Callable, dimensions:int=1) -> ty
 		# this is &collections.Counter.update. For &list, this is &list.extend.
 	"""
 	collapsed = collections.defaultdict(data.default_factory)
-	collapse = functools.lru_cache(128)(lambda x: x[:-dimensions])
+	collapse_key = functools.lru_cache(128)(lambda x: x[:-dimensions])
 
 	for k, v in data.items():
-		merge(collapsed[collapse(k)], v)
+		merge(collapsed[collapse_key(k)], v)
 
 	return collapsed
 
-def isolate(measures) -> dict:
+def aggregate(data, islice=itertools.islice):
 	"""
-	# Construct a mapping that isolates each project's tests from each other.
-
-	# [ Returns ]
-
-	# A dictionary instance whose keys are &libroutes.Import instances referring
-	# to the project containing the test. The values are a triple containing
-	# the &libroutes.Import referring to the test module, the attributes that
-	# select the test from the module, and the key used to access the entry
-	# in the given &measures dictionary.
+	# Aggregate profile data using the &statistics function.
+	# &data is expected to be a simple sequence of positive numbers
+	# where the even indexes (and zero) are cumulative, and the odds are
+	# resident.
 	"""
+	ctimes = statistics(islice(data, 0, None, 2))
+	rtimes = statistics(islice(data, 1, None, 2))
+	return (ctimes, rtimes)
 
-	project_tests = collections.defaultdict(list)
-
-	for key in measures.keys():
-		if not key.startswith(b'source:'):
-			continue
-
-		mid = key[len('source:'):].decode('utf-8')
-		r, attrs = libroutes.Import.from_attributes(mid)
-		r = r.anchor() # set context to project bottom package
-		prj = r.context # bottom()
-		project_tests[prj].append((r, attrs, key))
-
-	return dict(project_tests)
-
-def merge(perspective, sfm, project_entry, measures):
-	"""
-	# Merge the re-oriented metrics into the given perspective and return
-	# the test results in a dictionary..
-
-	# This loads the stored metrics from disk for the given test specified in &project_entry.
-	"""
-	import pickle
-	# recollect stored coverage data and orient them relative to the project
-	project, (route, test, key) = project_entry
-
-	with measures.route(key).open('rb') as f:
-		data = pickle.load(f)
-
-	container = key[len('source:'):]
-	reorient(container, sfm, data['measurements'], perspective)
-
-	return {
-		k: data.get(k) for k in {'fate', 'impact', 'duration', 'error'}
-	}
-
-def aggregate(item, islice=itertools.islice):
-	ctimes = statistics(islice(item[1], 0, None, 2))
-	rtimes = statistics(islice(item[1], 1, None, 2))
-
-	return (
-		(item[0] + ('cumulative',), ctimes),
-		(item[0] + ('resident',), rtimes),
-	)
-
-def group(times, counts):
-	"""
-	# &collapse the given &times and &counts providing a ceiling key.
-
-	# [ Parameters ]
-
-	# /times
-		# .
-	# /counts
-		# .
-	"""
-
-	# recollect stored coverage data and orient them relative to the project
-	context = collapse(times, list.extend)
+def timings(data):
+	context = collapse(data, list.extend)
 	times_groups = {
-		('floor', 'call', 'outercall', 'test'): times,
+		('floor', 'call', 'outercall', 'test'): data,
 		('context', 'call', 'outercall'): context,
 	}
 
 	times_groups[('ceiling', 'call')] = collapse(context, list.extend)
+	return times_groups
 
+def counters(data):
 	counts_groups = {
-		('floor', 'test'): counts,
-		('ceiling',): collapse(counts, collections.Counter.update),
+		('floor', 'test'): data,
+		('ceiling',): collapse(data, collections.Counter.update),
 	}
+	return counts_groups
 
-	return times_groups, counts_groups
-
-def coverage(module, counts, RangeSet=libc.range.Set, irs=libc.range.inclusive_range_set):
+def coverage(counts, counters):
 	"""
-	# Identify the uncovered units (lines) from the line counts.
+	# Construct coverage summary from the given set of counters.
 	"""
+	positives = set(counts.keys())
+	zeros = set(
+		key for key in counters.keys() if key not in positives
+	)
 
-	traversable = syntax.apply(module.spec().origin, syntax.coverable)
-	traversable = RangeSet.from_set(traversable)
+	n_missing = len(zeros)
+	n_counted = len(positives)
 
-	traversed = RangeSet.from_set(counts)
-	traversable = traversed.union(traversable)
+	traversable = libc.range.Set(([],[]))
+	for x, y in counters.items():
+		startl = x[0]
+		stopl = y[0] or startl
+		traversable.add(libc.range.IRange((startl,stopl)))
 
-	untraversed = traversable - traversed
+	traversed = libc.range.Set(([],[]))
+	for x in positives:
+		startl = x[0]
+		stopl = counters_meta.get(x, (startl,))[0] or startl
+		traversed.add(libc.range.IRange((startl,stopl)))
 
-	return traversable, traversed, untraversed
+	untraversed = libc.range.Set(([],[]))
+	for x in zeros:
+		startl = x[0]
+		stopl = counters_meta[x][0] or startl
+		untraversed.add(libc.range.IRange((startl,stopl)))
 
-def process(measures, item,
+	return (
+		n_missing, n_counted, len(counters),
+		traversed, untraversed, traversable,
+	)
+
+def summary(telemetry):
+	"""
+	# Generate coverage summary for the given telemetry.
+	"""
+	assert telemetry.exists()
+
+	project_data = telemetry/'project'
+	with (project_data/'source_index').open('rb') as f:
+		relevant = pickle.load(f)
+	with (project_data/'counters').open('rb') as f:
+		countable = pickle.load(f)
+
+	filtered = set()
+	for path in countable:
+		if path not in relevant:
+			filtered.add(path)
+	for path in filtered:
+		countable.pop(path, None)
+
+	n_counters_per_file = {f:len(v) for f,v in countable.items()}
+	n_counters = sum(n_counters_per_file.values())
+
+	counters = collections.defaultdict(collections.Counter)
+	tests = set(telemetry.subnodes()[0])
+	tests.discard(project_data)
+	test_counters = collections.defaultdict(dict)
+
+	# Aggregate per-file and collect for each test.
+	for test in tests:
+		fragment = '.'.join((telemetry.identifier, test.identifier))
+
+		pf = test / 'counters'
+		with pf.open('rb') as f:
+			f_counters = pickle.load(f)
+
+		for f, data in f_counters.items():
+			if f not in relevant:
+				# Filter out-of-project files.
+				continue
+			counters[f].update(data)
+			test_counters[fragment][f] = data
+
+	for path, counters in countable.items():
+		counts = counters[path]
+		yield (path,) + coverage(counts, counters)
+
+def profile(telemetry, record='profile'):
+	"""
+	# Extract profile data.
+	"""
+	assert telemetry.exists()
+
+	project_factor = telemetry.identifier
+	project_data = telemetry/'project'
+	with (project_data/'source_index').open('rb') as f:
+		relevant = pickle.load(f)
+
+	tests = set(telemetry.subnodes()[0])
+	tests.discard(project_data)
+
+	data = collections.defaultdict(lambda: collections.defaultdict(list))
+
+	for test in tests:
+		fragment = '.'.join((project_factor, test.identifier))
+
+		pf = test / record
+		with pf.open('rb') as f:
+			test_data = pickle.load(f)
+
+		for path, times_set in test_data.items():
+			if path not in relevant:
+				continue
+			for key, times in times_set.items():
+				data[path][(fragment,)+key].extend(times)
+
+	return data
+
+def process(
+		route, project,
 		defaultdict=collections.defaultdict,
 		chain=itertools.chain,
 		list=list, zip=zip, map=map,
 	):
 	"""
-	# Process the isolated project data.
+	# Process the telemetry.
 	"""
-	project, data = item
 
 	p = (defaultdict(list), defaultdict(collections.Counter))
 	sfm = source_file_map((project,))
 	test_results = defaultdict(list)
 
 	# merge into perspectives for per-file access.
-	for test in data:
-		test_result = merge(p, sfm, (project, test), measures)
-		ctx, test_path = test[:2]
+	for test in route.subdirectories():
+		test_result = None
+		test_project = test.identifier
+		test_path = '.'.join((test_project, test.identifier))
 		error = test_result.pop('error', None)
-		test_results[ctx].append((test_path or None, error, test_result))
+		test_results[test_project].append((test_path or None, error, test_result))
 
 	times, counts = group(*p)
 
-	# Aggregate the profile data and arrange it perfile.
-	permodule_times = defaultdict(lambda: defaultdict(list))
+	# Aggregate the profile data and arrange it per-file.
+	perfactor_times = defaultdict(lambda: defaultdict(list))
 	for gid, tdata in times.items():
+		tdata = list(tdata.items())
+		kiter = d
+		adata = map(aggregate, (x[1] for x in tdata))
 		for k, times in chain(*map(aggregate, tdata.items())):
 			m, *key = k
 			times[None] = list(zip(gid[1:] + ('area',), key))
 			permodule_times[m][gid[0]].append(times)
 
-	permodule_counts = defaultdict(lambda: defaultdict(list))
-	for gid, cdata in counts.items():
-		for k, counts in cdata.items():
-			m, *key = k
-
-			if key:
-				# Counts only have per-file-per-test at the floor.
-				key = key[0].decode('utf-8') # The test generating the coverage.
-			else:
-				key = None
-				if isinstance(m, libroutes.Import):
-					# String instances are composite subfactors; Import's are Python factors.
-					traversable, traversed, untraversed = coverage(m, counts)
-					permodule_counts[m]['untraversed'] = untraversed
-					permodule_counts[m]['traversed'] = traversed
-					permodule_counts[m]['traversable'] = traversable
-
-			fcounts = {None:key}
-			fcounts.update(counts)
-			permodule_counts[m][gid[0]].append(fcounts)
+	perfactor_counters = defaultdict(lambda: defaultdict(list))
 
 	return (project, (test_results, permodule_times, permodule_counts))
 
-def prepare(metrics:libfs.Dictionary, store=pickle.dump):
-	"""
-	# Prepare the metrics for formatting by tools like &..factors.
-
-	# Given a &libfs.Dictionary of collected metrics by &.metrics.Harness, process
-	# it into a form that is more suitable for consumption by reporting tools.
-	"""
-
-	i = isolate(metrics)
-
-	# Process on a per-project basis so old perspectives can be thrown away.
-	for project, data in i.items():
-		project_key = str(project).encode('utf-8')
-		data = process(metrics, (project, data))[1]
-
-		# project test results
-		# per-module times and counts.
-		test_results, pm_times, pm_counts = data
-		for module, times in pm_times.items():
-			m = str(module).encode('utf-8')
-			with metrics.route(b'profile:'+m).open('wb') as f:
-				store(times, f)
-
-		for module, counts in pm_counts.items():
-			m = str(module).encode('utf-8')
-			with metrics.route(b'coverage:'+m).open('wb') as f:
-				store(dict(counts), f)
-
-		with metrics.route(b'tests:'+project_key).open('wb') as f:
-			store(test_results, f)
-
 class Harness(testing.Harness):
 	"""
-	# Test harness for measuring a project using its tests.
+	# Harness for performing test-based measurements of a set of factors.
 	"""
 	from ..chronometry import library as libtime
 
 	concurrently = staticmethod(libsys.concurrently)
 
-	metrics_postprocessor = libroutes.File.which('llvm-profdata')
-	@staticmethod
-	def llvm_merge_profile_data(output, *inputs):
-		"""
-		# Return the constructed command to perform instrumentation profile data merge.
-
-		# This is a requisite step in order to get the recordd coverage information.
-		"""
-		l = ['llvm-profdata', 'merge', '-instr', '-output=' + str(output)]
-		l.extend(inputs)
-		return l
-
-	def __init__(self, work, measurements, package, status):
-		super().__init__(package, role='metrics')
-		self.work = work
-		self.measurements = measurements
+	def __init__(self, tools, context, telemetry, package, status):
+		super().__init__(context, package, intent='metrics')
+		self.tools = tools
+		self.telemetry = telemetry
+		self.measures = None
 		self.status = status
-		self.instrumentation_set = set()
+		self._root_test_executed = False
 
 	def _status_test_sealing(self, test):
-		self.status.write(test.identity+'\n')
+		self.status.write('\n\t'+test.identity[len(self.package)+1:])
 		self.status.flush() # need to see the test being ran right now
-
-	def preload_extension(self, test_id, *args):
-		mod = super().preload_extension(test_id, *args)
-
-		m = self.work / 'llvm' / test_id
-		if not m.exists():
-			m.init('directory')
-
-		mod._instrumentation_path = str(m / mod.__name__)
-		mod._instrumentation_set_path(mod._instrumentation_path)
-		mod._instrumentation_write()
-		mod._instrumentation_reset()
-		self.instrumentation_set.add(mod)
-
-		return mod
 
 	def dispatch(self, test):
 		faten = None
 		self._status_test_sealing(test)
 
-		# seal fate in a child process
-
+		# perform test in a child process
 		seal = self.concurrently(lambda: self.seal(test))
 
+		# report written to storage by child and returned to parent over a pipe.
 		l = []
 		report = seal(status_ref = l.append)
 
 		if report is None:
+			# child crashed or was interrupted.
 			report = {'fate': 'unknown', 'impact': -1}
 
 		pid, status = l[0]
 
 		if os.WCOREDUMP(status):
-			# fork core dumped.
+			# Test dumped core.
 			faten = 'core'
 			report['fate'] = 'core'
 			test.fate = self.libtest.Core(None)
@@ -440,165 +546,78 @@ class Harness(testing.Harness):
 			if corepath is None or not os.path.exists(corepath):
 				pass
 			else:
+				# Relocate core file to process-executed directory.
 				report['core'] = corepath
-				rr = self.measurements.route(test.identity.encode('utf-8'))
-				cr = self.measurements.route(('core:'+test.identity).encode('utf-8'))
-				os.move(corepath, str(cr))
+				measurements = self.telemetry.event(test.identity[len(self.package)+1:])
+				report_path = measurements.route / 'report.pickle'
+				r = measurements.event(pid)
+				os.move(corepath, r / 'core')
+
 				# dump the report with core's snapshot.
-				with rr.open('wb') as f:
+				with report_path.open('wb') as f:
 					pickle.dump(report, f)
 		elif not os.WIFEXITED(status):
-			# redrum
+			# Check process-executed directory and make sure a report was generated.
 			import signal
+			measurements = self.telemetry.event(test.identity[len(self.package)+1:])
+			r = measurements.event(pid)
+			report_path = measurements.route / 'report.pickle'
+
 			try:
 				os.kill(pid, signal.SIGKILL)
 			except OSError:
 				pass
 
+			if not report_path.exists():
+				# No report and killed.
+				report['fate'] = 'kill'
+				report['pid'] = pid
+				with report_path.open('wb') as f:
+					pickle.dump(report, f)
+
 		report['exitstatus'] = os.WEXITSTATUS(status)
 		return report
 
-	def prepare_extensions(self, test_id):
-		"""
-		# Prepare extensions with instrumentation for collection.
-
-		# This sets the desintation path of the counters and resets
-		# the current in memory data inside the extension.
-		"""
-		prefix = self.work / 'llvm' / test_id
-		prefix.init('directory')
-		for mod in self.instrumentation_set:
-			mod._instrumentation_set_path(str(prefix / mod.__name__))
-			mod._instrumentation_reset()
-		return prefix
-
-	@staticmethod
-	def merge_instrumentation_metrics(work, path):
-		"""
-		# When collecting metrics for instrumented binaries, merge the per-test set
-		# produced into a single file for each binary.
-
-		# This performs a final merge giving a set of counters that represent the
-		# counts across all test runs. When using &.bin.measure, this is performed
-		# when the (system:environment)`FAULT_COVERAGE_TOTALS` is set.
-		"""
-		prefix = work / 'llvm'
-		totals = libroutes.File.from_path(path)
-		totals.init('directory')
-
-		for cd in prefix.subnodes()[0]:
-			# llvm/*
-			for f in cd.subnodes()[1]:
-				# llvm/*/*
-				if f.extension == 'mpd':
-					continue
-				i = f.suffix('.mpd')
-				if not i.exists():
-					continue
-
-				out = totals / f.identifier
-				if not out.exists():
-					# first entry, just copy.
-					out.replace(i)
-					continue
-				tmp = out.prefix('tmp:')
-
-				cmd = list(map(str, Harness.llvm_merge_profile_data(str(tmp), str(out), i)))
-				cmd[0] = str(Harness.metrics_postprocessor)
-				sp = subprocess.Popen(cmd)
-				sp.wait()
-				# Move tmp back
-				out.replace(out.prefix('tmp:'))
-
-		for f in totals.subnodes()[1]:
-			if f.identifier.startswith('tmp:'):
-				f.void()
-
-	def flush_extensions(self, directory):
-		"""
-		# Iterate over the extensions writing any collected data to disk.
-		# The data is written to a file determined by &prepare_extensions prior
-		# to the execution of a test.
-
-		# After the data has been written, a postprocessor is immediately ran in-place
-		# to merge the data.
-		"""
-		if not self.instrumentation_set:
-			# No instrumentation extensions loaded.
-			return
-
-		for mod in self.instrumentation_set:
-			mod._instrumentation_write()
-
-		for x in directory.subnodes()[1]:
-			# Each file in this directory is the profile emitted by an extension.
-			cmd = list(map(str, self.llvm_merge_profile_data(str(x) + '.mpd', x)))
-			cmd[0] = str(self.metrics_postprocessor)
-			sp = subprocess.Popen(cmd)
-			sp.wait()
-
-	def instrumentation_metrics(self, directory):
-		"""
-		# Iterate over the merged profile data in the given &directory
-		# to collect the per-file measurements.
-		"""
-		from fragments.llvm import instr
-
-		for mod in self.instrumentation_set:
-			basename = mod.__name__
-			data = directory / (basename + '.mpd')
-			if not data.exists():
-				continue
-
-			# Each file in this directory is the profile emitted by an extension.
-			yield from instr.extract_nonzero_counters(mod.__file__, str(data))
-
-	def seal(self, test, prepare=tracing.prepare):
+	def seal(self, test):
 		"""
 		# Perform the test and store its report and measurements into
 		# the configured metrics directory.
 		"""
-		trace, events = prepare()
-		subscribe = trace.subscribe
-		cancel = trace.cancel
+
+		probes = contextlib.ExitStack()
+		measures = self.telemetry.event(test.identity[len(self.package)+1:])
+		self.measures = process_data = measures.event()
+		for x, d in self.tools:
+			probes.enter_context(x.connect(self, process_data))
+
+		os.environ['FAULT_MEASUREMENT_CONTEXT'] = str(measures)
 
 		# Get timing of test execution.
-		with self.libtime.clock.stopwatch() as view:
-			try:
-				llmetrics = self.prepare_extensions(test.identity)
-				subscribe()
-				with test.exits:
-					test.seal()
-			finally:
-				cancel()
+		with probes, self.libtime.clock.stopwatch() as view:
+			with test.exits:
+				test.seal()
 
 		if isinstance(test.fate, self.libtest.Fail):
+			# Print to standardd and serialize as XML for the report.
 			import traceback
 			import sys
 			fate = test.fate
 			tb = traceback.format_exception(fate.__class__, fate, fate.__traceback__)
 			tb = ''.join(tb)
 			sys.stderr.write(tb)
+
 			from ..xml.python import Serialization
 			xml = Serialization(xml_prefix='py:', xml_encoding='ascii')
 			error = list(xml.exception(test.fate, attributes=[
 					('xmlns:py', 'http://fault.io/xml/data')
-				], traversed=set((id(test.fate), id(events), id(xml), id(test), id(view), id(self))))
+				], traversed=set(
+					(id(test.fate), id(xml), id(test), id(view), id(self)))
+				)
 			)
 		else:
 			error = None
 
-		self.flush_extensions(llmetrics)
-
 		faten = test.fate.__class__.__name__.lower()
-		profile, coverage = tracing.measure(events)
-
-		for path, counters in self.instrumentation_metrics(llmetrics):
-			coverage[path].update({
-				x[0]: x[-1]
-				for x in counters
-				if x[-1] is not None
-			})
 
 		report = {
 			'test': test.identity,
@@ -606,17 +625,12 @@ class Harness(testing.Harness):
 			'fate': faten,
 			'duration': int(view()),
 			'error': error,
-			'measurements': (profile, coverage)
 		}
 
-		tid = test.identity.encode('utf-8')
-		with self.measurements.route(b'source:'+tid).open('wb') as f:
+		r = measures.route / 'report.pickle'
+		with r.open('wb') as f:
 			pickle.dump(report, f)
 
 		if isinstance(test.fate, self.libtest.Divide):
 			# subtests
 			self.execute(test.fate.content, ())
-
-if __name__ == '__main__':
-	import sys
-	prepare(libfs.Dictionary.open(sys.argv[1]))

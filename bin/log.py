@@ -7,8 +7,7 @@ import os
 import importlib
 import collections
 
-from .. import ipython
-from .. import library as libdev
+from .. import cc
 
 from ...system import libfactor
 from ...routes import library as libroutes
@@ -17,9 +16,9 @@ if __name__ == '__main__':
 	env = os.environ
 	command, module_fullname, *files = sys.argv
 
-	factor = libdev.Factor(libroutes.Import.from_fullname(module_fullname), None, None)
+	factor = cc.Factor(libroutes.Import.from_fullname(module_fullname), None, None)
 
-	ctx = libdev.Context.from_environment()
+	ctx = cc.Context.from_environment()
 	variants, mech = ctx.select(factor.domain)
 
 	refs = list(factor.dependencies())

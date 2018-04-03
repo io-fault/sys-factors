@@ -46,7 +46,7 @@ class Harness(testing.Harness):
 	concurrently = staticmethod(libsys.concurrently)
 
 	def __init__(self, package, status):
-		super().__init__(package)
+		super().__init__(None, package)
 		self.status = status
 		self.metrics = collections.Counter() # For division.
 		self.tests = []

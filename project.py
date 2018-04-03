@@ -1,6 +1,6 @@
 identity = 'http://fault.io/src/python/development'
 name = 'development'
-abstract = 'Construction, coverage, and testing for software projects'
+abstract = 'Software construction and management tools'
 icon = '🛠'
 
 fork = 'bootstraps'
@@ -9,3 +9,5 @@ status = 'flux'
 
 controller = 'fault.io'
 contact = 'mailto:critical@fault.io'
+
+commands = {'mkctx': 'bin.initialize'}

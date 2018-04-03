@@ -15,8 +15,11 @@ prefix = b'<factor xmlns="http://fault.io/xml/fragments"><void>'
 suffix = b'</void></factor>\n'
 
 def main(inv):
-	filepath, = inv.args
-	route = libroutes.File.from_path(filepath)
+	try:
+		filepath, = inv.args
+		route = libroutes.File.from_path(filepath)
+	except ValueError:
+		route = libroutes.File.from_absolute('/dev/stdin')
 
 	out = sys.stdout.buffer
 	out.write(prefix)

@@ -1,5 +1,5 @@
 """
-# Initialize a Construction Context for building factors for the host system.
+# Initialize a Construction Context for building factors for use by the host system.
 """
 import os
 import sys
@@ -11,7 +11,7 @@ from ...xml import library as libxml
 from ...system import library as libsys
 from ...system import libfactor
 from .. import probe
-from .. import library as libdev
+from .. import cc
 from .. import web
 
 from itertools import product
@@ -35,7 +35,8 @@ compiler_collections = {
 		'fortran', 'ada', # via dragonegg
 	),
 	'gcc': (
-		'c', 'c++', 'objective-c', 'fortran', 'ada', 'java',
+		'c', 'c++', 'objective-c',
+		'fortran', 'ada', 'java',
 	),
 	'icc': (
 		'c', 'c++',
@@ -177,7 +178,7 @@ def python_bytecode_domain(paths):
 	# Python library = module with preprocessed sources
 	# Python executable = python source executed in __main__
 	# Python extension = maybe python source executed in a library?
-	# Python fragment = source file
+	# Python partial = source file
 
 	pyexe = select(paths, ['python3', 'python3.4', 'python3.5', 'python3.6'], ['python3'])
 	pyname, pycommand = pyexe
@@ -192,7 +193,7 @@ def python_bytecode_domain(paths):
 		'transformations': {
 			'python': {
 				'method': 'internal',
-				'interface': libdev.__name__ + '.local_bytecode_compiler',
+				'interface': cc.__name__ + '.local_bytecode_compiler',
 				'name': 'pyc',
 				'command': __package__ + '.pyc',
 			},
@@ -214,7 +215,7 @@ def javascript_domain(paths):
 
 	# Currently a transparent copy for raw javascript.
 	transforms = {
-		'interface': libdev.__name__ + '.transparent',
+		'interface': cc.__name__ + '.transparent',
 		'type': 'transparent',
 		'command': '/bin/cp',
 	}
@@ -231,7 +232,7 @@ def javascript_domain(paths):
 	else:
 		ints = {
 			'library': {
-				'interface': libdev.__name__ + '.concatenation',
+				'interface': cc.__name__ + '.concatenation',
 				'type': 'linker',
 				'name': 'cat',
 				'command': str(jsc),
@@ -245,7 +246,7 @@ def javascript_domain(paths):
 		'formats': {
 			'executable': 'js',
 			'library': 'js',
-			'fragment': 'js',
+			'partial': 'js',
 		},
 
 		'integrations': ints,
@@ -284,7 +285,7 @@ def css_domain(paths):
 
 		'transformations': {
 			'css': {
-				'interface': libdev.__name__ + '.transparent',
+				'interface': cc.__name__ + '.transparent',
 				'type': 'transparent',
 				'command': '/bin/cp',
 			},
@@ -314,27 +315,27 @@ def xml_domain(paths):
 		'encoding': 'ascii',
 		'target-file-extensions': {
 			'executable': '.xml',
-			'fragment': '.xml',
+			'partial': '.xml',
 			'library': '.d',
 		},
 
 		'formats': {
 			'executable': 'xml',
-			'fragment': 'xml',
+			'partial': 'xml',
 			'library': 'xml',
 		},
 
 		'integrations': {
 			'executable': {
-				'interface': web.__name__ + '.xml',
+				'interface': web.__name__ + '.xml_combine',
 				'name': 'integrate',
 				'command': __package__ + '.xml',
 				'root': 'root.xml',
 				'method': 'python',
 			},
 
-			'fragment': {
-				'interface': web.__name__ + '.xml',
+			'partial': {
+				'interface': web.__name__ + '.xml_combine',
 				'name': 'integrate',
 				'command': __package__ + '.xml',
 				'root': 'root.xml',
@@ -358,7 +359,7 @@ def xml_domain(paths):
 			},
 
 			'txt': {
-				'interface': libdev.__name__ + '.standard_io',
+				'interface': cc.__name__ + '.standard_io',
 				'name': 'transform',
 				'method': 'python',
 				'command': 'fault.text.bin.xml',
@@ -381,12 +382,12 @@ def source_domain(paths):
 			'executable': 'octets',
 			'library': 'octets',
 			'extension': 'octets',
-			'fragment': 'octets',
+			'partial': 'octets',
 		},
 
 		'transformations': {
 			None: {
-				'interface': libdev.__name__ + '.transparent',
+				'interface': cc.__name__ + '.transparent',
 				'type': 'transparent',
 				'command': '/bin/cp',
 			},
@@ -397,7 +398,7 @@ def source_domain(paths):
 
 def resource_domain(paths):
 	"""
-	# Initialize a (ctx:ftype)`resource` subject for inclusion in a context.
+	# Initialize a (factor/type)`resource` subject for inclusion in a context.
 	"""
 
 	mech = {
@@ -409,12 +410,12 @@ def resource_domain(paths):
 
 		'transformations': {
 			None: {
-				'interface': libdev.__name__ + '.transparent',
+				'interface': cc.__name__ + '.transparent',
 				'type': 'transparent',
 				'command': '/bin/cp',
 			},
 			'uri': {
-				'interface': libdev.__name__ + '.transparent',
+				'interface': cc.__name__ + '.transparent',
 				'method': 'python',
 				'command': __package__ + '.stream',
 				'redirect': 'stdout',
@@ -431,7 +432,7 @@ def inspect(reqs, ctx, paths):
 
 	iempty = {
 		'command': 'fault.development.bin.delineate',
-		'interface': libdev.__name__ + '.empty',
+		'interface': cc.__name__ + '.empty',
 		'method': 'python',
 		'redirect': 'stdout',
 	}
@@ -440,7 +441,7 @@ def inspect(reqs, ctx, paths):
 		'library': 'xml',
 		'executable': 'xml',
 		'extension': 'xml',
-		'fragment': 'xml',
+		'partial': 'xml',
 		None: 'xml',
 	}
 
@@ -451,14 +452,14 @@ def inspect(reqs, ctx, paths):
 		'transformations': {
 			None: {
 				'command': 'fault.xml.bin.delineate',
-				'interface': libdev.__name__ + '.standard_out',
+				'interface': cc.__name__ + '.standard_out',
 				'method': 'python',
 				'redirect': 'stdout',
 			},
 
 			'txt': {
 				'command': 'fault.text.bin.delineate',
-				'interface': libdev.__name__ + '.standard_out',
+				'interface': cc.__name__ + '.standard_out',
 				'method': 'python',
 				'redirect': 'stdout',
 			},
@@ -471,7 +472,7 @@ def inspect(reqs, ctx, paths):
 		'transformations': {
 			None: {
 				'command': 'fault.development.bin.delineate',
-				'interface': libdev.__name__ + '.standard_out',
+				'interface': cc.__name__ + '.standard_out',
 				'method': 'python',
 				'redirect': 'stdout',
 			},
@@ -484,7 +485,7 @@ def inspect(reqs, ctx, paths):
 		'transformations': {
 			None: {
 				'command': 'fault.development.bin.delineate',
-				'interface': libdev.__name__ + '.standard_out',
+				'interface': cc.__name__ + '.standard_out',
 				'method': 'python',
 				'redirect': 'stdout',
 			},
@@ -494,46 +495,20 @@ def inspect(reqs, ctx, paths):
 	unsupported = {
 		'target-file-extensions': {None:'.void'},
 		'formats': formats,
-		'transformations': {
-			None: iempty,
-		},
+		'transformations': {None: iempty},
 	}
 
 	python = {
 		'target-file-extensions': {None:'.xml'},
 		'formats': formats,
-
-		'transformations': {
-			'python': {
-				'command': 'fragments.python.bin.delineate',
-				'interface': libdev.__name__ + '.package_module_parameter',
-				'method': 'python',
-				'name': 'delineate-python-source',
-				'redirect': 'stdout'
-			},
-		}
-	}
-
-	llvm = {
-		'command': 'fragments.llvm.bin.delineate',
-		'interface': libdev.__name__ + '.compiler_collection',
-		'method': 'python',
-		'redirect': 'stdout',
+		'transformations': {None: iempty}
 	}
 
 	system = {
 		'formats': formats,
 		'target-file-extensions': {None:'.xml'},
 		'platform': 'xml-inspect-' + sys.platform,
-		'transformations': {
-			None: iempty,
-			'objective-c': llvm,
-			'c++[rtti exceptions]': llvm,
-			'c++': llvm,
-			'c': llvm,
-			'c-header': llvm,
-			'c++-header': llvm,
-		}
+		'transformations': {None: iempty}
 	}
 
 	core = {
@@ -550,9 +525,9 @@ def inspect(reqs, ctx, paths):
 	S = libxml.Serialization()
 	D = S.switch('data:')
 	xml = b''.join(
-		S.root('context',
+		S.root('mechanism',
 			libxml.Data.serialize(D, core),
-			('name', 'inspect'),
+			('name', 'fragments'),
 			('xmlns', 'http://fault.io/xml/dev/fpi'),
 			('xmlns:data', 'http://fault.io/xml/data'),
 		),
@@ -561,14 +536,14 @@ def inspect(reqs, ctx, paths):
 	corefile = ctx / 'core.xml'
 	corefile.store(xml)
 
-	intentions(corefile)
+	return corefile
 
-def host_system_domain(reqs, paths):
+def host_system_domain(intention, reqs, paths):
 	target_file_extensions = {
 		'executable': '.exe',
 		'library': '.so',
 		'extension': '.so',
-		'fragment': '.fo',
+		'partial': '.fo',
 		None: '.so',
 	}
 	root = libroutes.File.from_absolute('/')
@@ -586,28 +561,28 @@ def host_system_domain(reqs, paths):
 
 	# default command
 	if 'cc' in reqs:
-		cc = libroutes.File.from_path(reqs['cc'])
-		ccname = cc.identifier
+		cc_route = libroutes.File.from_path(reqs['cc'])
+		ccname = cc_route.identifier
 	elif 'CC' in os.environ:
-		cc = libroutes.File.from_absolute(os.environ['CC'])
-		ccname = cc.identifier
+		cc_route = libroutes.File.from_absolute(os.environ['CC'])
+		ccname = cc_route.identifier
 	else:
-		ccname, cc = select(paths,
+		ccname, cc_route = select(paths,
 			compiler_collections, compiler_collection_preference)
 	ldname, ld = select(paths, linkers, linker_pref)
 
-	bindir = cc.container
+	bindir = cc_route.container
 	ccprefix = bindir.container
 	profile_lib = None
 
 	# gather compiler information.
-	p = subprocess.Popen([str(cc), '--version'],
+	p = subprocess.Popen([str(cc_route), '--version'],
 		stderr=subprocess.STDOUT, stdout=subprocess.PIPE, stdin=None)
 	data = p.communicate(None)[0].decode('utf-8').split('\n')
 
 	# Analyze the library search directories.
 	# Primarily interested in finding the crt*.o files for linkage.
-	p = subprocess.Popen([str(cc), '-print-search-dirs'],
+	p = subprocess.Popen([str(cc_route), '-print-search-dirs'],
 		stderr=subprocess.STDOUT, stdout=subprocess.PIPE, stdin=None)
 	search_dirs_data = p.communicate(None)[0].decode('utf-8').split('\n')
 	search_dirs_data = [x.split(':', 1) for x in search_dirs_data if x]
@@ -649,7 +624,7 @@ def host_system_domain(reqs, paths):
 		h_archs.append('osx')
 		h_archs.append('macos')
 
-	cclib = compiler_libraries(ccname, ccprefix, '.'.join(version_info), cc, target)
+	cclib = compiler_libraries(ccname, ccprefix, '.'.join(version_info), cc_route, target)
 	builtins = None
 	if cclib is None:
 		cclib = libroutes.File.from_relative(root, search_dirs_data['libraries'][0])
@@ -660,19 +635,6 @@ def host_system_domain(reqs, paths):
 		builtins = cclib / 'libgcc.a'
 	elif ccname == 'clang' and cclib is not None:
 		files = cclib.subnodes()[1]
-		profile_libs = [x for x in files if 'profile' in x.identifier]
-
-		if len(profile_libs) == 1:
-			# Presume target of interest.
-			profile_lib = profile_libs[0]
-		else:
-			# Scan for library with matching architecture.
-			for x, a in product(profile_libs, h_archs):
-				if a in x.identifier:
-					profile_lib = str(x)
-					break
-			else:
-				profile_lib = None
 
 		if platform == 'darwin':
 			builtins = str(cclib / 'libclang_rt.osx.a')
@@ -702,6 +664,14 @@ def host_system_domain(reqs, paths):
 	# scan for system objects (crt1.o, crt0.o, etc)
 	found, missing = probe.search(libdirs, runtime_objects)
 	prepare = lambda x: tuple(map(str, [y for y in x if y]))
+
+	if ccname == 'clang':
+		xfname = 'tool:llvm-clang'
+	elif ccname == 'gcc':
+		xfname = 'tool:gnu-gcc'
+	else:
+		xfname = 'tool:cc'
+
 	system = {
 		# domain data
 		'platform': target,
@@ -739,14 +709,14 @@ def host_system_domain(reqs, paths):
 					prepare((found.get('crtendS.o'), found.get('crtn.o')),),
 				],
 			},
-			# fragments do not have requirements.
-			'fragment': None,
+			# partials do not have requirements.
+			'partial': None,
 		},
 
 		# subject interfaces.
 		'integrations': {
 			None: {
-				'interface': libdev.__name__ + '.link_editor',
+				'interface': cc.__name__ + '.link_editor',
 				'type': 'linker',
 				'name': ldname,
 				'command': str(ld),
@@ -755,30 +725,30 @@ def host_system_domain(reqs, paths):
 		},
 
 		'transformations': {
-			None: {
-				'interface': libdev.__name__ + '.compiler_collection',
+			xfname: {
+				'interface': cc.__name__ + '.compiler_collection',
 				'type': 'collection',
 				'name': ccname,
 				'implementation': cctype,
 				'libraries': str(cclib),
 				'version': tuple(map(int, version_info)),
 				'release': release,
-				'command': str(cc),
+				'command': str(cc_route),
 				'defaults': {},
+				'options': [],
 				'resources': {
-					'profile': str(profile_lib) if profile_lib else None,
 					'builtins': str(builtins) if builtins else None,
 				},
+				'feature-control': {
+					'c++' : {
+						'exceptions': ('-fexceptions', '-fno-exceptions'),
+						'rtti': ('-frtti', '-fno-rtti'),
+					},
+				}
 			},
-
-			# -fno-rtti -fno-exceptions
-			'c++[rtti exceptions]': {
-				'inherit': None,
-				'language': 'c++',
-				'options': (
-					'-fno-exceptions',
-					'-fno-rtti',
-				)
+			# Default compiler.
+			None: {
+				'inherit': xfname,
 			}
 		},
 	}
@@ -793,8 +763,8 @@ def host_system_domain(reqs, paths):
 	else:
 		# FreeBSD and many Linux systems.
 		system['objects']['executable'] = {
-			# PDC or PIE based executables. PIC is, essentially, PIE.
-			# PDC does not mean that the library is a (completely) statically link binary.
+			# PDC or PIE based executables.
+			# PDC does not mean that the library is a (completely) statically linked binary.
 			'pdc': [
 				prepare((found.get('crt1.o'), found.get('crti.o'), found.get('crtbegin.o')),),
 				prepare((found.get('crtend.o'), found.get('crtn.o')),),
@@ -813,44 +783,65 @@ common_intentions = {
 
 	'test': 'Debugging intention with support for injections for comprehensive testing',
 	'metrics': 'Test intention with profiling and coverage collection enabled',
+	'inspect': 'Context used to extract fragments from source files',
 
 	'profiling': 'Raw profiling build for custom collections',
 	'coverage': 'Raw coverage build for custom collections',
 }
 
-def intentions(corefile):
+def designate(corefile, intent, filename):
+	abstract = common_intentions[intent]
 	ctx = corefile.container
 	S = libxml.Serialization()
 	D = S.switch('data:')
 
 	empty = {}
-	for x, abstract in common_intentions.items():
-		ctxfile = ctx / (x + '.xml')
+	ctxfile = ctx / filename
 
-		xml = b''.join(
-			S.root('libconstruct', chain((
-					S.element('xi:include',
-						(),
-						('href', corefile.identifier),
-					),
-					S.element('context',
-						libxml.Data.serialize(D, empty),
-						('intention', x),
-					),
-				)),
-				('xmlns', 'http://fault.io/xml/dev/fpi'),
-				('xmlns:data', 'http://fault.io/xml/data'),
-				('xmlns:xi', libxml.namespaces['xinclude']),
-			)
+	xml = b''.join(
+		S.root('context', chain((
+				S.element('xi:include',
+					(),
+					('href', corefile.identifier),
+				),
+				S.element('mechanism',
+					libxml.Data.serialize(D, empty),
+				),
+			)),
+			('xmlns', 'http://fault.io/xml/dev/fpi'),
+			('xmlns:data', 'http://fault.io/xml/data'),
+			('xmlns:xi', libxml.namespaces['xinclude']),
 		)
-		ctxfile.store(xml)
+	)
+	ctxfile.store(xml)
+
+def store_mechanisms(route, data, name=None, intention=None):
+	"""
+	# Serialize the mechanisms' data.
+	"""
+	S = libxml.Serialization()
+	D = S.switch('data:')
+
+	xml = b''.join(
+		S.root('context',
+			S.element('mechanism',
+				libxml.Data.serialize(D, data),
+				('name', name),
+			),
+			('xmlns', 'http://fault.io/xml/dev/fpi'),
+			('xmlns:data', 'http://fault.io/xml/data'),
+			('xmlns:xi', libxml.namespaces['xinclude']),
+		)
+	)
+
+	route.store(xml)
+	return len(xml)
 
 def static(reqs, ctx, paths):
 	"""
-	# Platform independent processing.
+	# Invariant factor processing.
 	"""
-
-	core = {
+	data = {
 		'source': source_domain(paths),
 		'resource': resource_domain(paths),
 		'javascript': javascript_domain(paths),
@@ -858,33 +849,21 @@ def static(reqs, ctx, paths):
 		'xml': xml_domain(paths),
 	}
 
+	store_mechanisms(ctx/'static.xml', data, name='static')
+
 	import pprint
-	pprint.pprint(core)
+	pprint.pprint(data)
 
-	S = libxml.Serialization()
-	D = S.switch('data:')
+def empty(target, name):
+	store_mechanisms(target, {}, name=name)
 
-	xml = b''.join(
-		S.root('context',
-			libxml.Data.serialize(D, core),
-			('name', 'static'),
-			('xmlns', 'http://fault.io/xml/dev/fpi'),
-			('xmlns:data', 'http://fault.io/xml/data'),
-		)
-	)
-
-	corefile = ctx / 'core.xml'
-	corefile.store(xml)
-
-	intentions(corefile)
-
-def host(reqs, ctx, paths):
+def host(intention, reqs, ctx, paths):
 	"""
-	# Initialize a (libdev/context)`host` context.
+	# Initialize a construction context for host targets.
 	"""
 
 	core = {
-		'system': host_system_domain(reqs, paths),
+		'system': host_system_domain(intention, reqs, paths),
 		# Move to static.
 		'bytecode.python': python_bytecode_domain(paths),
 	}
@@ -895,7 +874,7 @@ def host(reqs, ctx, paths):
 	S = libxml.Serialization()
 	D = S.switch('data:')
 	xml = b''.join(
-		S.element('context',
+		S.element('mechanism',
 			libxml.Data.serialize(D, core),
 			('name', 'host'),
 			('xmlns', 'http://fault.io/xml/dev/fpi'),
@@ -906,14 +885,14 @@ def host(reqs, ctx, paths):
 	corefile = ctx / 'core.xml'
 	corefile.store(xml)
 
-	intentions(corefile)
+	return corefile
 
 def web_context(reqs, ctx, paths):
 	# default command
 	webcc = select(paths, ['emcc'], web_compiler_collection_preference)
 	if webcc is None:
 		return None
-	ccname, cc = webcc
+	ccname, cc_route = webcc
 
 	# Execution method for targets.
 	node = select(paths, ['emcc'], web_compiler_collection_preference)
@@ -940,7 +919,7 @@ def web_context(reqs, ctx, paths):
 
 			'target-file-extensions': {
 				None: '.js',
-				'fragment': '.bc',
+				'partial': '.bc',
 			},
 
 			'reference-types': {'weak', 'lazy', 'upward', 'default'},
@@ -967,13 +946,13 @@ def web_context(reqs, ctx, paths):
 					'emscripten': [],
 				},
 				# fragments do not have requirements.
-				'fragment': None,
+				'partial': None,
 			},
 
 			# subject interfaces.
 			'integrations': {
 				None: {
-					'interface': libdev.__name__ + '.web_link_editor',
+					'interface': cc.__name__ + '.web_link_editor',
 					'type': 'linker',
 					'name': 'emcc',
 					'command': str(cc),
@@ -982,11 +961,11 @@ def web_context(reqs, ctx, paths):
 			},
 
 			'transformations': {
-				None: {
-					'interface': libdev.__name__ + '.web_compiler_collection',
+				'tool:emcc': {
+					'interface': cc.__name__ + '.web_compiler_collection',
 					'type': 'collection',
 					'name': 'emcc',
-					'command': str(cc),
+					'command': str(cc_route),
 					'implementation': 'emscripten',
 					'libraries': [],
 					'version': None,
@@ -997,6 +976,9 @@ def web_context(reqs, ctx, paths):
 						'builtins': None
 					},
 				},
+				None: {
+					'inherit': 'tool:emcc',
+				},
 			},
 		}
 	}
@@ -1004,7 +986,7 @@ def web_context(reqs, ctx, paths):
 	S = libxml.Serialization()
 	D = S.switch('data:')
 	xml = b''.join(
-		S.root('context',
+		S.root('mechanism',
 			libxml.Data.serialize(D, core),
 			('name', 'web'),
 			('xmlns', 'http://fault.io/xml/dev/fpi'),
@@ -1025,12 +1007,13 @@ factors = os.environ.get('FACTORS')
 if factors and factors != fpath:
 	fpath = fpath + ':' + factors
 ctx_path = os.path.realpath(os.path.dirname(sys.argv[0]))
+ctx_lib = os.path.join(ctx_path, 'lib', 'python')
 os.environ['CONTEXT'] = ctx_path
 dev_bin = %s
 """ %(repr(__package__).encode('utf-8'),)
 
 ep_template = prefix + b"""
-os.environ['PYTHONPATH'] = fpath
+os.environ['PYTHONPATH'] = ctx_lib + ':' + fpath if fpath else ctx_lib
 os.execv(sys.executable, [
 		sys.executable, '-m', %s,
 		'context', ctx_path,
@@ -1078,22 +1061,35 @@ def sysconfig_python_parameters():
 		}
 	}
 
+def materialize_support_project(directory, name):
+	# Initialize the telemetry project for holding tool support modules.
+	from ...text import bin as tmodule
+	from .. import templates
+
+	status = os.spawnv(os.P_WAIT, sys.executable, [
+		sys.executable, '-m', tmodule.__name__ + '.ifst',
+		str(directory), templates.__name__, 'context', name
+	])
+
+	return status
+
 def main(inv):
-	target, *args = inv.args
+	refctx = None
+	intention, target, *args = inv.args
 	reqs = dict(zip(args[0::2], args[1::2]))
+
+	if 'CONTEXT' in os.environ:
+		refctx = libroutes.File.from_absolute(os.environ['CONTEXT'])
 
 	ctx = libroutes.File.from_path(target)
 	mechdir = ctx / 'mechanisms'
-	measures = ctx / 'measurements'
 	lib = ctx / 'lib'
 	work = ctx / 'work'
 	params = ctx / 'parameters'
+	pylib = lib / 'python'
 
-	for x in mechdir, measures, lib, work:
+	for x in mechdir, lib, work, pylib:
 		x.init('directory')
-
-	for x in 'host', 'static', 'inspect', 'web':
-		(mechdir / x).init('directory')
 
 	# Initialize entry point for context.
 	initial = __package__.split('.')[0]
@@ -1101,7 +1097,7 @@ def main(inv):
 	pypath = os.path.dirname(os.path.dirname(fault.__file__))
 	pypath = '\nfpath = ' + repr(pypath)
 
-	dev = (ctx / 'develop')
+	dev = (ctx / 'execute')
 	dev.init('file')
 	src = ep_template % (
 		repr(__package__ + '.interface').encode('utf-8'),
@@ -1119,31 +1115,65 @@ def main(inv):
 
 	# Initialize context/parameters and store the Python parameter.
 	params.init('directory')
+
+	if refctx is not None:
+		support = str(refctx)
+	else:
+		support = ''
+
+	ctxparams = (params / 'context.xml')
+	ctxparams.init('file')
+	xml = libxml.Serialization()
+	x = cc.Parameters.serialize_parameters(xml,
+		'http://protocol.fault.io/factor/context',
+		{
+			'support': support,
+			'name': 'host',
+			'intention': intention,
+			'optimizations': {
+				'time': 1 if intention == 'optimal' else 0,
+				'debug': 1 if intention in {'debug','test','metrics'} else 0,
+				'size': 0,
+				'power': 0,
+			},
+		},
+	)
+	ctxparams.store(b''.join(x))
+
 	python = (params / 'python.xml')
 	python.init('file')
 	xml = libxml.Serialization()
-	x = libdev.Context.serialize_parameter(xml,
+	x = cc.Parameters.serialize_parameters(xml,
 		'http://protocol.fault.io/factor/python',
 		sysconfig_python_parameters()
 	)
 	python.store(b''.join(x))
 
 	paths = probe.environ_paths()
-	host(reqs, mechdir / 'host', paths)
-	static(reqs, mechdir / 'static', paths)
-	inspect(reqs, mechdir / 'inspect', paths)
-	web_context(reqs, mechdir / 'web', paths)
 
-	# Initialze default scanner probes.
-	sa = (ctx / 'scanner')
-	probed = (sa / 'probes')
-	from .. import probes
-	status = os.spawnv(os.P_WAIT, sys.executable, [
-		sys.executable, '-m', probes.__name__, str(probed)
-	])
-	(probed / '__init__.py').init('file')
+	if intention == 'inspect':
+		corefile = inspect(reqs, mechdir, paths)
+		designate(corefile, intention, 'intent.xml')
+		empty(ctx/'mechanisms'/'static.xml', 'static')
+		materialize_support_project(pylib / 'f_syntax', 'inspection')
+	else:
+		corefile = host(intention, reqs, mechdir, paths)
+		designate(corefile, intention, 'intent.xml')
+		static(reqs, mechdir, paths)
 
-	sys.exit(0)
+		# Initialze default scanner probes.
+		sa = (ctx / 'scanner')
+		probed = (sa / 'probes')
+		from .. import probes
+		status = os.spawnv(os.P_WAIT, sys.executable, [
+			sys.executable, '-m', probes.__name__, str(probed)
+		])
+		(probed / '__init__.py').init('file')
+
+		if intention == 'metrics':
+			materialize_support_project(pylib / 'f_telemetry', 'instrumentation')
+
+	return inv.exit(0)
 
 if __name__ == '__main__':
 	libsys.control(main, libsys.Invocation.system())

@@ -44,15 +44,22 @@ def xml(
 	"""
 	# &..xml based processor for XML targets.
 	"""
-	vars = list(build.variants.items())
-	vars.sort()
+	variants = list(build.variants.items())
+	variants.sort()
 
 	cmd = ['xml', adapter['name'], filepath(output), filepath(inputs[0])]
-	cmd.extend(itertools.chain.from_iterable(vars))
+	cmd.extend(itertools.chain.from_iterable(variants))
 
 	return cmd
 
+def xml_combine(transform_mechanisms, *args, **kw):
+	"""
+	# Used to build xml "executable" targets.
+	"""
+	return xml(*args, **kw)
+
 def xml_link(
+		transform_mechanism,
 		build, adapter,
 		otype, output,
 		itype, inputs,
@@ -95,6 +102,7 @@ def lessc(
 	return cmd
 
 def css_cleancss(
+		transform_mechanisms,
 		build, adapter, o_type, output, i_type, inputs,
 		fragments, libraries,
 		verbose=None,
@@ -120,6 +128,7 @@ def css_cleancss(
 	return command
 
 def javascript_uglify(
+		transform_mechanisms,
 		build, adapter, o_type, output, i_type, inputs,
 		fragments, libraries,
 		verbose=None,

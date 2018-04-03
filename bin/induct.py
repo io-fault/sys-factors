@@ -13,7 +13,7 @@ import types
 import importlib.util
 import collections
 
-from .. import library as libdev
+from .. import cc
 
 from ...system import libfactor
 from ...routes import library as libroutes
@@ -35,27 +35,27 @@ def main():
 		env = os.environ
 
 	rebuild = env.get('FPI_REBUILD', '0')
-	ctx = libdev.Context.from_environment()
+	ctx = cc.Context.from_environment()
 	variants, mech = ctx.select('bytecode.python')
 
 	rebuild = bool(int(rebuild))
 	if rebuild:
-		condition = libdev.rebuild
+		condition = cc.rebuild
 	else:
-		condition = libdev.updated
+		condition = cc.updated
 
 	# collect packages to prepare from positional parameters
 	roots = [import_from_fullname(x) for x in args]
 
 	# Get the simulations for the bytecode files.
-	for f in libdev.gather_simulations(roots):
-		refs = libdev.references(f.dependencies())
+	for f in cc.gather_simulations(roots):
+		refs = cc.references(f.dependencies())
 		(sp, (fvariants, key, locations)), = f.link(variants, ctx, mech, refs, [])
 		outdir = locations['integral']
 
 		for src in f.sources():
 			induct = outdir / src.identifier
-			perform, cf = libdev.update_bytecode_cache(src, induct, condition)
+			perform, cf = cc.update_bytecode_cache(src, induct, condition)
 			if perform and cf.exists():
 				cf.replace(induct)
 				print(str(induct), '->', cf)
@@ -72,7 +72,7 @@ def main():
 		del modules
 
 	for route in candidates:
-		factor = libdev.Factor(route, None, None)
+		factor = cc.Factor(route, None, None)
 		m = ctx.select(factor.domain)
 		if m is None:
 			print('ignoring[unknown type]', str(factor))
@@ -81,7 +81,7 @@ def main():
 
 		if libfactor.composite(route):
 			# Primarily need the probe to select the proper build.
-			refs = libdev.references(factor.dependencies())
+			refs = cc.references(factor.dependencies())
 
 			for sp, l in factor.link(tvars, ctx, tmech, refs, []):
 				vars, key, locations = l
@@ -92,7 +92,7 @@ def main():
 				factor_dir.replace(fp)
 
 				if libfactor.python_extension(factor.module):
-					link, src = libdev.link_extension(factor.route, factor_dir)
+					link, src = cc.link_extension(factor.route, factor_dir)
 					print(str(src), '->', str(link))
 
 	sector.unit.result = 0
