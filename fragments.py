@@ -1,6 +1,6 @@
 """
 # Fragments module providing support for generating xml/fragments instances
-# for source inspection purposes.
+# for source delineation purposes.
 """
 import itertools
 import hashlib

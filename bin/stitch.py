@@ -1,9 +1,6 @@
 """
-# Extract the delineated sources (fragments) of the entire package tree into a
+# Store the delineated sources (fragments) of the entire package tree into a
 # &..filesystem.library.Dictionary instance.
-
-# For composite factors and Python modules, the cached data from a constructed build
-# using the inspect intention provides the sources for the target.
 """
 
 import sys
@@ -223,7 +220,7 @@ def copy(ctx, target, package):
 def main(inv):
 	target, package = inv.args
 
-	ctx = cc.Context.from_environment() # inspect
+	ctx = cc.Context.from_environment() # delineation
 	copy(ctx, target, package)
 
 	return inv.exit(0)

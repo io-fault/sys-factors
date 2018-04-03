@@ -57,7 +57,7 @@ intentions = {
 	'profiling': "Raw profiling build for custom collections",
 	'coverage': "Raw coverage build for custom collections",
 
-	'inspect': "Context used to extract fragments from source files",
+	'delineation': "Context used to extract fragments from source files",
 }
 
 intention_flags = {
@@ -70,7 +70,7 @@ intention_flags = {
 	'profiling': '-P',
 	'coverage': '-C',
 
-	'inspect': '-i',
+	'delineation': '-i',
 }
 
 library_extensions = {
@@ -795,8 +795,8 @@ class Mechanism(object):
 		commands = []
 		for src in f.sources():
 			fnx = src.extension
-			if ctxname != 'inspect' and fnx in ignores or src.identifier.startswith('.'):
-				# Ignore header files and dot-files for non-inspect contexts.
+			if ctxname != 'delineation' and fnx in ignores or src.identifier.startswith('.'):
+				# Ignore header files and dot-files for non-delineation contexts.
 				continue
 			obj = File(loc['output'], src.points)
 
@@ -1516,7 +1516,7 @@ def unix_compiler_collection(
 			'debug': '0',
 			'test': '0',
 			'profile': '3',
-			'inspect': '0',
+			'delineation': '0',
 		},
 		empty = {}
 	):

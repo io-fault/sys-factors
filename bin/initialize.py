@@ -180,7 +180,7 @@ def python_bytecode_domain(paths):
 	# Python extension = maybe python source executed in a library?
 	# Python partial = source file
 
-	pyexe = select(paths, ['python3', 'python3.4', 'python3.5', 'python3.6'], ['python3'])
+	pyexe = select(paths, ['python3', 'python3.4', 'python3.5', 'python3.6', 'python3.7'], ['python3'])
 	pyname, pycommand = pyexe
 
 	return {
@@ -425,9 +425,9 @@ def resource_domain(paths):
 
 	return mech
 
-def inspect(reqs, ctx, paths):
+def delineation(reqs, ctx, paths):
 	"""
-	# Initialize an `inspect` context for managing delineation adaptions.
+	# Initialize a `delineation` context for managing fragment extraction.
 	"""
 
 	iempty = {
@@ -783,7 +783,7 @@ common_intentions = {
 
 	'test': 'Debugging intention with support for injections for comprehensive testing',
 	'metrics': 'Test intention with profiling and coverage collection enabled',
-	'inspect': 'Context used to extract fragments from source files',
+	'delineation': 'Context used to extract fragments from source files',
 
 	'profiling': 'Raw profiling build for custom collections',
 	'coverage': 'Raw coverage build for custom collections',
@@ -1151,8 +1151,8 @@ def main(inv):
 
 	paths = probe.environ_paths()
 
-	if intention == 'inspect':
-		corefile = inspect(reqs, mechdir, paths)
+	if intention == 'delineation':
+		corefile = delineation(reqs, mechdir, paths)
 		designate(corefile, intention, 'intent.xml')
 		empty(ctx/'mechanisms'/'static.xml', 'static')
 		materialize_support_project(pylib / 'f_syntax', 'inspection')

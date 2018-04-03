@@ -55,6 +55,6 @@
 #define FV_COVERAGE(y) (F_INTENTION_ID == F_INTENTION_coverage)
 #define FV_PROFILING(y) (F_INTENTION_ID == F_INTENTION_profiling)
 
-#define FV_INSPECT(y) (F_INTENTION_ID == F_INTENTION_inspect)
+#define FV_DELINEATION(y) (F_INTENTION_ID == F_INTENTION_delineation)
 
 #endif /* guard */
