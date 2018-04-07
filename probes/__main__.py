@@ -2,12 +2,12 @@
 # Instantiate the standard set of construction context probes.
 """
 import sys
-from ...system import library as libsys
-from ...routes import library as libroutes
-from ...xml import lxml
-from ...text import library as libtxt
-from ...text import xml as txtxml
-from ...system import libfactor
+from fault.system import library as libsys
+from fault.routes import library as libroutes
+from fault.xml import lxml
+from fault.text import library as libtxt
+from fault.text import xml as txtxml
+from fault.system import libfactor
 
 def emit(route, elements):
 	element = None

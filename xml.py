@@ -6,8 +6,8 @@
 import itertools
 import typing
 
-from ..chronometry import library as libtime
-from ..xml import library as libxml
+from fault.chronometry import library as libtime
+from fault.xml import library as libxml
 from . import schemas
 
 namespaces = libxml.document.index_namespace_labels(schemas)

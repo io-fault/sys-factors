@@ -25,16 +25,16 @@ import typing
 
 from . import include
 
-from ..computation import library as libc
-from ..chronometry import library as libtime
-from ..routes import library as libroutes
-from ..io import library as libio
-from ..system import library as libsys
-from ..system import libfactor
-from ..filesystem import library as libfs
+from fault.computation import library as libc
+from fault.chronometry import library as libtime
+from fault.routes import library as libroutes
+from fault.io import library as libio
+from fault.system import library as libsys
+from fault.system import libfactor
+from fault.filesystem import library as libfs
 
-from ..xml import library as libxml
-from ..xml import lxml
+from fault.xml import library as libxml
+from fault.xml import lxml
 
 Import = libroutes.Import
 File = libroutes.File

@@ -3,8 +3,8 @@
 """
 import sys
 import os
-from ...system import library as libsys
-from ...routes import library as libroutes
+from fault.system import library as libsys
+from fault.routes import library as libroutes
 from .. import fs
 
 flags = {

@@ -3,8 +3,9 @@
 """
 import os
 from .. import probe as module
-from ...routes import library as libroutes
-from ...io import library as libio
+
+from fault.routes import library as libroutes
+from fault.io import library as libio
 
 def test_executables(test):
 	with libroutes.File.temporary() as td:

@@ -8,11 +8,11 @@ import importlib.util
 
 from .. import include # Minimum modification time.
 from .. import cc
-from ...system import libfactor
+from fault.system import libfactor
 
-from ...routes import library as libroutes
-from ...chronometry import library as libtime
-from ...io import library as libio
+from fault.routes import library as libroutes
+from fault.chronometry import library as libtime
+from fault.io import library as libio
 
 import_from_fullname = libroutes.Import.from_fullname
 import_from_module = libroutes.Import.from_module
@@ -106,5 +106,5 @@ def main():
 
 if __name__ == '__main__':
 	sys.dont_write_bytecode = True
-	from ...io import command
+	from fault.io import command
 	command.execute()

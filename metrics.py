@@ -22,17 +22,17 @@ import subprocess
 import types
 import contextlib
 
-from ..system import library as libsys
-from ..system import corefile
-from ..system import libfactor
+from fault.system import library as libsys
+from fault.system import corefile
+from fault.system import libfactor
 
-from ..routes import library as libroutes
-from ..filesystem import library as libfs
-from ..computation import library as libc
+from fault.routes import library as libroutes
+from fault.filesystem import library as libfs
+from fault.computation import library as libc
+from fault.syntax import library as libsyntax
 
 from . import testing
 from . import cc
-from ..syntax import library as libsyntax
 
 def target(context, route):
 	"""
@@ -606,7 +606,7 @@ class Harness(testing.Harness):
 			tb = ''.join(tb)
 			sys.stderr.write(tb)
 
-			from ..xml.python import Serialization
+			from fault.xml.python import Serialization
 			xml = Serialization(xml_prefix='py:', xml_encoding='ascii')
 			error = list(xml.exception(test.fate, attributes=[
 					('xmlns:py', 'http://fault.io/xml/data')

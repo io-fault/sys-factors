@@ -6,9 +6,10 @@
 # this as the default when a given language is not supported.
 """
 import sys
-from ...system import library as libsys
-from ...routes import library as libroutes
-from ...xml import library as libxml
+
+from fault.system import library as libsys
+from fault.routes import library as libroutes
+from fault.xml import library as libxml
 from .. import fragments
 
 prefix = b'<factor xmlns="http://fault.io/xml/fragments"><void>'
@@ -26,7 +27,8 @@ def main(inv):
 	lines = fragments.source_element(libxml.Serialization(), route)
 	out.writelines(lines)
 	out.write(suffix)
-	sys.exit(0)
+
+	return inv.exit(0)
 
 if __name__ == '__main__':
 	libsys.control(main, libsys.Invocation.system())

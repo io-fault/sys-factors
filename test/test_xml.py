@@ -1,7 +1,7 @@
 """
-Metrics validation.
+# Metrics validation.
 """
-from ...xml import libfactor
+from fault.xml import libfactor
 from ..schemas import metrics
 
 valids = {

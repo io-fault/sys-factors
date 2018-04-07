@@ -12,8 +12,8 @@ import types
 
 from . import cc
 
-from ..routes import library as libroutes
-from ..io import library as libio
+from fault.routes import library as libroutes
+from fault.io import library as libio
 
 def fs_routes(i:typing.Iterator[str]) -> typing.Sequence[libroutes.File]:
 	return list(map(libroutes.File.from_absolute, i))

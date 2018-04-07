@@ -39,7 +39,7 @@ class Harness(object):
 		# The construction contexts that will be referenced to identify
 		# the builds to test.
 	"""
-	from . import libtest # class attribute for general access.
+	from fault.test import library as libtest
 	Test = libtest.Test
 	gather = staticmethod(libtest.gather)
 

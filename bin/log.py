@@ -9,8 +9,8 @@ import collections
 
 from .. import cc
 
-from ...system import libfactor
-from ...routes import library as libroutes
+from fault.system import libfactor
+from fault.routes import library as libroutes
 
 if __name__ == '__main__':
 	env = os.environ

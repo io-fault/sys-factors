@@ -6,10 +6,11 @@ import sys
 import functools
 import subprocess
 
-from ...routes import library as libroutes
-from ...xml import library as libxml
-from ...system import library as libsys
-from ...system import libfactor
+from fault.routes import library as libroutes
+from fault.xml import library as libxml
+from fault.system import library as libsys
+from fault.system import libfactor
+
 from .. import probe
 from .. import cc
 from .. import web
@@ -1063,7 +1064,7 @@ def sysconfig_python_parameters():
 
 def materialize_support_project(directory, name):
 	# Initialize the telemetry project for holding tool support modules.
-	from ...text import bin as tmodule
+	from fault.text import bin as tmodule
 	from .. import templates
 
 	status = os.spawnv(os.P_WAIT, sys.executable, [
@@ -1093,8 +1094,8 @@ def main(inv):
 
 	# Initialize entry point for context.
 	initial = __package__.split('.')[0]
-	fault = sys.modules[initial]
-	pypath = os.path.dirname(os.path.dirname(fault.__file__))
+	kit = sys.modules[initial]
+	pypath = os.path.dirname(os.path.dirname(kit.__file__))
 	pypath = '\nfpath = ' + repr(pypath)
 
 	dev = (ctx / 'execute')

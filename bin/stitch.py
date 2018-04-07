@@ -8,16 +8,17 @@ import itertools
 import os.path
 from copy import deepcopy
 
-from ...system import libfactor
-from ...system import library as libsys
+from fault.system import libfactor
+from fault.system import library as libsys
 
 from .. import xml as devxml
 from .. import cc
 
-from ...routes import library as libroutes
-from ...xml import libfactor as xmlfactor
-from ...filesystem import library as libfs
-from ...xml import library as libxml
+from fault.routes import library as libroutes
+from fault.xml import libfactor as xmlfactor
+from fault.filesystem import library as libfs
+from fault.xml import library as libxml
+
 lxml = xmlfactor.lxml
 fragments_ns = devxml.namespaces['fragments']
 
@@ -52,7 +53,7 @@ def copy(ctx, target, package):
 		x for x in pkg.tree()[0]
 		if x.absolute[-1] == 'extensions'
 	]
-	from fragments.python import xml as d_python
+	from ...adapters.python import xml as d_python
 
 	for pex in pexset:
 		# Get the list of extension modules

@@ -4,7 +4,7 @@
 """
 
 import sys
-from ...routes import library as libroutes
+from fault.routes import library as libroutes
 
 def descend(route, directory='__pycache__'):
 	p = (route / directory)

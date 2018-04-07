@@ -1,9 +1,9 @@
 """
-Test compilation of system modules.
+# Test compilation of system modules.
 """
 # Temporary directories are used to manage
 # the test compilation modules.
-from ...routes import library as libroutes
+from fault.routes import library as libroutes
 
 bad_c_module = \
 	"""

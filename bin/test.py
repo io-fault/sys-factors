@@ -9,11 +9,10 @@ import functools
 import types
 import importlib
 
-from ...system import library as libsys
-from ...system import corefile
-from ...routes import library as libroutes
-
-from .. import libtest
+from fault.system import library as libsys
+from fault.system import corefile
+from fault.routes import library as libroutes
+from fault.test import library as libtest
 
 from .. import testing
 from .. import backtrace

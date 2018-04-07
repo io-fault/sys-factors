@@ -6,7 +6,7 @@
 # related
 """
 import typing
-from ..filesystem import library as libfs
+from fault.filesystem import library as libfs
 
 class Corpus(libfs.Protocol):
 	"""

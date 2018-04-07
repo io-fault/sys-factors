@@ -1,4 +1,4 @@
-from ...system import corefile
+from fault.system import corefile
 from .. import backtrace as module
 
 def test_location(test):

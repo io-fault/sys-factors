@@ -5,8 +5,8 @@
 # XML document.
 """
 import sys
-from ...xml import lxml, libfactor
-from ...xml import library as libxml
+from fault.xml import lxml, libfactor
+from fault.xml import library as libxml
 
 def transform(document, parameters):
 	"""

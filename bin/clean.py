@@ -5,8 +5,8 @@ import os
 import sys
 import types
 
-from ...routes import library as libroutes
-from ...io import library as libio
+from fault.routes import library as libroutes
+from fault.io import library as libio
 
 import_from_fullname = libroutes.Import.from_fullname
 import_from_module = libroutes.Import.from_module
@@ -44,5 +44,5 @@ def main():
 
 if __name__ == '__main__':
 	sys.dont_write_bytecode = True
-	from ...io import command
+	from fault.io import command
 	command.execute()
