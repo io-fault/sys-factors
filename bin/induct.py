@@ -15,9 +15,9 @@ import collections
 
 from .. import cc
 
-from ...system import libfactor
-from ...routes import library as libroutes
-from ...io import library as libio
+from fault.system import libfactor
+from fault.routes import library as libroutes
+from fault.io import library as libio
 
 def main():
 	"""
@@ -98,5 +98,5 @@ def main():
 	sector.unit.result = 0
 
 if __name__ == '__main__':
-	from ...io import command
+	from fault.io import command
 	command.execute()

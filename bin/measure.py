@@ -8,13 +8,13 @@ import contextlib
 import collections
 import pickle
 
+from fault.system import libfactor
+from fault.routes import library as libroutes
+from fault.system import corefile
+from fault.system import library as libsys
+
 from .. import metrics
 from .. import cc
-from ...system import libfactor
-
-from ...routes import library as libroutes
-from ...system import corefile
-from ...system import library as libsys
 
 def test(context, telemetry, tools, route):
 	"""

@@ -9,8 +9,9 @@ import sys
 import collections
 import pickle
 
-from ...system import library as libsys
-from ...routes import library as libroutes
+from fault.system import library as libsys
+from fault.routes import library as libroutes
+
 from .. import metrics
 
 delimit_reveal_start = '['
