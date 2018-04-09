@@ -20,8 +20,8 @@ import importlib
 import importlib.machinery
 import collections
 
-from ..routes.library import Import
-from ..system import libfactor
+from fault.routes.library import Import
+from fault.system import libfactor
 
 from . import cc
 

@@ -158,7 +158,7 @@ Modules raise exceptions to force editing.
 
 			if __name__ == '__main__':
 				import sys
-				from ...development import libtest
+				from fault.test import library as libtest
 				libtest.execute(sys.modules[__name__])
 
 /documentation

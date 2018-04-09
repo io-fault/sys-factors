@@ -29,6 +29,7 @@ from fault.system import libfactor
 from fault.routes import library as libroutes
 from fault.filesystem import library as libfs
 from fault.computation import library as libc
+from fault.range import library as librange
 from fault.syntax import library as libsyntax
 
 from . import testing
@@ -361,23 +362,23 @@ def coverage(counts, counters):
 	n_missing = len(zeros)
 	n_counted = len(positives)
 
-	traversable = libc.range.Set(([],[]))
+	traversable = librange.Set(([],[]))
 	for x, y in counters.items():
 		startl = x[0]
 		stopl = y[0] or startl
-		traversable.add(libc.range.IRange((startl,stopl)))
+		traversable.add(librange.IRange((startl,stopl)))
 
-	traversed = libc.range.Set(([],[]))
+	traversed = librange.Set(([],[]))
 	for x in positives:
 		startl = x[0]
 		stopl = counters_meta.get(x, (startl,))[0] or startl
-		traversed.add(libc.range.IRange((startl,stopl)))
+		traversed.add(librange.IRange((startl,stopl)))
 
-	untraversed = libc.range.Set(([],[]))
+	untraversed = librange.Set(([],[]))
 	for x in zeros:
 		startl = x[0]
 		stopl = counters_meta[x][0] or startl
-		untraversed.add(libc.range.IRange((startl,stopl)))
+		untraversed.add(librange.IRange((startl,stopl)))
 
 	return (
 		n_missing, n_counted, len(counters),

@@ -1,8 +1,8 @@
 """
 # Sanity checks for metrics.
 """
-from ...routes import library as libroutes
-from ...computation import library as libc
+from fault.routes import library as libroutes
+from fault.computation import library as libc
 from .. import metrics
 
 def test_Measurements_init(test):
