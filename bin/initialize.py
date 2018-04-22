@@ -181,6 +181,7 @@ def python_bytecode_domain(paths):
 	# Python extension = maybe python source executed in a library?
 	# Python partial = source file
 
+	from ...adapters.python.bin import compile
 	pyexe = select(paths, ['python3', 'python3.4', 'python3.5', 'python3.6', 'python3.7'], ['python3'])
 	pyname, pycommand = pyexe
 
@@ -194,9 +195,9 @@ def python_bytecode_domain(paths):
 		'transformations': {
 			'python': {
 				'method': 'internal',
-				'interface': cc.__name__ + '.local_bytecode_compiler',
+				'interface': compile.__name__ + '.function_bytecode_compiler',
 				'name': 'pyc',
-				'command': __package__ + '.pyc',
+				'command': __package__ + '.compile',
 			},
 		}
 	}

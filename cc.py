@@ -1645,7 +1645,7 @@ def local_bytecode_compiler(
 	from .bin.pyc import compile_python_bytecode
 
 	intention = build.context.intention(None)
-	inf, = inputs
+	inf, = inputs # One source file.
 
 	command = [
 		compile_python_bytecode, filepath(output), filepath(inf),
@@ -2350,6 +2350,11 @@ class Construction(libio.Context):
 					if logfile.exists():
 						logfile.void()
 				except BaseException as err:
+					self.failures += 1
+					pi_call = cmd[0]
+					pi_call_id = '.'.join((pi_call.__module__, pi_call.__name__))
+					print(factor.fullname, 'call (%s) raised' % (pi_call_id,), err.__class__.__name__, str(err))
+
 					from traceback import format_exception
 					out = format_exception(err.__class__, err, err.__traceback__)
 					logfile.store('[Exception]\n#!/traceback\n\t', 'w')

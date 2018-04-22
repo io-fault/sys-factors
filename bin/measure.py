@@ -70,16 +70,24 @@ def test(context, telemetry, tools, route):
 	variants, domain = context.select('bytecode.python')
 	mech = domain.descriptor['transformations']['python']
 	tool_ref = mech.get('telemetry')
+	metrics_sources = {}
 	for f in simulated_factors:
+		refs = cc.references(f.dependencies())
+		(sp, (fvariants, key, locations)), = f.link(variants, context, domain, refs, [])
+		outdir = locations['integral']
+
 		for src in f.sources():
+			processed = outdir / src.identifier
 			module_name = src.identifier.rsplit('.', 1)[0]
 			if module_name == '__init__':
 				s_route = f.route
 			else:
 				s_route = f.route / module_name
 
-			source_path_map[str(src)] = ('whole', str(s_route), str(s_route.container))
-			factor_map[tool_ref][str(s_route)] = (s_route, None, [src])
+			fr = str(s_route)
+			source_path_map[str(src)] = ('whole', fr, str(s_route.container))
+			factor_map[tool_ref][fr] = (s_route, None, [src])
+			metrics_sources[fr] = processed
 
 	division = metrics.Telemetry(telemetry / str(route) / 'test')
 	division.init()
@@ -103,8 +111,19 @@ def test(context, telemetry, tools, route):
 	with (project_region_map / 'counters').open('wb') as f:
 		pickle.dump(counter_data, f)
 
+	# Clear any modules already loaded.
+	prefix = str(route) + '.'
+	for x in [k for k in sys.modules if k.startswith(prefix)]:
+		m = sys.modules[x]
+		del sys.modules[x]
+	sys.modules.pop(prefix[:-1])
+
 	harness = metrics.Harness(tools, context, division, str(route), sys.stderr)
-	harness.execute(harness.root(route), ())
+
+	# Manage Fork exceptions specially so the real root has cleanup rights.
+	rf = metrics.testing.RedirectFinder.root(metrics_sources)
+	with rf:
+		harness.execute(harness.root(route), ())
 
 	captures = [
 		metrics.Measurements(x) for x in (telemetry/str(route)).subdirectories()
@@ -185,7 +204,7 @@ def main(inv):
 		return inv.exit(1)
 
 	if 'TELEMETRY' not in os.environ or not os.environ['TELEMETRY'].strip():
-		# Telemetry unspecified, default to context/telemetry
+		# Telemetry destination unspecified, default to context/telemetry
 		telemetry = ctx_route / 'telemetry'
 		os.environ['TELEMETRY'] = str(telemetry)
 	else:
@@ -204,9 +223,6 @@ def main(inv):
 		if 'constructor' in tdata
 	]
 
-	# Make sure fragments.python is placed last in the sequence.
-	# Avoids the collection of data regarding other tooling.
-	tools.sort(key=lambda k:(k[1]['constructor']=='fragments.python.library.Probe'))
 	for t, d in tools:
 		tool_stack.enter_context(t.setup(ctx, telemetry, d)) # (Harness, tool Data)
 

@@ -1,7 +1,7 @@
 """
 # Metrics data aggregation and serialization.
 
-# Used in conjunction with &.bin.measure and &..factors to report the collected measurements
+# Used in conjunction with &.bin.measure to report the collected measurements
 # along side the tests that produced them.
 
 # [ Engineering ]
@@ -21,6 +21,7 @@ import os.path
 import subprocess
 import types
 import contextlib
+import importlib
 
 from fault.system import library as libsys
 from fault.system import corefile
@@ -505,8 +506,6 @@ class Harness(testing.Harness):
 	"""
 	# Harness for performing test-based measurements of a set of factors.
 	"""
-	from ..chronometry import library as libtime
-
 	concurrently = staticmethod(libsys.concurrently)
 
 	def __init__(self, tools, context, telemetry, package, status):
@@ -579,7 +578,8 @@ class Harness(testing.Harness):
 		report['exitstatus'] = os.WEXITSTATUS(status)
 		return report
 
-	def seal(self, test):
+	from fault.chronometry import library as libtime
+	def seal(self, test, stopwatch=libtime.clock.stopwatch):
 		"""
 		# Perform the test and store its report and measurements into
 		# the configured metrics directory.
@@ -594,7 +594,7 @@ class Harness(testing.Harness):
 		os.environ['FAULT_MEASUREMENT_CONTEXT'] = str(measures)
 
 		# Get timing of test execution.
-		with probes, self.libtime.clock.stopwatch() as view:
+		with probes, stopwatch() as view:
 			with test.exits:
 				test.seal()
 
@@ -635,3 +635,4 @@ class Harness(testing.Harness):
 		if isinstance(test.fate, self.libtest.Divide):
 			# subtests
 			self.execute(test.fate.content, ())
+	del libtime

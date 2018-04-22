@@ -19,11 +19,122 @@ import types
 import importlib
 import importlib.machinery
 import collections
+import contextlib
 
-from fault.routes.library import Import
-from fault.system import libfactor
+from fault.routes import library as libroutes
+from fault.system import libfactor, library as libsys
 
 from . import cc
+
+class RedirectFinder(object):
+	"""
+	# Redirect the import of a Python module to select an alternative bytecode file.
+	"""
+	SupportingFinder = importlib.machinery.PathFinder
+
+	class Loader(importlib.machinery.SourceFileLoader):
+		_bytecode_path = None
+		_module_name = None
+
+		def get_data(self, bytecode_path):
+			return super().get_data(self._bytecode_path)
+
+	def __init__(self, mapping):
+		self.redirects = mapping
+
+	@classmethod
+	def invalidate_caches(self):
+		pass
+
+	def find_spec(self, name, path, target=None):
+		spec = self.SupportingFinder.find_spec(name, path, target=target)
+		if spec is None:
+			return None
+
+		if spec.name in self.redirects:
+			spec.cached = str(self.redirects[spec.name])
+			spec.loader.__class__ = self.Loader
+			spec.loader._bytecode_path = spec.cached
+			spec.loader._module_name = spec.name
+
+		return spec
+
+	@contextlib.contextmanager
+	def redirection(self):
+		"""
+		# Context manager installing import redirects for Python bytecode.
+		# Allows the use of out-of-place constructed bytecode files with the executing tests.
+		"""
+
+		suppress = False
+		ridx = sys.meta_path.index(self.SupportingFinder)
+		sys.meta_path.insert(ridx, self)
+		try:
+			yield None
+		except libsys.Fork:
+			suppress = True
+			raise
+		finally:
+			if not suppress:
+				del sys.meta_path[sys.meta_path.index(self)]
+
+	envvar = 'PYTHONIMPORTREDIRECTS'
+
+	@classmethod
+	def inherit(Class):
+		"""
+		# Permanently inherit import redirects from the environment.
+		"""
+
+		import pickle
+
+		paths = os.environ[Class.envvar]
+		redirects = {}
+		redirects_files = [x for x in paths.split(os.path.pathsep) if x.strip() != '']
+
+		for path in redirects_files:
+			with open(path) as f:
+				redirects.update(pickle.load(f))
+
+		finder = Class(redirects)
+		finder.redirection().__enter__()
+		return finder
+
+	@classmethod
+	@contextlib.contextmanager
+	def root(Class, mapping):
+		"""
+		# Create and install the &RedirectFinder along with a temporary file
+		# noted in (system/environ)`PYTHONIMPORTREDIRECTS` for subprocesses
+		# to inherit.
+		"""
+
+		import pickle
+		suppress = False
+		finder = Class(mapping)
+
+		with libroutes.File.temporary() as tmpdir:
+			f = tmpdir/'import-redirects.pickle'
+			f.store(pickle.dumps({k:str(v) for k,v in mapping.items()}))
+
+			try:
+				if Class.envvar in os.environ:
+					r = os.environ[Class.envvar]
+				else:
+					r = None
+					os.environ[Class.envvar] = ''
+				os.environ[Class.envvar] += (os.path.pathsep + str(f))
+				with finder.redirection():
+					yield finder
+			except libsys.Fork:
+				suppress = True
+				raise
+			finally:
+				if not suppress:
+					if r is None:
+						del os.environ[Class.envvar]
+					else:
+						os.environ[Class.envvar] = r
 
 class Harness(object):
 	"""
@@ -75,7 +186,7 @@ class Harness(object):
 		# The package module
 		module = importlib.import_module(test.identity)
 		test/module.__name__ == test.identity
-		ir = Import.from_fullname(module.__name__)
+		ir = libroutes.Import.from_fullname(module.__name__)
 		tid = str(ir.floor())
 
 		# Initialize the project attribute and imports set.
@@ -116,12 +227,13 @@ class Harness(object):
 		# Construct the Test instances for the tests gathered in &container
 		# and perform them using &dispatch.
 		"""
+
 		for tid, tcall in getattr(container, '__tests__', ()):
 			test = self.Test(tid, tcall)
 			self.test = tid
 			self.dispatch(test)
 
-	def preload_extension(self, test_id, route:Import):
+	def preload_extension(self, test_id, route):
 		"""
 		# Given a Python extension, &route, import the module using
 		# the configured &self.context.
@@ -149,7 +261,7 @@ class Harness(object):
 
 		# Update containing package dictionary and sys.modules
 		sys.modules[name] = mod
-		route = Import.from_fullname(name)
+		route = libroutes.Import.from_fullname(name)
 		parent = importlib.import_module(str(route.container))
 		setattr(parent, route.identifier, mod)
 

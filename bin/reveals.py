@@ -2,8 +2,9 @@
 # Command line reporting tool for navigating uncounted regions produced by &.measure.
 
 ##!/pl/sh
-	metrics/measure project
-	metrics/execute reveals
+	cc/metrics/execute construct project
+	cc/metrics/execute measure project
+	cc/metrics/execute reveals
 """
 import sys
 import collections
@@ -51,7 +52,12 @@ def main(inv):
 			context = '.'.join((datadir.identifier, test.identifier))
 			pf = test / 'counters'
 			with pf.open('rb') as f:
-				counters = pickle.load(f)
+				try:
+					counters = pickle.load(f)
+				except EOFError:
+					# DEFECT: throw warning
+					print('EOF')
+					continue
 			for f, data in counters.items():
 				counts[f].update(data)
 
@@ -78,6 +84,7 @@ def main(inv):
 			n_missing = len(missing)
 			if n_missing == 0:
 				continue
+
 			lines = libroutes.File.from_absolute(path).load(mode='r').split('\n')
 
 			header = '%s [%d lines %d missed counters of %d]'%(

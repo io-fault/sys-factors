@@ -3,7 +3,7 @@
 
 # This copies constructed files into a filesystem location that Python requires them
 # to be in order for them to be used. For fabricated targets, this means placing
-# bytecode compiles into (system:filename)`__pycache__` directories. For Python extension
+# bytecode compiles into (system/filename)`__pycache__` directories. For Python extension
 # modules managed with composite factors, this means copying the constructed extension
 # library into the appropriate package directory.
 """
