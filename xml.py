@@ -6,7 +6,7 @@
 import itertools
 import typing
 
-from fault.chronometry import library as libtime
+from fault.time import library as libtime
 from fault.xml import library as libxml
 from . import schemas
 

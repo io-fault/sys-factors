@@ -26,7 +26,7 @@ import typing
 from . import include
 
 from fault.computation import library as libc
-from fault.chronometry import library as libtime
+from fault.time import library as libtime
 from fault.routes import library as libroutes
 from fault.io import library as libio
 from fault.system import library as libsys

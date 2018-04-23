@@ -11,7 +11,7 @@ from .. import cc
 from fault.system import libfactor
 
 from fault.routes import library as libroutes
-from fault.chronometry import library as libtime
+from fault.time import library as libtime
 from fault.io import library as libio
 
 import_from_fullname = libroutes.Import.from_fullname

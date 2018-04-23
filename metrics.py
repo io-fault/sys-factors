@@ -578,7 +578,7 @@ class Harness(testing.Harness):
 		report['exitstatus'] = os.WEXITSTATUS(status)
 		return report
 
-	from fault.chronometry import library as libtime
+	from fault.time import library as libtime
 	def seal(self, test, stopwatch=libtime.clock.stopwatch):
 		"""
 		# Perform the test and store its report and measurements into
