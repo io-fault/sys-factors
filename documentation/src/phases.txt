@@ -119,8 +119,8 @@ that define the sources of the a particular factor set.
 For comparison, the effects of a (python:package)`distutils`
 based build does *not* perform a function similar to inductance. Rather, a separate
 build directory is used to house the content for installation and release packaging.
-For (python:package)`distutils`, Inductance would be similar to performing a build,
-and adding the built package to (system:environment)`PYTHONPATH`. &..development
+For (python/package)`distutils`, Inductance would be similar to performing a build,
+and adding the built package to (system/environ)`PYTHONPATH`. &..development
 orients this differently to aid the developer during engineering, and to maintain
 the consistency of the tree without manifest files upon installation.
 
