@@ -39,8 +39,9 @@ class RedirectFinder(object):
 		def get_data(self, bytecode_path):
 			return super().get_data(self._bytecode_path)
 
-	def __init__(self, mapping):
-		self.redirects = mapping
+	def __init__(self, bytecodes, extensions):
+		self.bytecode_redirects = bytecodes
+		self.extension_redirects = extensions
 
 	@classmethod
 	def invalidate_caches(self):
@@ -51,8 +52,10 @@ class RedirectFinder(object):
 		if spec is None:
 			return None
 
-		if spec.name in self.redirects:
-			spec.cached = str(self.redirects[spec.name])
+		if spec.name in self.extension_redirects:
+			spec.origin = spec.loader.path = str(self.extension_redirects[spec.name])
+		elif spec.name in self.bytecode_redirects:
+			spec.cached = str(self.bytecode_redirects[spec.name])
 			spec.loader.__class__ = self.Loader
 			spec.loader._bytecode_path = spec.cached
 			spec.loader._module_name = spec.name
@@ -89,20 +92,24 @@ class RedirectFinder(object):
 		import pickle
 
 		paths = os.environ[Class.envvar]
-		redirects = {}
+		r_bc = {}
+		r_ext = {}
 		redirects_files = [x for x in paths.split(os.path.pathsep) if x.strip() != '']
 
+		import fault.routes.library as lr
 		for path in redirects_files:
-			with open(path) as f:
-				redirects.update(pickle.load(f))
+			f=lr.File.from_absolute(path)
+			with open(path, 'rb') as f:
+				bytecodes, extensions = pickle.load(f)
+				r_bc.update(bytecodes)
+				r_ext.update(extensions)
 
-		finder = Class(redirects)
-		finder.redirection().__enter__()
+		finder = Class(r_bc, r_ext)
 		return finder
 
 	@classmethod
 	@contextlib.contextmanager
-	def root(Class, mapping):
+	def root(Class, *mappings):
 		"""
 		# Create and install the &RedirectFinder along with a temporary file
 		# noted in (system/environ)`PYTHONIMPORTREDIRECTS` for subprocesses
@@ -111,30 +118,35 @@ class RedirectFinder(object):
 
 		import pickle
 		suppress = False
-		finder = Class(mapping)
+		finder = Class(*mappings)
 
-		with libroutes.File.temporary() as tmpdir:
-			f = tmpdir/'import-redirects.pickle'
-			f.store(pickle.dumps({k:str(v) for k,v in mapping.items()}))
+		tmp = libroutes.File.from_absolute(libroutes.tempfile.mkdtemp())
+		f = tmp/'import-redirects.pickle'
+		ser = []
+		for x in mappings:
+			ser.append({k:str(v) for k,v in x.items()})
 
-			try:
-				if Class.envvar in os.environ:
-					r = os.environ[Class.envvar]
+		f.store(pickle.dumps(tuple(ser)))
+
+		try:
+			if Class.envvar in os.environ:
+				r = os.environ[Class.envvar]
+			else:
+				r = None
+				os.environ[Class.envvar] = ''
+			os.environ[Class.envvar] += (os.path.pathsep + str(f))
+			with finder.redirection():
+				yield finder
+		except libsys.Fork:
+			suppress = True
+			raise
+		finally:
+			if not suppress:
+				tmp.void()
+				if r is None:
+					del os.environ[Class.envvar]
 				else:
-					r = None
-					os.environ[Class.envvar] = ''
-				os.environ[Class.envvar] += (os.path.pathsep + str(f))
-				with finder.redirection():
-					yield finder
-			except libsys.Fork:
-				suppress = True
-				raise
-			finally:
-				if not suppress:
-					if r is None:
-						del os.environ[Class.envvar]
-					else:
-						os.environ[Class.envvar] = r
+					os.environ[Class.envvar] = r
 
 class Harness(object):
 	"""
@@ -151,6 +163,7 @@ class Harness(object):
 		# the builds to test.
 	"""
 	from fault.test import library as libtest
+
 	Test = libtest.Test
 	gather = staticmethod(libtest.gather)
 
@@ -158,7 +171,6 @@ class Harness(object):
 		self.context = context
 		self.package = package
 		self.intent = intent
-		self.extensions = collections.defaultdict(list)
 
 	def module_test(self, test):
 		"""
@@ -167,9 +179,6 @@ class Harness(object):
 		"""
 		module = importlib.import_module(test.identity)
 		test/module.__name__ == test.identity
-
-		for x in self.extensions.get(test.identity, ()):
-			mod = self.preload_extension(test.identity, x)
 
 		module.__tests__ = self.gather(module)
 		if '__test__' in dir(module):
@@ -191,13 +200,6 @@ class Harness(object):
 
 		# Initialize the project attribute and imports set.
 		self.project = tid
-
-		# Preload all extensions inside the package.
-		# Empty when .intent is None
-		if not self.imports:
-			for x in self.extensions.get(tid, ()):
-				mod = self.preload_extension(tid, x)
-				self.imports.add(mod)
 
 		if 'context' in dir(module):
 			module.context(self)
@@ -233,46 +235,6 @@ class Harness(object):
 			self.test = tid
 			self.dispatch(test)
 
-	def preload_extension(self, test_id, route):
-		"""
-		# Given a Python extension, &route, import the module using
-		# the configured &self.context.
-
-		# Used by the harness to import extensions that are being tested in a fashion
-		# that allows for coverage and profile data to be collected and for injection
-		# dependent tests.
-		"""
-
-		env = os.environ
-
-		f = cc.Factor(route, None, None)
-		vars, mech = self.context.select(f.domain)
-		refs = cc.references(f.dependencies())
-		(sp, (vl, key, loc)), = f.link(dict(vars), self.context, mech, refs, ())
-
-		dll = loc['integral'] / 'pf.lnk'
-
-		name = libfactor.extension_access_name(str(route))
-
-		# Get the loader for the extension file.
-		loader = importlib.machinery.ExtensionFileLoader(name, str(dll))
-		current = sys.modules.pop(name, None)
-		mod = loader.load_module()
-
-		# Update containing package dictionary and sys.modules
-		sys.modules[name] = mod
-		route = libroutes.Import.from_fullname(name)
-		parent = importlib.import_module(str(route.container))
-		setattr(parent, route.identifier, mod)
-
-		return mod
-
-	@staticmethod
-	def _collect_targets(route):
-		for pkg in route.tree()[0]:
-			if libfactor.composite(pkg):
-				yield pkg
-
 	def root(self, route):
 		"""
 		# Generate the root test from the given route.
@@ -282,7 +244,6 @@ class Harness(object):
 		# stage identically to how divisions are handled at later stages.
 		"""
 
-		self.imports = set()
 		self.project = None
 
 		# pseudo-module for absolute root; the initial divisions are built
@@ -293,18 +254,9 @@ class Harness(object):
 		ft = getattr(module, '__factor_type__', 'python')
 
 		if ft == 'project':
-			extpkg = route / 'extensions'
-			if extpkg.exists() and self.intent is not None:
-				self.extensions[str(route)].extend(self._collect_targets(extpkg))
-
 			tr.__tests__ = [(route.fullname + '.test', self.package_test)]
 		elif ft == 'context':
 			pkg, mods = route.subnodes()
-			if self.intent is not None:
-				for x in pkg:
-					extpkg = x / 'extensions'
-					if extpkg.exists():
-						self.extensions[str(x)].extend(self._collect_targets(extpkg))
 
 			tr.__tests__ = [
 				(str(x) + '.test', self.package_test)
@@ -313,10 +265,6 @@ class Harness(object):
 			]
 		else:
 			# Presume specific test module
-			extpkg = route.floor() / 'extensions'
-			if extpkg.exists():
-				self.extensions[str(route)].extend(self._collect_targets(extpkg))
-
 			tr.__tests__ = [(str(route), self.module_test)]
 
 		return tr

@@ -94,6 +94,7 @@ class Probe(object):
 	"""
 	# Context manager set used by tools to manage environment variables and dependencies.
 	"""
+
 	def __init__(self, name, trap=None):
 		self.name = name
 
@@ -591,7 +592,7 @@ class Harness(testing.Harness):
 		for x, d in self.tools:
 			probes.enter_context(x.connect(self, process_data))
 
-		os.environ['FAULT_MEASUREMENT_CONTEXT'] = str(measures)
+		os.environ['FAULT_MEASUREMENT_CONTEXT'] = str(measures.route)
 
 		# Get timing of test execution.
 		with probes, stopwatch() as view:

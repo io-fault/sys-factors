@@ -32,6 +32,9 @@ def test(context, telemetry, tools, route):
 		if libfactor.composite(target)
 	]
 
+	python_extensions = {}
+	factor_targets = {}
+
 	for f in composites:
 		variants, mech = context.select(f.domain)
 		varset = f.link(variants, context, mech, [], [])
@@ -53,12 +56,16 @@ def test(context, telemetry, tools, route):
 
 			target_link = locations['integral'] / 'pf.lnk'
 			target = target_link.from_relative(target_link.container, os.readlink(str(target_link)))
+			ean = libfactor.extension_access_name(factor_path)
+
 			for tool_name, sources in tool_set.items():
 				target_data = (f.route, target, sources)
 				factor_map[tool_name][factor_path] = target_data
-				ean = libfactor.extension_access_name(factor_path)
 				factor_map[tool_name][ean] = target_data
 
+			if ean and ean != factor_path:
+				python_extensions[ean] = target
+			factor_targets[factor_path] = target
 			# Variants should be irrelevant here as we're strictly interested
 			# the instrumentation tool associated with the transformation.
 			break
@@ -119,9 +126,10 @@ def test(context, telemetry, tools, route):
 	sys.modules.pop(prefix[:-1])
 
 	harness = metrics.Harness(tools, context, division, str(route), sys.stderr)
+	harness.imports = set(python_extensions)
 
 	# Manage Fork exceptions specially so the real root has cleanup rights.
-	rf = metrics.testing.RedirectFinder.root(metrics_sources)
+	rf = metrics.testing.RedirectFinder.root(metrics_sources, python_extensions)
 	with rf:
 		harness.execute(harness.root(route), ())
 
@@ -225,6 +233,10 @@ def main(inv):
 
 	for t, d in tools:
 		tool_stack.enter_context(t.setup(ctx, telemetry, d)) # (Harness, tool Data)
+
+	os.environ['FAULT_METRICS_PROBES'] = ':'.join(
+		'/'.join((t.name, tdata['constructor'])) for t, tdata in tools
+	)
 
 	# global tool instance initialization
 	# tools[n].connect() constructs the per-test contextmanager inside
