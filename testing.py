@@ -15,16 +15,12 @@
 """
 import os
 import sys
-import types
 import importlib
 import importlib.machinery
-import collections
 import contextlib
 
 from fault.routes import library as libroutes
 from fault.system import libfactor, library as libsys
-
-from . import cc
 
 class RedirectFinder(object):
 	"""
