@@ -1,5 +1,5 @@
 """
-# Validate a project as functioning by performing its tests against the *active variant*.
+# Validate a project by performing its tests.
 """
 import os
 import sys
@@ -10,8 +10,7 @@ import signal
 from fault.system import corefile
 from fault.system import library as libsys
 from fault.routes import library as libroutes
-
-from .. import testing
+from fault.test import library as libtest
 
 # The escapes are used directly to avoid dependencies.
 exits = {
@@ -30,12 +29,11 @@ def failure_report_file(test):
 	# Return the route to the failure report for the given test.
 	"""
 	ir, rpath = libroutes.Import.from_attributes(test.identity)
-	cd = ir.floor().directory() / '__pycache__'
-	rf = cd / 'failures' / test.identity
+	cd = (ir.floor() / 'test').directory()
 
-	return rf
+	return cd / 'failures', test.identity
 
-class Harness(testing.Harness):
+class Harness(libtest.Harness):
 	"""
 	# The collection and execution of a series of tests for the purpose
 	# of validating a configured build.
@@ -44,9 +42,11 @@ class Harness(testing.Harness):
 	# and generally quiet.
 	"""
 	concurrently = staticmethod(libsys.concurrently)
+	Divide = libtest.Divide
+	intent = 'validation'
 
 	def __init__(self, package, status):
-		super().__init__(None, package)
+		super().__init__(package)
 		self.status = status
 		self.metrics = collections.Counter() # For division.
 		self.tests = []
@@ -91,7 +91,7 @@ class Harness(testing.Harness):
 			signal.alarm(0)
 			signal.signal(signal.SIGALRM, signal.SIG_IGN)
 
-		if isinstance(test.fate, self.libtest.Divide):
+		if isinstance(test.fate, self.Divide):
 			# Descend. Clear in case of subdivide.
 			self.metrics.clear()
 			del self.tests[:]
@@ -100,7 +100,7 @@ class Harness(testing.Harness):
 			# dispatch all of them and wait for completion.
 
 			divisions = test.fate.content
-			self.execute(divisions, ())
+			self.process(divisions, ())
 			for x in self.tests:
 				self.complete(x)
 
@@ -113,15 +113,27 @@ class Harness(testing.Harness):
 				fe = test.fate
 				import traceback
 				fex = traceback.format_exception(fe.__class__, fe, fe.__traceback__)
-				rf = failure_report_file(test)
-				rf.store(''.join(fex), 'w')
+				rf, fail_id = failure_report_file(test)
+				try:
+					rf.init('directory')
+					sig = rf / '.validation'
+					sig.store(b'libtest\n')
+				except:
+					pass
+				fail = rf / fail_id
+				fail.store(''.join(fex), 'w')
 			return {test.fate.impact: 1}
 
-def main(packages):
+def main(inv:libsys.Invocation) -> libsys.Exit:
+	packages = inv.args
+	timeout = int(inv.environ.get('TEST_TIMEOUT', 6))
+	log=sys.stderr
+	sys.dont_write_bytecode = True
+
+	# Project name coloring after all tests have been ran.
 	red = lambda x: '\x1b[38;5;196m' + x + '\x1b[0m'
 	green = lambda x: '\x1b[38;5;46m' + x + '\x1b[0m'
 
-	sys.dont_write_bytecode = True
 	pkgset = []
 	for package in packages:
 		root = libroutes.Import.from_fullname(package)
@@ -138,40 +150,38 @@ def main(packages):
 	for pkg in pkgset:
 		if not pkg.exists():
 			raise FileNotFoundError(str(pkg))
-		cdr = pkg.directory() / '__pycache__' / 'failures'
-		if cdr.exists():
+		cdr = pkg.directory() / 'test' / 'failures'
+		if cdr.exists() and (cdr/'.validation').exists():
 			cdr.void()
 
-		sys.stderr.write(str(pkg) + ': ^')
-		sys.stderr.flush()
+		log.write(str(pkg) + ': ^')
+		log.flush()
 
-		p = Harness(str(pkg), sys.stderr)
-		p.execute(p.root(pkg), [])
-		for x in p.tests:
-			p.complete(x)
+		h = Harness(str(pkg), log)
+		h.process(h.test_root(pkg), [])
+		for x in h.tests:
+			h.complete(x)
 
-		f = p.metrics.get(-1, 0)
-		sys.stderr.write(';\r')
+		f = h.metrics.get(-1, 0)
+		log.write(';\r')
 		if not f:
-			sys.stderr.write(green(str(pkg)))
+			log.write(green(str(pkg)))
 		else:
-			sys.stderr.write(red(str(pkg)))
+			log.write(red(str(pkg)))
 
-		sys.stderr.write('\n')
-		sys.stderr.flush()
+		log.write('\n')
+		log.flush()
 
 		failures += f
 
 	if failures:
-		sys.stderr.write("\nFailure reports are placed into the project ")
-		sys.stderr.write("package's `__pycache__` directory.\n")
-		sys.stderr.write("Subsequent runs will overwrite past reports.\n")
-		sys.stderr.write("`dev report` for quick pager based access.\n")
+		log.write("\nFailure reports are placed into the project ")
+		log.write("package's `test/failures` directory.\n")
+		log.write("Subsequent runs will overwrite past reports.\n")
 
 	raise SystemExit(min(failures, 201))
 
 if __name__ == '__main__':
-	command, *packages = sys.argv
 	try:
 		os.nice(10)
 	except:
@@ -179,4 +189,4 @@ if __name__ == '__main__':
 		pass
 
 	with corefile.constraint():
-		libsys.control(main, packages)
+		libsys.control(main, libsys.Invocation.system(environ=('TEST_TIMEOUT',)))
