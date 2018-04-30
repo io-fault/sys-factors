@@ -131,7 +131,7 @@ def test(context, telemetry, tools, route):
 	# Manage Fork exceptions specially so the real root has cleanup rights.
 	rf = metrics.testing.RedirectFinder.root(metrics_sources, python_extensions)
 	with rf:
-		harness.execute(harness.root(route), ())
+		harness.process(harness.test_root(route), ())
 
 	captures = [
 		metrics.Measurements(x) for x in (telemetry/str(route)).subdirectories()

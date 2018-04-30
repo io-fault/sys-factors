@@ -14,7 +14,6 @@ from fault.system import corefile
 from fault.routes import library as libroutes
 from fault.test import library as libtest
 
-from .. import testing
 from .. import backtrace
 
 def color(color, text):
@@ -33,14 +32,15 @@ working_fate_messages = color('0x1c1c1c', '|' + (' execute  ') + '|')
 bottom_fate_messages = color('0x1c1c1c', '+' + ('-' * 10) + '+--')
 report_core_message = '\r{start} {fate!s} {stop} {tid}                \n'
 
-class Harness(testing.Harness):
+class Harness(libtest.Harness):
 	"""
 	# The collection and execution of a series of tests.
 	"""
 	concurrently = staticmethod(libsys.concurrently)
 
 	def __init__(self, context, package, status, intent='test'):
-		super().__init__(context, package, intent=intent)
+		super().__init__(package)
+		self.context = context
 		self.status = status
 		self.selectors = []
 
@@ -101,7 +101,7 @@ class Harness(testing.Harness):
 		if os.WCOREDUMP(status):
 			faten = 'core'
 			report['fate'] = 'core'
-			test.fate = self.libtest.Core(None)
+			test.fate = self.Core(None)
 			self._report_core(test)
 			self._handle_core(corefile.location(pid))
 		elif not os.WIFEXITED(status):
@@ -155,9 +155,9 @@ class Harness(testing.Harness):
 			'interrupt': None,
 		}
 
-		if isinstance(test.fate, self.libtest.Divide):
-			self.execute(test.fate.content, (), division = True)
-		elif isinstance(test.fate, self.libtest.Fail):
+		if isinstance(test.fate, self.Divide):
+			self.process(test.fate.content, (), division = True)
+		elif isinstance(test.fate, self.Fail):
 			if isinstance(test.fate.__cause__, KeyboardInterrupt):
 				report['interrupt'] = True
 			self._print_tb(test.fate)
@@ -171,25 +171,23 @@ class Harness(testing.Harness):
 				tb = test.fate.__traceback__
 			pdb.post_mortem(tb)
 
-	def execute(self, container, modules, division = None):
+	def process(self, container, modules, division = None):
 		if division is None:
 			self.status.write(top_fate_messages + '\n')
 
-		super().execute(container, modules)
+		super().process(container, modules)
 
 		if division is None:
 			self.status.write(bottom_fate_messages + '\n')
 
 def main(package, modules, intent='test'):
-	intent = os.environ.get('FAULT_ROLE', intent)
-
 	# Expecting metrics intention to be configured.
 	from .. import cc
 	ctx = cc.Context.from_environment()
 	ctx_route = libroutes.File.from_absolute(os.environ.get('CONTEXT'))
 
-	p = Harness(ctx, package, sys.stderr, intent=intent)
-	p.execute(p.root(libroutes.Import.from_fullname(package)), modules)
+	p = Harness(ctx, package, sys.stderr)
+	p.process(p.test_root(libroutes.Import.from_fullname(package)), modules)
 
 	raise SystemExit(0)
 

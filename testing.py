@@ -174,8 +174,7 @@ class Harness(object):
 
 	def module_test(self, test):
 		"""
-		# Method used to implement the root module test that divides
-		# into the set of tests defined therein.
+		# Test subject for loading modules and dividing their contained tests.
 		"""
 		module = importlib.import_module(test.identity)
 		test/module.__name__ == test.identity
@@ -188,18 +187,13 @@ class Harness(object):
 
 	def package_test(self, test):
 		"""
-		# Method used to implement the test package test that divides
-		# into the set of &module_test executions.
+		# Test subject for loading packages and dividing their contained modules.
 		"""
 
 		# The package module
 		module = importlib.import_module(test.identity)
 		test/module.__name__ == test.identity
 		ir = libroutes.Import.from_fullname(module.__name__)
-		tid = str(ir.floor())
-
-		# Initialize the project attribute and imports set.
-		self.project = tid
 
 		if 'context' in dir(module):
 			module.context(self)
@@ -220,13 +214,14 @@ class Harness(object):
 
 		# This method is often overwritten in subclasses to control execution.
 		"""
-		test.seal()
+		with test.exits:
+			test.seal()
 
 	def execute(self, container, modules):
 		"""
 		# Execute the *tests* of the given container.
 
-		# Construct the Test instances for the tests gathered in &container
+		# Construct the &Test instances for the gathered targets in &container
 		# and perform them using &dispatch.
 		"""
 
@@ -251,7 +246,7 @@ class Harness(object):
 		tr = types.ModuleType("test.root")
 
 		module = route.module()
-		ft = getattr(module, '__factor_type__', 'python')
+		ft = getattr(module, '__factor_type__', 'library')
 
 		if ft == 'project':
 			tr.__tests__ = [(route.fullname + '.test', self.package_test)]

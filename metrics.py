@@ -32,9 +32,10 @@ from fault.filesystem import library as libfs
 from fault.computation import library as libc
 from fault.range import library as librange
 from fault.syntax import library as libsyntax
+from fault.test import library as libtest
 
-from . import testing
 from . import cc
+from . import testing
 
 def target(context, route):
 	"""
@@ -503,14 +504,15 @@ def process(
 
 	return (project, (test_results, permodule_times, permodule_counts))
 
-class Harness(testing.Harness):
+class Harness(libtest.Harness):
 	"""
 	# Harness for performing test-based measurements of a set of factors.
 	"""
 	concurrently = staticmethod(libsys.concurrently)
 
 	def __init__(self, tools, context, telemetry, package, status):
-		super().__init__(context, package, intent='metrics')
+		super().__init__(package)
+		self.context = context
 		self.tools = tools
 		self.telemetry = telemetry
 		self.measures = None
@@ -542,7 +544,7 @@ class Harness(testing.Harness):
 			# Test dumped core.
 			faten = 'core'
 			report['fate'] = 'core'
-			test.fate = self.libtest.Core(None)
+			test.fate = self.Core(None)
 			corepath = corefile.location(pid)
 			if corepath is None or not os.path.exists(corepath):
 				pass
@@ -599,7 +601,7 @@ class Harness(testing.Harness):
 			with test.exits:
 				test.seal()
 
-		if isinstance(test.fate, self.libtest.Fail):
+		if isinstance(test.fate, self.Fail):
 			# Print to standardd and serialize as XML for the report.
 			import traceback
 			import sys
@@ -633,7 +635,7 @@ class Harness(testing.Harness):
 		with r.open('wb') as f:
 			pickle.dump(report, f)
 
-		if isinstance(test.fate, self.libtest.Divide):
+		if isinstance(test.fate, self.Divide):
 			# subtests
-			self.execute(test.fate.content, ())
+			self.process(test.fate.content, ())
 	del libtime
