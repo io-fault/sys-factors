@@ -8,7 +8,7 @@ f -pkg
 f ls [list cwp's]
 f -*
 f void [clear cwp's pycache]
-f induct, construct, test, validate, etc.
+f incorporate, construct, test, validate, etc.
 
 [ Low-Level Construction Commands ]
 
@@ -61,7 +61,7 @@ leverage it.
 
 #!/pl/sh
 	python -m fault.development.bin.construct pkg && \
-	python -m fault.development.bin.induct pkg && \
+	python -m fault.development.bin.incorporate pkg && \
 	python -m fault.development.bin.validate pkg
 
 All of these commands use the default construction context given that an environment

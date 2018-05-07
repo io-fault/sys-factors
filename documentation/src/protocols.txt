@@ -8,24 +8,25 @@ This chapter documents these protocols and describes why the names were chosen.
 Project Factors employ a large number special entries to encourage consistency across
 projects and to simplify project processing.
 
-/`documentation`
+/documentation/
 	A collection of &..text files making up a project's documentation. A long name is used
 	for clarity and to avoid conflicting with shorter variations. It's rare that documentation
 	will ever be directly imported, so an inconveniently large name was chosen.
 
-/`test`
+/test/
 	The modules and factors providing test cases to validate that project's functionality.
 
-/`bin`
+/bin/
 	A collection of executable factors intended for direct use.
 
-/`extensions`
+/extensions/
 	A collection of extension factors whose subfactors' integral will be positioned
 	adjacent to the `extensions` package. Concretely, these are Python Extension Modules.
 
-/`core`
-	A common foundation factor, usually a Python module.
+/core/
+	A common foundation factor, usually a Python module, and almost always for internal
+	use only. Contents should be explicitly exported if use is desired by other projects.
 
-/`library`
+/library/
 	The primary exported functionality of the project if any. This entry is only treated
 	specially conceptually.

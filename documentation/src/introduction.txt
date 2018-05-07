@@ -3,7 +3,7 @@ Constructing, testing, debugging, coverage, profiling and maybe deployment.
 [ Defense ]
 -----------
 
-&..development seeks to make software development management as seamless as possible.
+&..factors seeks to make software development management as seamless as possible.
 Construction, testing, coverage, and profiling are integrated in order to make development
 processes easier and less fragile than systems that rely on the users to connect
 tools together.
@@ -15,13 +15,11 @@ extracted coverage and profile information, trends can be viewed across releases
 [ Construction ]
 ----------------
 
-The primary purpose of &..development is the provision of an abstraction layer for constructing
+The primary purpose of &..factors is the provision of an abstraction layer for constructing
 targets, &.library.Factor instances. The abstraction layer defines the method that is used
 to build a particular Factor Type on the given host, and usually for the given host.
 However, the abstraction layer is composed so the Factor could be built for another platform
 or no platform at all.
-
-&..development.library provides an alternative autotools for small to medium sized projects.
 
 ! WARNING:
 	The construction portion of development is a work in progress and the documentation
@@ -47,7 +45,7 @@ to be performed using standard comparison operators:
 		test/expectation > something.render()
 
 	if __name__ == '__main__':
-		import fault.development.libtest as libtest
+		import fault.test.library as libtest
 		import sys; libtest.execute(sys.modules[__name__])
 
 [ Measurements ]

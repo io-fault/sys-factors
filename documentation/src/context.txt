@@ -4,7 +4,7 @@ Index of terms used organized into subsections describing their context.
 
 [ Glossary >> Project Structure ]
 
-/Corpus
+/Corpus/
 	An entire collection of source.
 
 	A Corpus is arbitrarily defined, but usually refers the entire collection of data and
@@ -12,29 +12,29 @@ Index of terms used organized into subsections describing their context.
 	choose to organize their source code in multiple corpuses, but usually the interest
 	lies in the entire set.
 
-/Factor
+/Factor/
 	An addressable part of a &Product. For most &Products, this will be a Python
 	module or a (term)`Composite Factor`
 
-/Project
+/Project/
 	A set of interdependent &Factors managed within a single delta stream.
 
-/Product
+/Product/
 	A set of processed &Factors.
 
-/Context Factor
+/Context Factor/
 	A collection of &Project Factors.
 
-/Fraction
+/Fraction/
 	A contributing subfactor of a Composite Factor.
 	For C/C++, this would be an individual
 	translation unit. A source file inside a Composite Factor.
 
-/Composite Factor
+/Composite Factor/
 	A Factor consisting of a set files, called Fractions, that are intended
 	to compose the Factor.
 
-/Fragment
+/Fragment/
 	An internal part of a Factor or Fraction. A Python class could be a
 	Fragment of a Factor. Anything that is addressable within the (term)`Delineated Form`.
 
@@ -42,53 +42,53 @@ Index of terms used organized into subsections describing their context.
 
 [ Glossary >> Construction ]
 
-/Delineated Form
+/Delineated Form/
 	A &.schemas.fragments instance describing the (term)`Factor`.
 
-/Target
+/Target/
 	The files constructed by a, usually, Composite Factor.
 
-/Construction Context
+/Construction Context/
 	The set of mechanisms ultimately used to process Factors for a build.
 
-/Mechanism
+/Mechanism/
 	The part of a Construction Context used to identify how to process
 	a given input into the requested Factor Type.
 
-/Factor Processing Instructions
+/Factor Processing Instructions/
 	The instructions used to build a factor for use. Normally conjured
 	by a Construction Context.
 
-/Inductance
+/Incorporation/
 	The local (same package directory) installation of composite factors,
 	and Python bytecode.
 
-/Materialization
+/Materialization/
 	The, currently, conceptual phase of forming the Product. This is
 	an implicit step between Inductance and Installation.
 
-/Factor Type
+/Factor Type/
 	The application or use of the target.
 	Executable, Library, Extension, or Fragment.
 
 [ Glossary >> Testing ]
 
-/Metrics
+/Metrics/
 	The measurements collected described the effects of the tests provided
 	by a project.
 
-/Harness
+/Harness/
 	In the context of &.libtest and &.testing, a harness is an
 	object used to manage execution of the tests. Harnesses define how and
 	what tests are executed.
 
-/Fate
+/Fate/
 	Refers to the result of a &.libtest.Test.
 
-/Seal
+/Seal/
 	Refers to the execution of a &.libtest.Test: seal the fate of a test.
 
-/Validation
+/Validation/
 	The execution of tests for the purpose of checking an inducted build.
 	Often prior to installation and potentially excluding Unit Tests.
 
@@ -97,23 +97,23 @@ Index of terms used organized into subsections describing their context.
 Intentions are used to select a Construction Context that can properly process
 the factors of a Corpus.
 
-/Optimal
+/Optimal/
 	Factors built for optimal, subjective, performance.
 
-/Debug
+/Debug/
 	Factors constructed with debugging symbols and any additional source level
 	tools enabled by preprocessing instructions.
 
-/Test
+/Test/
 	Purpose used to enable injection ports and debugging that might otherwise
 	be disabled.
 
-/Metrics
+/Metrics/
 	A purpose identical to Test, but with coverage and profiling
 	instrumentation enabled for gathering measurements about a Project's tests.
 
-/Profiling
+/Profiling/
 	Purpose enabling regular profiling instrumentation.
 
-/Coverage
-	Purpose enabling regular coverage instrumentation.
+/Coverage/
+	Intent enabling regular coverage instrumentation.

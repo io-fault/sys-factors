@@ -1,4 +1,4 @@
-Construction Contexts and the processing cycles dispatched by &..development.
+Construction Contexts and the processing cycles dispatched by &..factors.
 
 [ Construction Contexts ]
 
@@ -34,7 +34,7 @@ options based on the variant.
 
 ================
 
-The implementation of the concept in &..development is internally viewed as
+The implementation of the concept in &..factors is internally viewed as
 function taking a single parameter, the variants, that returns the unit
 abstraction scanned for solutions.
 
@@ -70,22 +70,22 @@ Phases of the factor processing cycle:
 	# &[Preparation] of the Factor Set.
 	# &[Construction] of the Factor Set.
 	# &[Materialization] of the Product from the Constructed Factor Set.
-	# &[Inductance] of the Materialized Product.
+	# &[Incorporation] of the Materialized Product.
 	# &[Validation] of the Inducted Product.
 	# &[Installation] of the Inducted Product.
 	# &[Deployment] of an Installation.
 
-The first and last two events are not of direct interest to &..development. For
-some deployments, installation and deployment occur at inductance.
+The first and last two events are not of direct interest to &..factors. For
+some deployments, installation and deployment occur at incorporation.
 Specifically, in that case, the product is being used in the place that
 it was built. Implementation is the engineering process itself or metaphorically,
 the process of getting the project sources in order to perform a build.
 
 [ Implementation ]
 
-This is the initial phase that is outside the scope of &.libfpi. The implementation
+This is the initial phase that is outside the scope of &.library. The implementation
 of a factor is its authorship or creation. The exact meaning being irrelevant to
-&.libfpi.
+&.library.
 
 [ Preparation ]
 
@@ -96,13 +96,13 @@ necessary files.
 
 [ Construction ]
 
-Construction is the primary phase that &.libfpi is concerned with. It uses the
+Construction is the primary phase that &.library is concerned with. It uses the
 aformentioned Construction Context's to process factors for the purpose of completing
 a Product.
 
 [ Materialization ]
 
-Currently in &.libfpi, materialization is purely imaginary. It's the step that follows
+Currently in &.library, materialization is purely imaginary. It's the step that follows
 &[Construction] that may perform no operations.
 
 ! DEVELOPMENT: Plans
@@ -110,21 +110,13 @@ Currently in &.libfpi, materialization is purely imaginary. It's the step that f
 	successfully constructing the entire factor set. May be a reasonable
 	place to introduce post-processing of targets. (strip/isolate debugging)
 
-[ Inductance ]
+[ Incorporation ]
 
-Inductance is the introduction of the materialized product, all of the factors, of a
-particular construction context into use. Notably, by the packages (directories)
+Incorporation is the introduction of the materialized product, all of the factors, of a
+particular construction context into use by the system. Notably, by the packages (directories)
 that define the sources of the a particular factor set.
 
-For comparison, the effects of a (python:package)`distutils`
-based build does *not* perform a function similar to inductance. Rather, a separate
-build directory is used to house the content for installation and release packaging.
-For (python/package)`distutils`, Inductance would be similar to performing a build,
-and adding the built package to (system/environ)`PYTHONPATH`. &..development
-orients this differently to aid the developer during engineering, and to maintain
-the consistency of the tree without manifest files upon installation.
-
-Inductance allows &..system.libfactor to identify the set of resources that should be
+Incorporation allows &..system.libfactor to identify the set of resources that should be
 used to facilitate the effect and function of a processed factor. It separates
 construction from use to trivialize the identification of the constructed
 factor's resources.
