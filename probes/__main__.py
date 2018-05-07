@@ -38,11 +38,11 @@ def process(document, route):
 		sid, = section.select('@identifier')
 		emit(route / sid, section.select('txt:dictionary'))
 
-def main(invocation:libsys.Invocation) -> None:
+def main(inv:libsys.Invocation) -> libsys.Exit:
 	try:
-		route, *ignored = invocation.args
+		route, *ignored = inv.args
 	except:
-		invocation.exit(libsys.Exit.exiting_from_bad_usage)
+		inv.exit(libsys.Exit.exiting_from_bad_usage)
 
 	route = libroutes.File.from_path(route)
 	documents = libfactor.selected(libroutes.Import.from_fullname(__name__))
@@ -53,7 +53,7 @@ def main(invocation:libsys.Invocation) -> None:
 		bname = f.identifier[:-(len(f.extension)+1)]
 		process(doc, route / bname)
 
-	invocation.exit(libsys.Exit.exiting_from_success)
+	inv.exit(libsys.Exit.exiting_from_success)
 
 if __name__ == '__main__':
 	libsys.control(main, libsys.Invocation.system())
