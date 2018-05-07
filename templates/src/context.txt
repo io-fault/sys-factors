@@ -1,7 +1,6 @@
-[ instrumentation ]
+[ intention ]
 
-Instrumentation project instantiated by metrics contexts to manage executables and extension modules
-used to collect and translate coverage data into a local form.
+f_intention template for support modules and extensions.
 
 /__init__.py
 	#!/pl/python
@@ -9,19 +8,22 @@ used to collect and translate coverage data into a local form.
 		# Instrumentation support project for context dependent tools.
 		"""
 
-/project.py
+/project.txt
 	#!/pl/python
-		identity = 'context/instrumentation'
-		name = 'instrumentation'
-		abstract = 'Coverage data collection tools'
-		icon = '🛠'
-
-		fork = None
-		versioning = 'irrelevant'
-		status = None
-
-		controller = 'fault.io'
-		contact = 'mailto:critical@fault.io'
+		/identity/
+			`context/intention`
+		/name/
+			`intention`
+		/abstract/
+			`Construction Context Support`
+		/icon/
+			(emoji)'🛠'
+		/versioning/
+			`irrelevant`
+		/controller/
+			`fault.io`
+		/contact/
+			&<https://fault.io/critical>
 
 /bin
 	/__init__.py
@@ -29,48 +31,11 @@ used to collect and translate coverage data into a local form.
 			"""
 			# Executables supporting coverage data collection for a given tool.
 			"""
+			__factor_type__ = 'executables'
 
 /extensions
 	/__init__.py
 		#!/pl/python
 			"""
-			# Python extensions supporting coverage data collection for a given tool.
-			"""
-
-[ inspection ]
-
-Inspection project for context dependent tools.
-
-/__init__.py
-	#!/pl/python
-		"""
-		# Inspection support project for context dependent tooling.
-		"""
-
-/project.py
-	#!/pl/python
-		identity = 'context/inspection'
-		name = 'inspection'
-		abstract = "Inspection support tools"
-		icon = '🛠'
-
-		fork = None
-		versioning = 'irrelevant'
-		status = None
-
-		controller = 'fault.io'
-		contact = 'mailto:critical@fault.io'
-
-/bin
-	/__init__.py
-		#!/pl/python
-			"""
-			# Executables supporting inspection.
-			"""
-
-/extensions
-	/__init__.py
-		#!/pl/python
-			"""
-			# Extensions supporting inspection.
+			# Python extensions.
 			"""
