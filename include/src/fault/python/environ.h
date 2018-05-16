@@ -1,6 +1,6 @@
 /**
-	Python C-API extensions for compensating for older versions
-	and for providing additional utility.
+	# Python C-API extensions for compensating for older versions
+	# and for providing additional utility.
 */
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
@@ -9,14 +9,14 @@
 
 typedef PyObject * PyObj;
 
-#if FV_TEST() || FV_METRICS()
+#if FV_INJECTIONS()
 	extern PyObj __ERRNO_RECEPTACLE__;
 	extern PyObj __PYTHON_RECEPTACLE__;
 #endif
 
-/*
- * Cover in case of absence
- */
+/**
+	# Cover in case of absence
+*/
 #ifndef Py_RETURN_NONE
 	#define Py_RETURN_NONE do { Py_INCREF(Py_None); return(Py_None); } while(0)
 #endif

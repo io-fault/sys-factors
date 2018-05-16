@@ -31,13 +31,12 @@
 #define F_INTENTION_optimal 1
 #define F_INTENTION_debug 2
 
-#define F_INTENTION_test 5
-#define F_INTENTION_metrics 10
+#define F_INTENTION_injections 5
+#define F_INTENTION_instruments 10
 
 #define F_INTENTION_profiling 4
-#define F_INTENTION_coverage 9
 
-#define F_INTENTION_inspect (-1)
+#define F_INTENTION_fragments (-1)
 
 #define _F_INTENTION_PREFIX() F_INTENTION_
 #define _F_INTENTION_REF() F_INTENTION
@@ -49,12 +48,13 @@
 #define FV_OPTIMAL(y) (F_INTENTION_ID == F_INTENTION_optimal)
 #define FV_DEBUG(y) (F_INTENTION_ID == F_INTENTION_debug)
 
-#define FV_TEST(y) (F_INTENTION_ID == F_INTENTION_test)
-#define FV_METRICS(y) (F_INTENTION_ID == F_INTENTION_metrics)
+#define FV_INJECTIONS(y) \
+	(F_INTENTION_ID == F_INTENTION_injections || F_INTENTION_ID == F_INTENTION_instruments)
+#define FV_INSTRUMENTS(y) (F_INTENTION_ID == F_INTENTION_instruments)
 
 #define FV_COVERAGE(y) (F_INTENTION_ID == F_INTENTION_coverage)
 #define FV_PROFILING(y) (F_INTENTION_ID == F_INTENTION_profiling)
 
-#define FV_DELINEATION(y) (F_INTENTION_ID == F_INTENTION_delineation)
+#define FV_FRAGMENTS(y) (F_INTENTION_ID == F_INTENTION_fragments)
 
 #endif /* guard */

@@ -1,8 +1,8 @@
 /**
 	# Support for failure injection for coverage purposes.
-**/
+*/
 
-#if FV_TEST() || FV_METRICS()
+#if FV_INJECTIONS()
 extern PyObj __ERRNO_RECEPTACLE__;
 extern PyObj __PYTHON_RECEPTACLE__;
 
@@ -16,7 +16,7 @@ extern PyObj __PYTHON_RECEPTACLE__;
 		{
 
 		}
-**/
+*/
 #define ERRNO_RECEPTACLE(ERROR_STATUS, RETURN, SYSCALL, ...) \
 do { \
 	PyObj _er_entry; \
@@ -67,9 +67,9 @@ do { \
 	} \
 } while(0)
 
-/*
- * Usually called with GIL. Dynamically override a C-API call.
- */
+/**
+	# Usually called with GIL. Dynamically override a C-API call.
+*/
 #define PYTHON_RECEPTACLE(ID, RETURN, CALL, ...) \
 do { \
 	PyObj _pr_entry; \

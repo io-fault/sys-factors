@@ -3,11 +3,11 @@
 
 # [ Properties ]
 
-# /library_extensions
+# /library_extensions/
 	# Used by &library_filename to select the appropriate extension
 	# for (factor/type)`system.library` and (factor/type)`system.extension` factors.
 
-# /intentions
+# /intentions/
 	# Construction intentions known to the implementation
 	# associated with a sentence describing it.
 """
@@ -51,26 +51,20 @@ intentions = {
 	'optimal': "Subjective performance selection",
 	'debug': "Reduced optimizations and defines for emitting debugging information",
 
-	'test': "Debugging intention with support for injections for comprehensive testing",
-	'metrics': "Test intention with profiling and coverage collection enabled",
+	'injections': "Debugging intention with support for injections for comprehensive testing",
+	'instruments': "Test intention with profiling and coverage collection enabled",
 
-	'profiling': "Raw profiling build for custom collections",
-	'coverage': "Raw coverage build for custom collections",
-
-	'delineation': "Context used to extract fragments from source files",
+	'fragments': "Context used to extract fragments from source files",
 }
 
 intention_flags = {
 	'optimal': '-O',
 	'debug': '-g',
 
-	'test': '-t',
-	'metrics': '-M',
+	'injections': '-J',
+	'instruments': '-M',
 
-	'profiling': '-P',
-	'coverage': '-C',
-
-	'delineation': '-i',
+	'fragments': '-F',
 }
 
 library_extensions = {
@@ -197,7 +191,7 @@ def updated(outputs, inputs, requirement=None):
 	# object has already been updated.
 	return True
 
-# Resolve cache_from_source.
+# Relocate to adapters.python
 try:
 	import importlib.util
 	cache_from_source = importlib.util.cache_from_source
@@ -217,7 +211,7 @@ except (ImportError, AttributeError):
 finally:
 	pass
 
-def update_bytecode_cache(src, induct, condition,
+def update_bytecode_cache(src, target, condition,
 		cache_from_source=cache_from_source,
 		mkr=libroutes.File.from_path
 	) -> typing.Tuple[bool, str]:
@@ -226,17 +220,18 @@ def update_bytecode_cache(src, induct, condition,
 	# with &src.
 
 	# [ Parameters ]
-	# /src
+	# /src/
 		# A Python source &File properly positioned in its package directory.
 		# &importlib.util.cache_from_source will be called to find its
 		# final destination.
-	# /induct
+	# /target/
 		# Compiled bytecode &File to install.
 
 	# [ Returns ]
-	# /&bool
+
+	# /&bool/
 		# Whether the file was updated or not.
-	# /&str
+	# /&str/
 		# The string path to the cache file location
 		# that should be overwritten.
 
@@ -246,11 +241,11 @@ def update_bytecode_cache(src, induct, condition,
 
 	fp = str(src)
 	if not src.exists() or not fp.endswith('.py'):
-		return (False, 'source does not exist or does not end with ".py"')
+		return (False, "source does not exist or does not end with `.py`")
 
 	cache_file = mkr(cache_from_source(fp, optimization=None))
 
-	if condition((cache_file,), (induct,)):
+	if condition((cache_file,), (target,)):
 		return (False, "update condition was not present")
 
 	return (True, cache_file)
@@ -316,8 +311,8 @@ class Factor(object):
 	"""
 
 	default_source_directory = 'src'
-	default_cache_name = '__pycache__'
-	default_fpi_name = '.fpi'
+	default_cache_name = '__f_cache__'
+	default_fpi_name = 'work'
 
 	def __repr__(self):
 		return "{0.__class__.__name__}({1}, {2}, {3})".format(
@@ -423,7 +418,7 @@ class Factor(object):
 			return self.module.__factor_domain__
 		except AttributeError:
 			# python.library
-			return 'python'
+			return 'factor'
 
 	@property
 	def type(self):
@@ -477,7 +472,7 @@ class Factor(object):
 	@property
 	def cache_directory(self) -> File:
 		"""
-		# Python cache directory to use for the factor.
+		# Factor build cache directory.
 		"""
 		return self.package_directory / self.default_cache_name
 
@@ -512,7 +507,7 @@ class Factor(object):
 		wd = self.fpi_set.route(key, filename=str)
 
 		return vl, key, {
-			'work': wd, # normally, __pycache__ subdirectory.
+			'work': wd, # normally, __f_cache__ subdirectory.
 			# Processed Source Directory; becomes ftr if no reduce.
 			'output': wd / 'psd',
 			'log': wd / 'log',
@@ -1145,7 +1140,9 @@ class Context(object):
 	@classmethod
 	def from_directory(Class, route):
 		p = Parameters([route / 'parameters'])
-		return Class([], p)
+		xml, intent = Class.load_xml(route/'mechanisms'/'intent.xml')
+		xml, static = Class.load_xml(route/'mechanisms'/'static.xml')
+		return Class([intent,static], p)
 
 # Specifically for identifying files to be compiled and how.
 extensions = {
@@ -1252,10 +1249,10 @@ def gather_simulations(packages:typing.Sequence[Import]):
 # The extension suffix to use for *this* Python installation.
 python_extension_suffix = importlib.machinery.EXTENSION_SUFFIXES[0]
 
-def link_extension(route, factor):
+def extension_link(route, factor):
 	"""
 	# Link an inducted Python extension module so that the constructed binary
-	# can be used by (python:statement)`import`.
+	# can be used by (python/statement)`import`.
 
 	# Used by &.bin.induct after copying the target's factor to the &libfactor.
 
@@ -1280,8 +1277,6 @@ def link_extension(route, factor):
 
 	link_target = pkg.file().container.extend(names)
 	final = link_target.suffix(python_extension_suffix)
-
-	final.link(src)
 
 	return (final, src)
 
@@ -1512,11 +1507,10 @@ def unix_compiler_collection(
 		),
 		optimizations = {
 			'optimal': '3',
-			'metrics': '0',
+			'injections': '0',
+			'instruments': '0',
 			'debug': '0',
-			'test': '0',
-			'profile': '3',
-			'delineation': '0',
+			'fragments': '0',
 		},
 		empty = {}
 	):
@@ -1967,9 +1961,9 @@ class Construction(libio.Context):
 	# dispatches the work to be performed for completion in the appropriate order.
 
 	# [ Engineering ]
-		# - Rewrite as a (Transaction) Context maintaining a Flow.
-		# - Generalize; flow accepts jobs and emits FlowControl events
-			# describing the process. (rusage, memory, etc of process)
+	# - Rewrite as a (Transaction) Context maintaining a Flow.
+	# - Generalize; flow accepts jobs and emits FlowControl events
+		# describing the process. (rusage, memory, etc of process)
 
 	# Primarily, this class traverses the directed graph constructed by imports
 	# performed by the target modules being built.
@@ -2194,12 +2188,12 @@ class Construction(libio.Context):
 				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
 				sp = libio.Subprocess(pid)
 
-		fpath = factor.module.__name__ + ' '
-		pidstr = ' #' + str(pid)
+		fpath = factor.module.__name__
+		pidstr = str(pid)
 		formatted = {str(target): f_target_path(target)}
 		printed_command = tuple(formatted.get(x, x) for x in map(str, cmd))
-		message = fpath + ' '.join(printed_command) + iostr
-		print(message + pidstr)
+		command_string = ' '.join(printed_command) + iostr
+		sys.stderr.write("-> [%s:%d] %s\n" %(fpath, pid, command_string))
 
 		self.sector.dispatch(sp)
 		sp.atexit(functools.partial(
@@ -2207,7 +2201,7 @@ class Construction(libio.Context):
 			start=libtime.now(),
 			descriptor=(typ, cmd, log),
 			factor=factor,
-			message=message,
+			message=command_string,
 		))
 
 	def process_exit(self, processor,

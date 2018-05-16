@@ -8,7 +8,7 @@
 	#define MODULE_FUNCTIONS()
 #endif
 
-#if FV_METRICS() && __clang__
+#if FV_INSTRUMENTS() && __clang__
 	void __llvm_profile_write_file(void);
 	void __llvm_profile_reset_counters(void);
 	void __llvm_profile_set_filename(const char *);
@@ -40,8 +40,8 @@
 		PYMETHOD(_fault_metrics_set_path, _fault_metrics_file, METH_O, "set file path to write to" ) \
 		PYMETHOD(_fault_metrics_write, _fault_metrics_flush, METH_NOARGS, "save counters to disk" ) \
 		PYMETHOD(_fault_metrics_reset, _fault_metrics_clear, METH_NOARGS, "clear in memory counters" )
-#elif FV_METRICS()
-	#warning (metrics): No suitable instrumentation for coverage and profiling.
+#elif FV_INSTRUMENTS()
+	#warning No suitable instrumentation for coverage and profiling.
 	#define FAULT_MODULE_FUNCTIONS()
 #else
 	#define FAULT_MODULE_FUNCTIONS()
@@ -57,7 +57,7 @@ do { \
 	__dict__ = NULL; \
 } while(0)
 
-#if FV_TEST() || FV_METRICS()
+#if FV_INJECTIONS()
 	#define DEFINE_MODULE_GLOBALS \
 		PyObj __ERRNO_RECEPTACLE__; \
 		PyObj __PYTHON_RECEPTACLE__; \

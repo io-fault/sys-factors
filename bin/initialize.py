@@ -1,5 +1,5 @@
 """
-# Initialize a Construction Context for building factors for use by the host system.
+# Initialize a Construction Context for processing factors into a form usable by a system.
 """
 import os
 import sys
@@ -429,11 +429,11 @@ def resource_domain(paths):
 
 def delineation(reqs, ctx, paths):
 	"""
-	# Initialize a `delineation` context for managing fragment extraction.
+	# Initialize a `fragments` context for managing fragment extraction.
 	"""
 
 	iempty = {
-		'command': 'fault.development.bin.delineate',
+		'command': 'kit.factors.bin.delineate',
 		'interface': cc.__name__ + '.empty',
 		'method': 'python',
 		'redirect': 'stdout',
@@ -473,7 +473,7 @@ def delineation(reqs, ctx, paths):
 		'target-file-extensions': {None:'.xml'},
 		'transformations': {
 			None: {
-				'command': 'fault.development.bin.delineate',
+				'command': 'kit.factors.bin.delineate',
 				'interface': cc.__name__ + '.standard_out',
 				'method': 'python',
 				'redirect': 'stdout',
@@ -486,7 +486,7 @@ def delineation(reqs, ctx, paths):
 		'target-file-extensions': {None:'.xml'},
 		'transformations': {
 			None: {
-				'command': 'fault.development.bin.delineate',
+				'command': 'kit.factors.bin.delineate',
 				'interface': cc.__name__ + '.standard_out',
 				'method': 'python',
 				'redirect': 'stdout',
@@ -783,12 +783,9 @@ common_intentions = {
 	'optimal': 'Subjective performance selection',
 	'debug': 'Reduced optimizations and defines for emitting debugging information',
 
-	'test': 'Debugging intention with support for injections for comprehensive testing',
-	'metrics': 'Test intention with profiling and coverage collection enabled',
-	'delineation': 'Context used to extract fragments from source files',
-
-	'profiling': 'Raw profiling build for custom collections',
-	'coverage': 'Raw coverage build for custom collections',
+	'injections': 'Debugging intention with support for injections for comprehensive testing',
+	'instruments': 'Test intention with profiling and coverage collection enabled',
+	'fragments': 'Context used to delineate fragments from source files',
 }
 
 def designate(corefile, intent, filename):
@@ -853,9 +850,6 @@ def static(reqs, ctx, paths):
 
 	store_mechanisms(ctx/'static.xml', data, name='static')
 
-	import pprint
-	pprint.pprint(data)
-
 def empty(target, name):
 	store_mechanisms(target, {}, name=name)
 
@@ -869,9 +863,6 @@ def host(intention, reqs, ctx, paths):
 		# Move to static.
 		'bytecode.python': python_bytecode_domain(paths),
 	}
-
-	import pprint
-	pprint.pprint(core)
 
 	S = libxml.Serialization()
 	D = S.switch('data:')
@@ -1064,7 +1055,6 @@ def sysconfig_python_parameters():
 	}
 
 def materialize_support_project(directory, name):
-	# Initialize the telemetry project for holding tool support modules.
 	from fault.text import bin as tmodule
 	from .. import templates
 
@@ -1072,18 +1062,13 @@ def materialize_support_project(directory, name):
 		sys.executable, '-m', tmodule.__name__ + '.ifst',
 		str(directory), templates.__name__, 'context', name
 	])
+	(directory / '__init__.py').init('file')
+	(directory / 'extensions' / '__init__.py').init('file')
 
 	return status
 
-def main(inv):
-	refctx = None
-	intention, target, *args = inv.args
-	reqs = dict(zip(args[0::2], args[1::2]))
-
-	if 'CONTEXT' in os.environ:
-		refctx = libroutes.File.from_absolute(os.environ['CONTEXT'])
-
-	ctx = libroutes.File.from_path(target)
+def context(route, intention, reference, parameters):
+	ctx = route
 	mechdir = ctx / 'mechanisms'
 	lib = ctx / 'lib'
 	work = ctx / 'work'
@@ -1118,8 +1103,8 @@ def main(inv):
 	# Initialize context/parameters and store the Python parameter.
 	params.init('directory')
 
-	if refctx is not None:
-		support = str(refctx)
+	if reference is not None:
+		support = str(reference)
 	else:
 		support = ''
 
@@ -1132,9 +1117,13 @@ def main(inv):
 			'support': support,
 			'name': 'host',
 			'intention': intention,
+			# incorporate namespace
+			'incorporation': parameters.get('incorporation'),
+			# cache slot for incorporated targets
+			'slot': parameters.get('slot', 'factor'),
 			'optimizations': {
 				'time': 1 if intention == 'optimal' else 0,
-				'debug': 1 if intention in {'debug','test','metrics'} else 0,
+				'debug': 1 if intention in {'debug','injections','instruments'} else 0,
 				'size': 0,
 				'power': 0,
 			},
@@ -1153,28 +1142,27 @@ def main(inv):
 
 	paths = probe.environ_paths()
 
-	if intention == 'delineation':
-		corefile = delineation(reqs, mechdir, paths)
+	if intention == 'fragments':
+		corefile = delineation(parameters, mechdir, paths)
 		designate(corefile, intention, 'intent.xml')
 		empty(ctx/'mechanisms'/'static.xml', 'static')
-		materialize_support_project(pylib / 'f_syntax', 'inspection')
 	else:
-		corefile = host(intention, reqs, mechdir, paths)
+		corefile = host(intention, parameters, mechdir, paths)
 		designate(corefile, intention, 'intent.xml')
-		static(reqs, mechdir, paths)
+		static(parameters, mechdir, paths)
 
-		# Initialze default scanner probes.
-		sa = (ctx / 'scanner')
-		probed = (sa / 'probes')
-		from .. import probes
-		status = os.spawnv(os.P_WAIT, sys.executable, [
-			sys.executable, '-m', probes.__name__, str(probed)
-		])
-		(probed / '__init__.py').init('file')
+	materialize_support_project(pylib / 'f_intention', 'intention')
 
-		if intention == 'metrics':
-			materialize_support_project(pylib / 'f_telemetry', 'instrumentation')
+def main(inv):
+	refctx = None
+	intention, target, *args = inv.args
+	reqs = dict(zip(args[0::2], args[1::2]))
 
+	if 'CONTEXT' in os.environ:
+		refctx = libroutes.File.from_absolute(os.environ['CONTEXT'])
+
+	target = libroutes.File.from_path(target)
+	context(target, intention, refctx, reqs)
 	return inv.exit(0)
 
 if __name__ == '__main__':

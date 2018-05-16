@@ -1,5 +1,5 @@
 """
-# Induct the constructed targets of the configured construction context.
+# Incorporate the constructed factors for use by the system targeted by the Construction Context.
 
 # This copies constructed files into a filesystem location that Python requires them
 # to be in order for them to be used. For fabricated targets, this means placing
@@ -9,30 +9,28 @@
 """
 import os
 import sys
-import types
-import importlib.util
-import collections
 
 from .. import cc
 
 from fault.system import libfactor
+from fault.system import library as libsys
 from fault.routes import library as libroutes
-from fault.io import library as libio
 
-def main():
+def adjust_link_target(target, incorporation):
+	tid = target.identifier
+	return target.container / '__f_cache__' / incorporation / tid
+
+def adjust_bytecode_target(target, incorporation):
+	return adjust_link_target(target.container.container / target.identifier, incorporation)
+
+def main(inv:libsys.Invocation) -> libsys.Exit:
 	"""
 	# Induct the constructed targets.
 	"""
 	import_from_fullname = libroutes.Import.from_fullname
 
-	call = libio.context()
-	sector = call.sector
-	proc = sector.context.process
-
-	args = proc.invocation.parameters['system']['arguments']
-	env = proc.invocation.parameters['system'].get('environment')
-	if not env:
-		env = os.environ
+	args = inv.args
+	env = os.environ
 
 	rebuild = env.get('FPI_REBUILD', '0')
 	ctx = cc.Context.from_environment()
@@ -47,6 +45,15 @@ def main():
 	# collect packages to prepare from positional parameters
 	roots = [import_from_fullname(x) for x in args]
 
+	ctx_params = ctx.parameters.load('context')[-1]
+	# Get prefix name.
+	incorp = ctx_params.get('incorporation')
+	slot = ctx_params.get('slot')
+	if incorp:
+		mkr = (lambda x: adjust_bytecode_target(libroutes.File.from_path(x), incorp))
+	else:
+		mkr = libroutes.File.from_path
+
 	# Get the simulations for the bytecode files.
 	for f in cc.gather_simulations(roots):
 		refs = cc.references(f.dependencies())
@@ -54,11 +61,12 @@ def main():
 		outdir = locations['integral']
 
 		for src in f.sources():
-			induct = outdir / src.identifier
-			perform, cf = cc.update_bytecode_cache(src, induct, condition)
-			if perform and cf.exists():
-				cf.replace(induct)
-				print(str(induct), '->', cf)
+			target = outdir / src.identifier
+			perform, cf = cc.update_bytecode_cache(src, target, condition, mkr=mkr)
+			if perform:
+				cf.container.init('directory')
+				cf.replace(target)
+				sys.stderr.write("*! %s <- %s\n" %(str(cf), str(target)))
 
 	# Python Extensions (factors) are composites which are package modules.
 	candidates = []
@@ -68,14 +76,15 @@ def main():
 
 		packages, modules = route.tree()
 		candidates.extend(packages)
-
 		del modules
 
 	for route in candidates:
 		factor = cc.Factor(route, None, None)
-		m = ctx.select(factor.domain)
+		domain = factor.domain
+		m = ctx.select(domain)
 		if m is None:
-			print('ignoring[unknown type]', str(factor))
+			if domain not in {'factor'}:
+				sys.stderr.write("!* unknown domain: [%s] %s\n"% (str(factor), domain))
 			continue
 		tvars, tmech = m
 
@@ -85,18 +94,25 @@ def main():
 
 			for sp, l in factor.link(tvars, ctx, tmech, refs, []):
 				vars, key, locations = l
-				factor_dir = libfactor.inducted(factor.route)
+				factor_dir = libfactor.incorporated(factor.route)
+				if incorp:
+					fdi = factor_dir.identifier
+					factor_dir = (factor_dir.container / (incorp+':'+fdi))
 				fp = factor.integral(key=key)
 
-				print(str(fp), '->', str(factor_dir))
+				sys.stderr.write("*! %s <- %s\n" %(str(factor_dir), str(fp)))
 				factor_dir.replace(fp)
 
 				if libfactor.python_extension(factor.module):
-					link, src = cc.link_extension(factor.route, factor_dir)
-					print(str(src), '->', str(link))
+					target, src = cc.extension_link(factor.route, factor_dir)
+					if incorp:
+						# Special case when incorporation field is present.
+						target = adjust_link_target(target, incorp)
+						target.container.init('directory')
+					target.link(src)
+					sys.stderr.write("&! %s <- %s\n" %(str(target), str(src)))
 
-	sector.unit.result = 0
+	return inv.exit(0)
 
 if __name__ == '__main__':
-	from fault.io import command
-	command.execute()
+	libsys.control(main, libsys.Invocation.system())
