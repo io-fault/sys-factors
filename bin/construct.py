@@ -4,6 +4,7 @@
 import os
 import sys
 import types
+import builtins
 import importlib.util
 
 from .. import include # Minimum modification time.
@@ -22,7 +23,7 @@ def report(cxn, unit=None):
 	# Report failure and not exit status.
 	"""
 	fcount = cxn.failures
-	sys.stderr.write('! SUMMARY: %d factor processing instructions failed.\n' %(fcount,))
+	sys.stderr.write('#! SUMMARY: %d factor processing instructions failed.\n' %(fcount,))
 
 	if fcount:
 		unit.result = 70 # EX_SOFTWARE
@@ -34,7 +35,7 @@ def set_exit_code(cxn, unit=None):
 	# Report failure and not exit status.
 	"""
 	fcount = cxn.failures
-	sys.stderr.write('! SUMMARY: %d factor processing instructions failed.\n' %(fcount,))
+	sys.stderr.write('#! SUMMARY: %d factor processing instructions failed.\n' %(fcount,))
 
 	if fcount:
 		unit.result = 70 # EX_SOFTWARE
@@ -45,7 +46,7 @@ def main():
 	"""
 	# Prepare the entire package building factor targets and writing bytecode.
 	"""
-	import builtins
+
 	isinstance = builtins.isinstance
 	import_module = importlib.import_module
 	ModuleType = types.ModuleType
@@ -55,9 +56,7 @@ def main():
 	proc = sector.context.process
 
 	args = proc.invocation.args
-	env = proc.invocation.parameters['system'].get('environment')
-	if not env:
-		env = os.environ
+	env = os.environ
 
 	rebuild = env.get('FPI_REBUILD') == '1'
 	ctx = cc.Context.from_environment()
