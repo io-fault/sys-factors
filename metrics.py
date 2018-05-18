@@ -29,7 +29,6 @@ from fault.system import libfactor
 
 from fault.routes import library as libroutes
 from fault.filesystem import library as libfs
-from fault.computation import library as libc
 from fault.range import library as librange
 from fault.syntax import library as libsyntax
 from fault.test import library as libtest
