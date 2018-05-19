@@ -7,7 +7,7 @@ from fault.system import library as libsys
 from fault.routes import library as libroutes
 from .. import fs
 
-def main(inv:libsys.Invocation):
+def main(inv:libsys.Invocation) -> libsys.Exit:
 	typ, path, *args = inv.args
 	typ = typ.capitalize()
 	Imp = getattr(fs, typ) # get class for specified directory protocol
@@ -34,7 +34,7 @@ def main(inv:libsys.Invocation):
 		if tools:
 			pass
 
-	sys.exit(0)
+	return inv.exit(0)
 
 if __name__ == '__main__':
 	libsys.control(main, libsys.Invocation.system())
