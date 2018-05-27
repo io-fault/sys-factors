@@ -50,7 +50,7 @@ compiler_collections = {
 	),
 }
 
-compiler_collection_preference = ['clang', 'gcc', 'icc', 'cl.exe']
+compiler_collection_preference = ['clang', 'gcc', 'icc',]
 
 linkers = {
 	'lld': (
@@ -62,12 +62,6 @@ linkers = {
 }
 linker_preference = ('lld', 'ld')
 
-assemblers = {
-	'yasm': (),
-	'nasm': (),
-	'as': (),
-}
-
 environment = {
 	'CC': 'compiler_collections',
 	'LINKER': 'system_linkers',
@@ -77,10 +71,6 @@ environment = {
 
 pyrex_compilers = {
 	'cython',
-}
-
-haskell_compilers = {
-	'ghc': ('haskell',),
 }
 
 platform = sys.platform.strip('0123456789')
