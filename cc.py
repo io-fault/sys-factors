@@ -1076,10 +1076,16 @@ class Context(object):
 
 	@functools.lru_cache(8)
 	def select(self, fdomain):
-		# Scan the data set for the domain instantiating a mechanism.
+		# Scan the paths (loaded data sets) for the domain.
 		for x in self.sequence:
 			if fdomain in x:
 				mechdata = x[fdomain]
+				if 'inherit' in mechdata:
+					# Find implementation and merge.
+					inner = mechdata['inherit']
+					variants, mech = self.select(inner)
+					merge(mechdata, mech.descriptor)
+
 				return x['variants'], Mechanism(mechdata)
 		else:
 			# Select the [trap] if available.
