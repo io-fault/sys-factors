@@ -34,7 +34,7 @@ def main(inv:libsys.Invocation) -> libsys.Exit:
 
 	rebuild = env.get('FPI_REBUILD', '0')
 	ctx = cc.Context.from_environment()
-	variants, mech = ctx.select('bytecode.python')
+	variants, mech = ctx.select('factor')
 
 	rebuild = bool(int(rebuild))
 	if rebuild:

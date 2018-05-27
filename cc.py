@@ -1223,7 +1223,7 @@ def simulate_composite(route):
 	pkgfile = route.file()
 
 	mod = types.ModuleType(str(route), "Simulated composite factor for bytecode compilation")
-	mod.__factor_domain__ = 'bytecode.python'
+	mod.__factor_domain__ = 'factor'
 	mod.__factor_type__ = 'library' # Truthfully, a [python] Package Module.
 	mod.__factor_sources__ = sources # Modules in the package.
 	mod.__factor_context__ = runtime_bytecode_triplet

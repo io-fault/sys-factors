@@ -515,7 +515,7 @@ def delineation(reqs, ctx, paths):
 
 	core = {
 		'[trap]': unsupported,
-		'bytecode.python': python,
+		'factor': python,
 
 		'xml': xml_domain,
 		'system': system,
@@ -861,7 +861,7 @@ def host(intention, reqs, ctx, paths):
 	core = {
 		'system': host_system_domain(intention, reqs, paths),
 		# Move to static.
-		'bytecode.python': python_bytecode_domain(paths),
+		'factor': python_bytecode_domain(paths),
 	}
 
 	S = libxml.Serialization()
