@@ -1023,7 +1023,7 @@ class Parameters(object):
 class Context(object):
 	"""
 	# A sequence of mechanism sets, Construction Context, that
-	# can be used to supply a given build with tools for factor
+	# can be used to supply a given build with factor processing tools
 	# processing.
 
 	# [ Engineering ]

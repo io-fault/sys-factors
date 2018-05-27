@@ -1,5 +1,6 @@
 """
-# Remove the factor processing instruction directory from the cache directory.
+# Remove the work directory from the factor's cache.
+# Usually used have running &.bin.incorporate.
 """
 import os
 import sys
