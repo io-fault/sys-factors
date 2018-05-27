@@ -47,3 +47,7 @@ def snapshot(corefile, executable=sys.executable):
 	stdout, stderr = p.communicate(('\n'.join(commands)+'\n').encode('ascii'))
 
 	return stdout
+
+if __name__ == '__main__':
+	import sys
+	print(snapshot(sys.argv[1]))
