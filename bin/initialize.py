@@ -20,15 +20,6 @@ from itertools import chain
 chain = chain.from_iterable
 
 javascript_combiners_preference = ['uglifyjs', 'cat']
-web_compiler_collections = {
-	'emcc': (
-		'c', 'c++', 'objective-c', 'objective-c++',
-		'fortran', 'ada', # via dragonegg
-	),
-}
-web_compiler_collection_preference = ('emcc',)
-web_linker_preference = ('emcc',)
-
 compiler_collections = {
 	'clang': (
 		'c', 'c++',
@@ -869,118 +860,6 @@ def host(intention, reqs, ctx, paths):
 	corefile.store(xml)
 
 	return corefile
-
-def web_context(reqs, ctx, paths):
-	# default command
-	webcc = select(paths, ['emcc'], web_compiler_collection_preference)
-	if webcc is None:
-		return None
-	ccname, cc_route = webcc
-
-	# Execution method for targets.
-	node = select(paths, ['emcc'], web_compiler_collection_preference)
-	if node is None:
-		return None
-	node_name, node_c = node
-
-	# Extract the default target from the compiler.
-	target = 'js-web'
-
-	# First field of the target string.
-	arch = target[:target.find('-')]
-	arch_alt = arch.replace('_', '-')
-
-	libdirs = []
-
-	core = {
-		'system': {
-			# subject data
-			'platform': target,
-			'source.parameters': [
-				('PRODUCT_ARCHITECTURE', target),
-			],
-
-			'target-file-extensions': {
-				None: '.js',
-				'partial': '.bc',
-			},
-
-			'reference-types': {'weak', 'lazy', 'upward', 'default'},
-
-			# Formats to build for targets.
-			# Fragments inherit the code type.
-			'formats': {
-				'executable': 'emscripten',
-				'library': 'emscripten',
-				'extension': 'emscripten',
-			},
-
-			# objects used to support the construction of system targets
-			# The split (prefix objects and suffix objects) is used to support
-			# linkers where the positioning of the parameters is significant.
-			'objects': {
-				'executable': {
-					'emscripten': [],
-				},
-				'library': {
-					'emscripten': [],
-				},
-				'extension': {
-					'emscripten': [],
-				},
-				# fragments do not have requirements.
-				'partial': None,
-			},
-
-			# subject interfaces.
-			'integrations': {
-				None: {
-					'interface': cc.__name__ + '.web_link_editor',
-					'type': 'linker',
-					'name': 'emcc',
-					'command': str(cc),
-					'defaults': {},
-				},
-			},
-
-			'transformations': {
-				'tool:emcc': {
-					'interface': cc.__name__ + '.web_compiler_collection',
-					'type': 'collection',
-					'name': 'emcc',
-					'command': str(cc_route),
-					'implementation': 'emscripten',
-					'libraries': [],
-					'version': None,
-					'release': None,
-					'defaults': {},
-					'resources': {
-						'profile': None,
-						'builtins': None
-					},
-				},
-				None: {
-					'inherit': 'tool:emcc',
-				},
-			},
-		}
-	}
-
-	S = libxml.Serialization()
-	D = S.switch('data:')
-	xml = b''.join(
-		S.root('mechanism',
-			libxml.Data.serialize(D, core),
-			('name', 'web'),
-			('xmlns', 'http://fault.io/xml/dev/fpi'),
-			('xmlns:data', 'http://fault.io/xml/data'),
-		),
-	)
-
-	corefile = ctx / 'core.xml'
-	corefile.store(xml)
-
-	intentions(corefile)
 
 prefix = b"""
 import sys
