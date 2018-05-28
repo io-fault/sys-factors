@@ -6,10 +6,6 @@
 # /library_extensions/
 	# Used by &library_filename to select the appropriate extension
 	# for (factor/type)`system.library` and (factor/type)`system.extension` factors.
-
-# /intentions/
-	# Construction intentions known to the implementation
-	# associated with a sentence describing it.
 """
 import os
 import sys
@@ -45,26 +41,6 @@ xml_namespaces = {
 	'lc': 'http://fault.io/xml/dev/fpi',
 	'd': 'http://fault.io/xml/data',
 	'ctx': 'http://fault.io/xml/dev/ctx',
-}
-
-intentions = {
-	'optimal': "Subjective performance selection",
-	'debug': "Reduced optimizations and defines for emitting debugging information",
-
-	'injections': "Debugging intention with support for injections for comprehensive testing",
-	'instruments': "Test intention with profiling and coverage collection enabled",
-
-	'fragments': "Context used to extract fragments from source files",
-}
-
-intention_flags = {
-	'optimal': '-O',
-	'debug': '-g',
-
-	'injections': '-J',
-	'instruments': '-M',
-
-	'fragments': '-F',
 }
 
 library_extensions = {
