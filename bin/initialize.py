@@ -146,34 +146,27 @@ def compiler_libraries(compiler, prefix, version, executable, target):
 	else:
 		pass
 
-def python_bytecode_domain(paths):
+def factor_domain(paths):
 	"""
-	# Constructs the subject for building Python bytecode for a host context.
-
-	# Currently, only builds subject for the executing Python.
-
-	# ! DEVELOPMENT: Features
-		# Must provide a means for compiling with versions of
-		# Python aside from the one that is running. A reasonable
-		# possibility is constructing the the `-c` command.
+	# Factor Library processing.
+	# Generally only supports libraries which are directories of whole factors and composites.
 	"""
-	# Python library = module with preprocessed sources
-	# Python executable = python source executed in __main__
-	# Python extension = maybe python source executed in a library?
-	# Python partial = source file
 
 	from ...adapters.python.bin import compile
-	pyexe = select(paths, ['python3', 'python3.4', 'python3.5', 'python3.6', 'python3.7'], ['python3'])
-	pyname, pycommand = pyexe
 
 	return {
 		'target-file-extensions': {},
 
 		'formats': {
-			'library': 'pyc',
+			'library': 'directory',
 		},
 
 		'transformations': {
+			'text': {
+				'interface': cc.__name__ + '.transparent',
+				'type': 'transparent',
+				'command': '/bin/cp',
+			},
 			'python': {
 				'method': 'internal',
 				'interface': compile.__name__ + '.function_bytecode_compiler',
@@ -842,7 +835,7 @@ def host(intention, reqs, ctx, paths):
 	core = {
 		'system': host_system_domain(intention, reqs, paths),
 		# Move to static.
-		'factor': python_bytecode_domain(paths),
+		'factor': factor_domain(paths),
 	}
 
 	S = libxml.Serialization()

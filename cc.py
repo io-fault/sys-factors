@@ -1200,11 +1200,11 @@ def simulate_composite(route):
 	sources = [
 		x.__class__(x.container, (x.identifier,))
 		for x in [x.file() for x in modules if x.exists()]
-		if x is not None and x.extension == 'py'
+		if x is not None and not x.is_directory() and x.identifier.endswith('.py')
 	]
 	pkgfile = route.file()
 
-	mod = types.ModuleType(str(route), "Simulated composite factor for bytecode compilation")
+	mod = types.ModuleType(str(route), "factor.library module")
 	mod.__factor_domain__ = 'factor'
 	mod.__factor_type__ = 'library' # Truthfully, a [python] Package Module.
 	mod.__factor_sources__ = sources # Modules in the package.
@@ -1214,6 +1214,9 @@ def simulate_composite(route):
 	return mod, pkgs
 
 def gather_simulations(packages:typing.Sequence[Import]):
+	"""
+	# Gather all (factor/qtype)`factor.library` modules.
+	"""
 	# Get the simulations for the bytecode files.
 	next_set = packages
 
