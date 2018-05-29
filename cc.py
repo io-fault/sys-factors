@@ -70,11 +70,11 @@ def update_named_mechanism(route:libroutes.File, name:str, data):
 	# overwrite the file's mechanism entry with the given &data.
 
 	# [ Parameters ]
-	# /route
+	# /route/
 		# The route to the file that is to be modified.
-	# /name
+	# /name/
 		# The xml:id used to identify the mechanism layer.
-	# /data
+	# /data/
 		# The dictionary to set as the mechanism's content.
 	"""
 	from fault.xml.lxml import Query
@@ -106,9 +106,9 @@ def load_named_mechanism(route:libroutes.File, name:str):
 	# load the file's mechanism entry.
 
 	# [ Parameters ]
-	# /route
+	# /route/
 		# The route to the file that is to be modified.
-	# /name
+	# /name/
 		# The xml:id used to identify the mechanism layer.
 	"""
 	raw = lxml.etree.parse(str(route))
@@ -270,7 +270,7 @@ class Factor(object):
 	# modifying or cleaning up &sys.modules.
 
 	# [ Properties ]
-	# /local_variants
+	# /local_variants/
 		# Explicitly designated variants.
 	"""
 
@@ -565,13 +565,13 @@ class Factor(object):
 		# to perform a build.
 
 		# [ Parameters ]
-		# /context
+		# /context/
 			# &Context instance providing the required mechanisms.
-		# /mechanism
+		# /mechanism/
 			# &Mechanism selected for production of the Factor Processing Instructions.
-		# /refs
+		# /refs/
 			# The dependencies, composite factors, specified by imports.
-		# /dependents
+		# /dependents/
 			# The list of Factors depending on this target.
 		"""
 
@@ -630,10 +630,10 @@ class Mechanism(object):
 
 	# [ Properties ]
 
-	# /descriptor
+	# /descriptor/
 		# The data structure referring to the interface used
 		# to construct commands for the selected mechanism.
-	# /cache
+	# /cache/
 		# Mapping of resolved adapters. Used internally for handling
 		# adapter inheritance.
 	"""
@@ -878,7 +878,7 @@ class Parameters(object):
 	# Stored Parameters interface for retrieving and updating parameters.
 
 	# [ Properties ]
-	# /route
+	# /routes/
 		# Route to the directory containing the context's parameters.
 	"""
 
@@ -1170,12 +1170,7 @@ del k, y, v
 
 def simulate_composite(route):
 	"""
-	# Given a Python package route, fabricate a composite factor in order
-	# to process Python module sources.
-
-	# [ Returns ]
-
-	# A pair consisting of the fabricated module and the next set of packages to process.
+	# Simulate a composite for processing (factor/qtype)`factor.library` directories.
 	"""
 	pkgs, modules = route.subnodes()
 
@@ -1227,7 +1222,7 @@ def extension_link(route, factor):
 	# Used by &.bin.induct after copying the target's factor to the &libfactor.
 
 	# [ Parameters ]
-	# /route
+	# /route/
 		# The &Import selecting the composite factor to induct.
 	"""
 
@@ -1341,7 +1336,7 @@ def identity(module):
 	# Discover the base identity of the target.
 
 	# Primarily, used to identify the proper basename of a library.
-	# The (python/attribute)`name` attribute on a target module provides an explicit
+	# The (python/attribute)`name` on a target module provides an explicit
 	# override. If the `name` is not present, then the first `'lib'` prefix
 	# is removed from the module's name if any. The result is returned as the identity.
 	# The removal of the `'lib'` prefix only occurs when the target factor is a
@@ -1733,13 +1728,13 @@ def unix_link_editor(
 
 	# [ Parameters ]
 
-	# /output
+	# /output/
 		# The file system location to write the linker output to.
 
-	# /inputs
+	# /inputs/
 		# The set of object files to link.
 
-	# /verbose
+	# /verbose/
 		# Enable or disable the verbosity of the command. Defaults to &True.
 	"""
 	factor = build.factor
@@ -1838,10 +1833,6 @@ class Construction(libio.Context):
 	# dispatches the work to be performed for completion in the appropriate order.
 
 	# [ Engineering ]
-	# - Rewrite as a (Transaction) Context maintaining a Flow.
-	# - Generalize; flow accepts jobs and emits FlowControl events
-		# describing the process. (rusage, memory, etc of process)
-
 	# Primarily, this class traverses the directed graph constructed by imports
 	# performed by the target modules being built.
 	"""
@@ -1917,12 +1908,12 @@ class Construction(libio.Context):
 		# Collect the parameters and work to be done for processing the &factor.
 
 		# [ Parameters ]
-		# /factor
+		# /factor/
 			# The &Factor being built.
-		# /references
+		# /references/
 			# The set of factors referred to by &factor. Often, the
 			# dependencies that need to be built in order to build the factor.
-		# /dependents
+		# /dependents/
 			# The set of factors that refer to &factor.
 		"""
 		tracks = self.tracking[factor]
