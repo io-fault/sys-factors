@@ -753,17 +753,7 @@ def host_system_domain(intention, reqs, paths):
 
 	return system
 
-common_intentions = {
-	'optimal': 'Subjective performance selection',
-	'debug': 'Reduced optimizations and defines for emitting debugging information',
-
-	'injections': 'Debugging intention with support for injections for comprehensive testing',
-	'instruments': 'Test intention with profiling and coverage collection enabled',
-	'fragments': 'Context used to delineate fragments from source files',
-}
-
 def designate(corefile, intent, filename):
-	abstract = common_intentions[intent]
 	ctx = corefile.container
 	S = libxml.Serialization()
 	D = S.switch('data:')
