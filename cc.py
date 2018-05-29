@@ -64,18 +64,6 @@ def strip_library_name(filename):
 
 	return prefix
 
-def python_context(implementation, version_info, abiflags, platform):
-	"""
-	# Construct the triplet representing the Python context for the platform.
-	# Used to define the construction context for Python extension modules.
-	"""
-	pyversion = ''.join(map(str, version_info[:2]))
-	return '-'.join((implementation, pyversion + abiflags, platform))
-
-runtime_bytecode_triplet = python_context(
-	sys.implementation.name, sys.version_info, '', 'bytecode'
-)
-
 def update_named_mechanism(route:libroutes.File, name:str, data):
 	"""
 	# Given a route to a mechanism file in a construction context,
@@ -1142,8 +1130,6 @@ extensions = {
 	'assembly': ('asm',),
 	'bitcode': ('bc',), # clang
 	'haskell': ('hs', 'hsc'),
-	'd': ('d',),
-	'rust': ('rs',),
 
 	'python': ('py',),
 	'bytecode.python': ('pyo', 'pyc',),
@@ -1208,7 +1194,6 @@ def simulate_composite(route):
 	mod.__factor_domain__ = 'factor'
 	mod.__factor_type__ = 'library' # Truthfully, a [python] Package Module.
 	mod.__factor_sources__ = sources # Modules in the package.
-	mod.__factor_context__ = runtime_bytecode_triplet
 	mod.__file__ = str(pkgfile)
 
 	return mod, pkgs
@@ -1632,9 +1617,6 @@ def local_bytecode_compiler(
 	]
 	return command
 
-def windows_link_editor(transform_mechs, context, mechanisms, factor, output, inputs):
-	raise RuntimeError("cl.exe linker not implemented")
-
 def macos_link_editor(
 		transform_mechanisms,
 		build, adapter, o_type, output, i_type, inputs,
@@ -1821,8 +1803,6 @@ def unix_link_editor(
 
 if sys.platform == 'darwin':
 	link_editor = macos_link_editor
-elif sys.platform in ('win32', 'win64'):
-	link_editor = windows_link_editor
 else:
 	link_editor = unix_link_editor
 
