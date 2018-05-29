@@ -2,15 +2,15 @@
 
 f_intention template for support modules and extensions.
 
-/__init__.py
+/__init__.py/
 	#!/pl/python
 		"""
 		# Instrumentation support project for context dependent tools.
 		"""
 
-/project.txt
+/project.txt/
 	#!/pl/python
-		/identity/
+		/identifier/
 			`context/intention`
 		/name/
 			`intention`
@@ -25,16 +25,16 @@ f_intention template for support modules and extensions.
 		/contact/
 			&<https://fault.io/critical>
 
-/bin
-	/__init__.py
+/bin/
+	/__init__.py/
 		#!/pl/python
 			"""
 			# Executables supporting coverage data collection for a given tool.
 			"""
 			__factor_type__ = 'executables'
 
-/extensions
-	/__init__.py
+/extensions/
+	/__init__.py/
 		#!/pl/python
 			"""
 			# Python extensions.

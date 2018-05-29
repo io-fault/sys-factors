@@ -2,7 +2,7 @@
 
 Modules raise exceptions to force editing.
 
-/__init__.py
+/__init__.py/
 	#!/pl/pyton
 		"""
 		# Package module. Overview documentation only.
@@ -12,7 +12,7 @@ Modules raise exceptions to force editing.
 		"""
 		raise RuntimeError("initialized package was not modified")
 
-/core.py
+/core.py/
 	#!/pl/python
 		"""
 		# Primary internal module if any.
@@ -28,7 +28,7 @@ Modules raise exceptions to force editing.
 		"""
 		raise RuntimeError("initialized package was not modified")
 
-/library.py
+/library.py/
 	#!/pl/python
 		"""
 		# Primary exposed functionality.
@@ -50,21 +50,21 @@ Modules raise exceptions to force editing.
 			# by documentation processors.
 
 			# [ Parameters ]
-			# /x
+			# /x/
 				# The first parameter. Joins with annotation of parameter named `x`.
-			# /y
+			# /y/
 				# The second parameter.
-			# /z
+			# /z/
 				# A series of optional parameters.
 
 			# [ Returns ]
-			# /&None
+			# /&None/
 				# Performed no operation.
-			# /&int
+			# /&int/
 				# A count of operations performed.
 
 			# [ Exceptions ]
-			# /&RuntimeError
+			# /&RuntimeError/
 				# Something ambiguous.
 
 			# [ Effects ]
@@ -78,28 +78,27 @@ Modules raise exceptions to force editing.
 
 		raise RuntimeError("initialized package was not modified")
 
-/project.py
-	#!/pl/python
-		"""
-		# Constant data describing the project.
-		# This may be generated from an XML file one day.
-		"""
-		identity = 'URL-To-Project(No versions, project "home page")'
-		name = 'name-of-project'
-		abstract = 'Single sentence description of the project'
-		icon = '<emoji or URL to icon>'
+/project.txt/
+	#!text
+		/identifier/
+			`URL-To-Project(No versions, project "home page")`
+		/name/
+			`name-of-project`
+		/abstract/
+			Paragraphs regarding the purpose of the project.
+		/icon/
+			'<emoji or URL to icon>'
 
-		fork = '<conceptual fork of project with respect to aformentioned identity>'
-		versioning = 'continuous|semantic|inconsistent' # if unspecified, inconsistent is presumed
-		status = 'state-of-project: stable|flux'
+		/versioning/
+			'continuous|semantic|inconsistent' # if unspecified, inconsistent is presumed
 
-		controller = 'domain name or mailto of project authority'
-		contact = 'email or URL to an appropriate party for inquiries'
+		/controller/
+			`domain name or mailto of project authority`
+		/contact/
+			`email or URL to an appropriate party for inquiries`
 
-		raise RuntimeError("initialized package was not modified")
-
-/test
-	/__init__.py
+/test/
+	/__init__.py/
 		#!/pl/python
 			"""
 			# Test context initialization.
@@ -114,7 +113,7 @@ Modules raise exceptions to force editing.
 				"""
 				pass
 
-	/test_library.py
+	/test_library.py/
 		#!/pl/python
 			"""
 			# Test module.
@@ -161,15 +160,15 @@ Modules raise exceptions to force editing.
 				from fault.test import library as libtest
 				libtest.execute(sys.modules[__name__])
 
-/documentation
-	/__init__.py
+/documentation/
+	/__init__.py/
 		#!/pl/python
 			__factor_domain__ = 'xml'
 			__factor_type__ = 'library'
 			__path__ = ()
 
-	/src
-		/introduction.txt
+	/src/
+		/introduction.txt/
 			#!text
 				Startup documentation. Probably avoid describing usage outside of
 				supportive illustrations.
@@ -183,7 +182,7 @@ Modules raise exceptions to force editing.
 
 				Note explicit goals and direction of the project.
 
-		/context.txt
+		/context.txt/
 			#!text
 				[ References ]
 				...
@@ -196,7 +195,7 @@ Modules raise exceptions to force editing.
 				/term
 					Colloquial definition of (term)&term.
 
-		/usage.txt
+		/usage.txt/
 			#!text
 				Primary narrative.
 
@@ -204,7 +203,7 @@ Modules raise exceptions to force editing.
 
 				Information about the hello world interfaces.
 
-		/mechanics.txt
+		/mechanics.txt/
 			#!text
 				Discuss project mechanics here if at all.
 				Often well positioned comments suffice, but given reasonably complicated
@@ -213,15 +212,15 @@ Modules raise exceptions to force editing.
 				[ Internal Patterns ]
 				...
 
-/bin
-	/__init__.py
+/bin/
+	/__init__.py/
 		#!/pl/python
 			"""
 			# Project Executables.
 			"""
 			__factor_type__ = 'executables'
 
-	/execute.py
+	/execute.py/
 		#!/pl/python
 			"""
 			# Executable entry point for use with -m.

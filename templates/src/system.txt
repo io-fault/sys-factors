@@ -2,13 +2,13 @@
 
 A system executable.
 
-/__init__.py
+/__init__.py/
 	#!/pl/python
 		__factor_domain__ = 'system'
 		__factor_type__ = 'executable'
 
-/src
-	/test.c
+/src/
+	/test.c/
 		#!/pl/c
 			#include <fault/libc.h>
 			#include <fault/internal.h>
@@ -30,13 +30,13 @@ A system executable.
 A system library target. The selected mechanisms determines whether this is
 dynamic or static. For some contexts, this is may be equivalent to a &[fragment].
 
-/__init__.py
+/__init__.py/
 	#!/pl/python
 		__factor_domain__ = 'system'
 		__factor_type__ = 'library'
 
-/src
-	/test.c
+/src/
+	/test.c/
 		#!/pl/c
 			#include "test.h"
 
@@ -55,13 +55,13 @@ dynamic or static. For some contexts, this is may be equivalent to a &[fragment]
 
 A system fragment intended for compilation into other targets.
 
-/__init__.py
+/__init__.py/
 	#!/pl/python
 		__factor_domain__ = 'system'
 		__factor_type__ = 'library'
 
-/src
-	/partial.c
+/src/
+	/partial.c/
 		#!/pl/c
 			int
 			sum(int x, int y)
@@ -73,7 +73,7 @@ A system fragment intended for compilation into other targets.
 
 A system (process) extension intended to be loaded into Python.
 
-/__init__.py
+/__init__.py/
 	#!/pl/python
 		__factor_domain__ = 'system'
 		__factor_type__ = 'extension'
@@ -83,8 +83,8 @@ A system (process) extension intended to be loaded into Python.
 			'python',
 		)
 
-/src
-	/module.c
+/src/
+	/module.c/
 		#!/pl/c
 			#include <fault/libc.h>
 			#include <fault/internal.h>
