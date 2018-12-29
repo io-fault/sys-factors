@@ -1,0 +1,49 @@
+! CONTEXT:
+	/protocol/
+		&<http://if.fault.io/filesystem>
+
+[ intention ]
+
+f_intention template for support modules and extensions.
+
+/__init__.py/#!/pl/python
+	"""
+	# Instrumentation support project for context dependent tools.
+	"""
+/infrastructure.txt/#!/text/fault
+	! CONTEXT:
+		/protocol/
+			&<http://if.fault.io/project/infrastructure>
+	/kit-llvm-instrumentation/
+		- &<http://fault.io/engineering/adapters.llvm#instrumentation>
+	/kit-llvm-delineation/
+		- &<http://fault.io/engineering/adapters.llvm#delineation>
+/project.txt/#!/text/fault
+	! CONTEXT:
+		/protocol/
+			&<http://if.fault.io/project/information>
+	/identifier/
+		`http://localhost/fault/intention`
+	/name/
+		`intention`
+	/abstract/
+		Construction Context Support.
+	/icon/
+		(emoji)'🛠'
+	/versioning/
+		`irrelevant`
+	/controller/
+		`fault.io`
+	/contact/
+		&<http://fault.io/critical>
+/bin/
+	/__init__.py/#!/pl/python
+		"""
+		# Executables supporting coverage data collection for a given tool.
+		"""
+		__factor_type__ = 'executables'
+/extensions/
+	/__init__.py/#!/pl/python
+		"""
+		# Python extensions.
+		"""
