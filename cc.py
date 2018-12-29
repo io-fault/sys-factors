@@ -1,11 +1,10 @@
 """
 # Construction Context implementation in Python.
 
-# [ Properties ]
-
-# /library_extensions/
-	# Used by &library_filename to select the appropriate extension
-	# for (factor/type)`system.library` and (factor/type)`system.extension` factors.
+# [ Engineering ]
+# /Mechanism Load Order/
+	# Mechanism data layers are not merged in a particular order.
+	# This allows for inconsistencies to occur across &Context instances.
 """
 import os
 import sys
@@ -18,6 +17,8 @@ import importlib
 import importlib.machinery
 import types
 import typing
+import pickle
+import copy
 
 from . import include
 
@@ -27,44 +28,17 @@ from fault.routes import library as libroutes
 from fault.io import library as libio
 from fault.system import library as libsys
 from fault.system import libfactor
+from fault.system import python as system_python
+from fault.system import files as system_files
 from fault.filesystem import library as libfs
+from fault.text import struct as libstruct
+from fault.project import library as libproject
+from fault.internet import ri
 
-from fault.xml import library as libxml
-from fault.xml import lxml
-
-Import = libroutes.Import
-File = libroutes.File
-
+File = system_files.Path
 fpi_addressing = libfs.Hash('fnv1a_32', depth=1, length=2)
 
-xml_namespaces = {
-	'lc': 'http://fault.io/xml/dev/fpi',
-	'd': 'http://fault.io/xml/data',
-	'ctx': 'http://fault.io/xml/dev/ctx',
-}
-
-library_extensions = {
-	'msw': 'dll',
-	'win32': 'dll',
-	'darwin': 'dylib',
-	'unix': 'so',
-}
-
-def library_filename(platform, name):
-	"""
-	# Construct a dynamic library filename for the given platform.
-	"""
-	return 'lib' + name.lstrip('lib') + '.' + library_extensions.get(platform, 'so')
-
-def strip_library_name(filename):
-	prefix, *suffix = filename.split('.', 1)
-
-	if prefix.startswith('lib'):
-		return prefix[3:]
-
-	return prefix
-
-def update_named_mechanism(route:libroutes.File, name:str, data):
+def update_named_mechanism(route:File, name:str, data):
 	"""
 	# Given a route to a mechanism file in a construction context,
 	# overwrite the file's mechanism entry with the given &data.
@@ -73,157 +47,238 @@ def update_named_mechanism(route:libroutes.File, name:str, data):
 	# /route/
 		# The route to the file that is to be modified.
 	# /name/
-		# The xml:id used to identify the mechanism layer.
+		# The component in the mechanism file to replace.
 	# /data/
 		# The dictionary to set as the mechanism's content.
 	"""
-	from fault.xml.lxml import Query
 
-	raw = lxml.etree.parse(str(route))
-	q = Query(raw, xml_namespaces)
-
-	S = libxml.Serialization()
-	D = S.switch('data:')
-	fragment = b''.join(S.element('mechanism',
-		libxml.Data.serialize(D, data),
-		('xml:id', name),
-		('xmlns', 'http://fault.io/xml/dev/fpi'),
-		('xmlns:data', 'http://fault.io/xml/data'),
-	))
-	fdoc = lxml.etree.XML(fragment).xpath('/*')[0]
-
-	current_mechanism = q.first('/lc:context/lc:mechanism[@xml:id=%r]' % (name,))
-	if current_mechanism is None:
-		q.append('/lc:context', fdoc)
+	if route.exists():
+		stored = pickle.loads(route.load())
 	else:
-		current_mechanism.replace('.', fdoc)
+		stored = {}
 
-	return route.store(lxml.etree.tostring(q.element))
+	stored[name] = data
+	route.store(pickle.dumps(stored))
 
-def load_named_mechanism(route:libroutes.File, name:str):
+def load_named_mechanism(route:File, name:str):
 	"""
 	# Given a route to a mechanism file in a construction context,
 	# load the file's mechanism entry.
 
 	# [ Parameters ]
 	# /route/
-		# The route to the file that is to be modified.
-	# /name/
-		# The xml:id used to identify the mechanism layer.
+		# The route to the mechanisms 
 	"""
-	raw = lxml.etree.parse(str(route))
-	data = raw.xpath(
-		"/lc:context/lc:mechanism[@xml:id=%r]/d:*" %(name,),
-		namespaces=xml_namespaces)
+	return pickle.loads(route.load())[name]
 
-	data = list(data)
-	if data:
-		return libxml.Data.structure(data[0])
+import faulthandler
+faulthandler.enable()
 
-	return {}
+def context_interface(path):
+	"""
+	# Resolves the construction interface for processing a source or performing
+	# the final reduction (link-stage).
+	"""
 
-def rebuild(outputs, inputs):
+	# Avoid at least one check as it is known there is at least
+	# one attribute in the path.
+	leading, final = path.rsplit('.', 1)
+	mod, apath = system_python.Import.from_attributes(leading)
+	obj = importlib.import_module(str(mod))
+
+	for x in apath:
+		obj = getattr(obj, x)
+
+	return getattr(obj, final)
+
+def rebuild(outputs, inputs, subfactor=True, cascade=False):
 	"""
 	# Unconditionally report the &outputs as outdated.
 	"""
+	if cascade is False and subfactor is False:
+		# If rebuild is selected, &cascade must be enabled in order
+		# for out-of-selection factors to be rebuilt.
+		return True
+
 	return False
 
-def updated(outputs, inputs, requirement=None):
+def updated(outputs, inputs, never=False, cascade=False, subfactor=True):
 	"""
 	# Return whether or not the &outputs are up-to-date.
 
 	# &False returns means that the target should be reconstructed,
 	# and &True means that the file is up-to-date and needs no processing.
 	"""
+
+	if never:
+		# Never up-to-date.
+		if cascade:
+			# Everything gets refreshed.
+			return False
+		elif subfactor:
+			# Subfactor inherits never regardless of cascade.
+			return False
+
 	olm = None
 	for output in outputs:
 		if not output.exists():
 			# No such object, not updated.
 			return False
-		lm = output.last_modified()
+		lm = output.get_last_modified()
 		olm = min(lm, olm or lm)
 
-	if requirement is not None and olm < requirement:
-		# Age requirement not meant, rebuild.
-		return False
+	# Otherwise, check the inputs against outputs.
+	# In the case of a non-cascading rebuild, it is desirable
+	# to perform the input checks.
 
 	for x in inputs:
-		if not x.exists() or x.last_modified() > olm:
+		if not x.exists() or x.get_last_modified() > olm:
 			# rebuild if any output is older than any source.
 			return False
 
 	# object has already been updated.
 	return True
 
-# Relocate to adapters.python
-try:
-	import importlib.util
-	cache_from_source = importlib.util.cache_from_source
-except (ImportError, AttributeError):
-	try:
-		import imp
-		cache_from_source = imp.cache_from_source
-		del imp
-	except (ImportError, AttributeError):
-		# Make a guess preferring the cache directory.
-		def cache_from_source(filepath):
-			return os.path.join(
-				os.path.dirname(filepath),
-				'__pycache__',
-				os.path.basename(filepath) + 'c'
-			)
-finally:
-	pass
-
-def update_bytecode_cache(src, target, condition,
-		cache_from_source=cache_from_source,
-		mkr=libroutes.File.from_path
-	) -> typing.Tuple[bool, str]:
+def group(factors:typing.Sequence[object]):
 	"""
-	# Determine whether to update the cached Python bytecode file associated
-	# with &src.
-
-	# [ Parameters ]
-	# /src/
-		# A Python source &File properly positioned in its package directory.
-		# &importlib.util.cache_from_source will be called to find its
-		# final destination.
-	# /target/
-		# Compiled bytecode &File to install.
-
-	# [ Returns ]
-
-	# /&bool/
-		# Whether the file was updated or not.
-	# /&str/
-		# The string path to the cache file location
-		# that should be overwritten.
-
-		# When &1 is &False, this will be a message describing
-		# why it should not be updated.
+	# Organize &factors by their domain-type pair using (python/attribute)`pair` on
+	# the factor.
 	"""
 
-	fp = str(src)
-	if not src.exists() or not fp.endswith('.py'):
-		return (False, "source does not exist or does not end with `.py`")
-
-	cache_file = mkr(cache_from_source(fp, optimization=None))
-
-	if condition((cache_file,), (target,)):
-		return (False, "update condition was not present")
-
-	return (True, cache_file)
-
-def references(factors):
 	container = collections.defaultdict(set)
 	for f in factors:
 		container[f.pair].add(f)
 	return container
 
+def interpret_reference(index, factor, symbol, url):
+	"""
+	# Extract the project identifier from the &url and find a corresponding
+	# entry in the project set, &index.
+
+	# The fragment portion of the URL specifies the factor within the project
+	# that should be connected in order to use the &symbol.
+	"""
+
+	print(url, index)
+	i = ri.parse(url)
+	rfactor = i.pop('fragment', None)
+	rproject_name = i['path'][-1]
+
+	i['path'][-1] = '' # Force the trailing slash in serialize()
+	product = ri.serialize(i)
+
+	project = None
+	path = None
+	ftype = (None, None)
+	rreqs = {}
+	sources = []
+
+	project_url = product + rproject_name
+
+	project = Project(*index.select(project_url))
+	factor = libroutes.Segment.from_sequence(rfactor.split('.'))
+	factor_dir = project.route.extend(factor.absolute)
+	from fault.project import explicit
+	ctx, data = explicit.struct.parse((factor_dir/'factor.txt').get_text_content())
+
+	t = Target(project, factor, data['domain'] or 'system', data['type'], rreqs, [])
+	return t
+
+def requirements(index, symbols, factor):
+	"""
+	# Return the set of factors that is required to build this Target, &self.
+	"""
+
+	if isinstance(factor, SystemFactor): # XXX: eliminate variation
+		return
+
+	for sym, refs in factor.symbols.items():
+		if sym in symbols:
+			sdef = symbols[sym]
+			if isinstance(sdef, list):
+				yield from sdef
+			else:
+				yield from SystemFactor.collect(symbols[sym])
+			continue
+
+		for r in refs:
+			if isinstance(r, Target):
+				yield r
+			else:
+				yield interpret_reference(index, factor, sym, r)
+
+def resolve(infrastructure, overrides, symbol):
+	if symbol in overrides:
+		return overrides[symbol]
+	return infrastructure[symbol]
+
+class Project(object):
+	"""
+	# Project Information and Infrastructure storage.
+	# Provides Construction Contexts with project identity and
+	# the necessary data for resolving infrastructure symbols.
+
+	# [ Properties ]
+	# /infrastructure/
+		# The infrastructure symbols provided by the project.
+	# /information/
+		# The finite map extracted from the &source.
+	"""
+
+	def __hash__(self):
+		return hash(str(self.paths.project))
+
+	@property
+	def symbol(self):
+		i = self.information
+		url = i['identifier']
+		return '[{1}{0}]:{2}'.format(url, i['icon'].get('emoji', ''), self.route)
+
+	@property
+	def segment(self):
+		"""
+		# Return the factor path of the Project.
+		"""
+		return libroutes.Segment(None, (self.paths.root >> self.paths.project)[1])
+
+	@property
+	def route(self):
+		return self.paths.project
+
+	@property
+	def product(self):
+		"""
+		# The route to the parent directory of the context, category, or project.
+		"""
+		p = self.paths
+		base = p.context or p.category or p.project
+		return base.container
+
+	@property
+	def environment(self):
+		"""
+		# Path to the environment containing the project.
+		"""
+
+		current = self.product.container
+		while not (current/'.environment').exists():
+			current = current.container
+			if str(current) == '/':
+				break
+		else:
+			return current
+
+		return None
+
+	def __init__(self, paths, infrastructure, information):
+		self.paths = paths
+		self.information = information
+		self.infrastructure = infrastructure
+
 class SystemFactor(object):
 	"""
 	# Factor structure used to provide access to include and library directories.
-	# Instances are normally stored in &Build.references which is populated by
+	# Instances are normally stored in &Build.requirements which is populated by
 	# the a factor's requirements list.
 	"""
 
@@ -245,6 +300,36 @@ class SystemFactor(object):
 			name = name,
 		)
 
+	@property
+	def pair(self):
+		return (self.domain, self.type)
+
+	@property
+	def absolute(self):
+		# XXX: invariant
+		return ()
+
+	@classmethod
+	def collect(Class, tree):
+		"""
+		# Create set of SystemFactor's from a nested dictionary of definitions.
+		"""
+		for domain, types in tree.items():
+			for ft, sf in types.items():
+				for sf_int in sf:
+					if sf_int is not None:
+						sf_route = system_files.Path.from_absolute(sf_int)
+					else:
+						sf_route = None
+
+					for sf_name in sf[sf_int]:
+						yield SystemFactor(
+							domain = domain,
+							type = ft,
+							integral = sf_route,
+							name = sf_name
+						)
+
 	def __init__(self, **kw):
 		for k in ('sources', 'integral'):
 			v = kw.pop(k, None)
@@ -255,13 +340,12 @@ class SystemFactor(object):
 	def sources(self):
 		return self.__dict__['_sources']
 
-	def integral(self):
+	def integral(self, *ignored):
 		return self.__dict__['_integral']
-iFactor = SystemFactor
 
-class Factor(object):
+class Target(object):
 	"""
-	# A Factor of a development environment; similar to "targets" in IDEs.
+	# A Factor of a project; conceptually similar to "targets" in IDEs.
 	# &Factor instances are specific to the module-local Construction Context
 	# implementation.
 
@@ -274,178 +358,109 @@ class Factor(object):
 		# Explicitly designated variants.
 	"""
 
-	default_source_directory = 'src'
 	default_cache_name = '__f_cache__'
-	default_fpi_name = 'work'
+	default_integral_name = '__f-int__'
 
 	def __repr__(self):
-		return "{0.__class__.__name__}({1}, {2}, {3})".format(
+		return "<%s>" %('.'.join(self.route),)
+
+	def __r_repr__(self):
+		return "{0.__class__.__name__}({1})".format(
 			self,
-			self.route,
-			self.module,
-			self.parameters
+			', '.join(
+				map(repr, [
+					self.project,
+					self.route,
+					self.domain,
+					self.type,
+					self.symbols,
+					self.sources(),
+				])
+			)
 		)
 
 	def __hash__(self):
-		p = list(self.parameters or ())
-		p.sort()
-		return hash((self.module, tuple(p)))
+		return hash(self.absolute)
+
+	@property
+	def absolute(self):
+		return (self.project.segment.extend(self.route))
+
+	@property
+	def absolute_path_string(self):
+		"""
+		# The target's factor path.
+		"""
+		return '.'.join(self.absolute)
 
 	def __eq__(self, ob):
-		if not isinstance(ob, Factor):
-			return False
-		return ob.module == self.module and ob.parameters == self.parameters
-
-	@staticmethod
-	@functools.lru_cache(32)
-	def _directory_cache(route):
-		parent = route.container
-		if (parent.context, parent.points) != (None, ()):
-			return Factor._directory_cache(route.container) / route.identifier
-		else:
-			return route
+		return self.absolute == ob.absolute
 
 	def __init__(self,
-			route:Import,
-			module:types.ModuleType, module_file:File,
-			parameters:typing.Mapping=None,
+			project:(Project),
+			route:(libroutes.Segment),
+			domain:(str),
+			type:(str),
+			symbols:(typing.Sequence[str]),
+			sources:(typing.Sequence[libroutes.Route]),
+			parameters:(typing.Mapping)=None,
+			variants:(typing.Mapping)=None,
 		):
 		"""
 		# Either &route or &module can be &None, but not both. The system's
 		# &importlib will be used to resolve a module from the &route in its
-		# absence, and the module's (python:attribute)`__name__` field will
+		# absence, and the module's (python/attribute)`__name__` field will
 		# be used to construct the &Import route given &route's absence.
 		"""
-		self.local_variants = {}
-		self.key = None
-
-		if route is None:
-			route = Import.from_fullname(module.__name__)
-		elif module is None:
-			module = importlib.import_module(str(route))
-
+		self.project = project
 		self.route = route
-		self.module = module
+		self.domain = domain
+		self.type = type
+		self.symbols = symbols
+		self._sources = sources
+		self.parameters = parameters
 
-		if module_file is None:
-			mfp = getattr(module, '__file__', None)
-			if mfp is not None:
-				# Potentially, this could be a purposeful lie.
-				module_file = File.from_absolute(mfp)
-			else:
-				# Get it from Python's loader.
-				module_file = route.file()
+		self.key = None
+		self.local_variants = variants or {}
 
-		pkgdir = self._directory_cache(module_file.container)
-		self.package_directory = pkgdir
-		self.module_file = pkgdir / module_file.identifier
-
-		if parameters is None:
-			# Collect from module if available.
-			parameters = getattr(module, 'parameters', None)
-			self.parameters = parameters
-
-	@classmethod
-	def from_fullname(Class, fullname):
-		"""
-		# Create from a module's fullname that is available on &sys.path.
-		"""
-		return Class(Import.from_fullname(fullname), None, None)
-
-	@classmethod
-	def from_module(Class, module):
-		"""
-		# Create from a &types.ModuleType. This constructor should be used in
-		# cases where a Factor is being simulated and is not addressable in
-		# Python's module path.
-		"""
-		if hasattr(module, '__factor__'):
-			return module.__factor__
-		return Class(None, module, None)
-
-	@property
-	@functools.lru_cache(32)
-	def fullname(self):
-		return self.route.fullname
-
-	def __str__(self):
-		struct = "({0.domain}.{0.type}) {0.fullname}[{0.module_file.fullpath}]"
+	def __str__(self, struct="({0.domain}.{0.type}) {0.name}"):
 		return struct.format(self, scheme=self.type[:3])
 
 	@property
 	def name(self):
-		return self.route.identifier
-
-	@property
-	def domain(self):
 		try:
-			return self.module.__factor_domain__
-		except AttributeError:
-			# python.library
-			return 'factor'
-
-	@property
-	def type(self):
-		try:
-			return self.module.__factor_type__
-		except AttributeError:
-			# python.library
-			return 'library'
-
-	@property
-	def reflective(self):
-		try:
-			return self.module.reflective
-		except AttributeError:
-			return False
+			return self.route.identifier
+		except:
+			# XXX: make route consistent
+			return self.route[-1]
 
 	@property
 	def pair(self):
 		return (self.domain, self.type)
 
-	@property
-	def latest_modification(self):
-		return scan_modification_times(self.package_directory)
-
-	@property
-	def source_directory(self):
-		"""
-		# Get the factor's source directory.
-		"""
-		srcdir = self.package_directory / self.default_source_directory
-		if not srcdir.exists():
-			return self.package_directory
-		return srcdir
-
 	def sources(self):
 		"""
 		# An iterable producing the source files of the Factor.
 		"""
-		# Full set of regular files in the sources location.
-		fs = getattr(self.module, '__factor_sources__', None)
-		if fs is not None:
-			return fs
-		else:
-			srcdir = self.source_directory
-			if srcdir.exists():
-				return [
-					srcdir.__class__(srcdir, (srcdir >> x)[1])
-					for x in srcdir.tree()[1]
-				]
+		return self._sources
 
 	@property
 	def cache_directory(self) -> File:
 		"""
 		# Factor build cache directory.
 		"""
-		return self.package_directory / self.default_cache_name
+		p = self.project.paths.project.extend(self.route)
+		if p.is_directory():
+			return p / self.default_cache_name
+		else:
+			return p.container / self.default_cache_name
 
 	@property
 	def fpi_root(self) -> File:
 		"""
 		# Factor Processing Instruction root work directory for the given Factor, &self.
 		"""
-		return self.cache_directory / self.default_fpi_name
+		return self.cache_directory
 
 	@staticmethod
 	def fpi_work_key(variants):
@@ -457,26 +472,32 @@ class Factor(object):
 		"""
 		return ';'.join('='.join((k,v)) for k,v in variants).encode('utf-8')
 
-	def fpi_initialize(self, *variant_sets, **variants):
+	def fpi_initialize(self, groups, *variant_sets, **variants):
 		"""
 		# Update and return the dictionary key used to access the processed factor.
 		"""
+
 		vl = list(itertools.chain.from_iterable(v.items() for v in variant_sets))
 		vl.extend(self.local_variants.items())
 		vl.extend(variants.items())
 		vl = list(dict(vl).items())
 		vl.sort()
+		variants = dict(vl)
 
 		key = self.fpi_work_key(vl)
 		wd = self.fpi_set.route(key, filename=str)
 
+		i = libproject.integrals(self.project.route, self.route)
+		out = libproject.compose(groups, variants)
+		out = i.extend(out).suffix('.i')
+
 		return vl, key, {
-			'work': wd, # normally, __f_cache__ subdirectory.
-			# Processed Source Directory; becomes ftr if no reduce.
-			'output': wd / 'psd',
-			'log': wd / 'log',
-			'integral': wd / 'int',
+			'integral': out,
+			'work': wd,
 			'libraries': wd / 'lib',
+			'log': wd / 'log',
+			'output': wd / 'xfd',
+			'sources': wd / 'src',
 		}
 
 	@property
@@ -496,46 +517,18 @@ class Factor(object):
 
 		return self.fpi_set.has_key(key)
 
-	def integral(self, key=None, slot='factor'):
+	def integral(self, groups, variants):
 		"""
 		# Get the appropriate reduction for the Factor based on the
 		# configured &key. If no key has been configured, the returned
 		# route will be to the inducted factor.
 		"""
 
-		if getattr(self.module, 'reflection', False):
-			return self.source_directory
+		i = libproject.integrals(self.project.route, self.route)
+		path = libproject.compose(groups, variants)
+		i = i.extend(path)
 
-		if key is not None and self.fpi_work_exists(key):
-			r = self.fpi_set.route(key) / 'int'
-			if not r.exists():
-				r = libfactor.inducted(self.route, slot=slot)
-		else:
-			r = libfactor.inducted(self.route, slot=slot)
-
-		if not r.exists():
-			raise RuntimeError("factor reduction does not exist", r, self)
-
-		return r
-
-	def dependencies(factor):
-		"""
-		# Return the set of dependencies that the given factor has.
-		"""
-
-		is_composite = libfactor.composite
-		ModuleType = types.ModuleType
-
-		refs = set(x for x in factor.module.__dict__.values() if isinstance(x, ModuleType))
-		for v in refs:
-			if not hasattr(v, '__factor_type__'):
-				# Factor, but no type means that
-				# it has no transformation to perform.
-				continue
-			if not hasattr(v, '__factor_domain__'):
-				continue
-
-			yield Factor(None, v, None)
+		return i.suffix('.i')
 
 	def formats(self, mechanism, dependents):
 		"""
@@ -559,7 +552,10 @@ class Factor(object):
 			# For system factors, this determines PIC/PIE/Unspecified.
 			yield fformats.get(self.type) or fformats[None]
 
-	def link(self, variants, context, mechanism, refs, dependents):
+	def groups(self, context):
+		return context.groups(self.project.environment)
+
+	def link(self, variants, context, mechanism, reqs, dependents):
 		"""
 		# Generate the variants, source parameters, and locations used
 		# to perform a build.
@@ -569,27 +565,19 @@ class Factor(object):
 			# &Context instance providing the required mechanisms.
 		# /mechanism/
 			# &Mechanism selected for production of the Factor Processing Instructions.
-		# /refs/
+		# /reqs/
 			# The dependencies, composite factors, specified by imports.
 		# /dependents/
 			# The list of Factors depending on this target.
 		"""
 
+		groups = self.groups(context)
+
 		for fmt in self.formats(mechanism, dependents):
 			vars = dict(variants)
 			vars['format'] = fmt
 
-			yield [], self.fpi_initialize(vars, format=fmt)
-
-def scan_modification_times(factor, aggregate=max):
-	"""
-	# Scan the factor's sources for the latest modification time.
-	"""
-	dirs, files = libfactor.sources(factor).tree()
-	del dirs
-
-	glm = File.get_last_modified
-	return aggregate(x for x in map(glm, files))
+			yield [], self.fpi_initialize(groups, vars, format=fmt)
 
 merge_operations = {
 	set: set.update,
@@ -632,19 +620,31 @@ class Mechanism(object):
 
 	# /descriptor/
 		# The data structure referring to the interface used
-		# to construct commands for the selected mechanism.
+		# to construct processing instructions for the selected mechanism.
 	# /cache/
 		# Mapping of resolved adapters. Used internally for handling
 		# adapter inheritance.
 	"""
 
 	def __init__(self, descriptor):
-		self.cache = {}
 		self.descriptor = descriptor
+		self.cache = {}
+
+	@property
+	def symbol(self):
+		return self.descriptor['path'][0]
+
+	@property
+	def groups(self):
+		return self.descriptor['groups']
 
 	@property
 	def integrations(self):
 		return self.descriptor['integrations']
+
+	@property
+	def transformations(self):
+		return self.descriptor['transformations']
 
 	def integrates(self):
 		ints = self.descriptor.get('integrations')
@@ -653,15 +653,11 @@ class Mechanism(object):
 		else:
 			return False
 
-	@property
-	def transformations(self):
-		return self.descriptor['transformations']
-
 	def suffix(self, factor):
 		"""
 		# Return the suffix that the given factor should use for its integral.
 		"""
-		tfe = self.descriptor['target-file-extensions']
+		tfe = self.descriptor.get('target-file-extensions', {None: '.v'})
 		return (
 			tfe.get(factor.type) or \
 			tfe.get(None) or '.i'
@@ -669,17 +665,14 @@ class Mechanism(object):
 
 	def prepare(self, build):
 		"""
-		# Generate any requisite filesystem initializations.
+		# Generate any requisite filesystem requirements.
 		"""
 
 		loc = build.locations
 		f = build.factor
 		ftr = loc['integral']
-		rr = ftr / (f.name + self.suffix(f))
 
-		yield ('directory', None, None, (None, ftr))
-		if not f.reflective:
-			yield ('link', None, None, (rr, ftr / 'pf.lnk'))
+		yield ('directory', None, None, (None, ftr.container))
 
 		od = loc['output']
 		ld = loc['log']
@@ -719,7 +712,7 @@ class Mechanism(object):
 
 		lmech = aset[key]
 		layers = [lmech]
-		while 'inherit' in lmech:
+		while 'inherit' in (lmech or ()):
 			basemech = lmech['inherit']
 			layers.append(aset[basemech]) # mechanism inheritance
 			lmech = aset[basemech]
@@ -727,7 +720,8 @@ class Mechanism(object):
 
 		cmech = {}
 		for x in layers:
-			merge(cmech, x)
+			if x is not None:
+				merge(cmech, x)
 		cmech.pop('inherit', None)
 
 		# cache merged mechanism
@@ -739,13 +733,12 @@ class Mechanism(object):
 		"""
 		# Transform the sources using the mechanisms defined in &context.
 		"""
-		global languages, include
 
 		f = build.factor
 		fdomain = f.domain
 		loc = build.locations
 		logs = loc['log']
-		ctxname = build.context.name
+		intention = build.context.intention
 		fmt = build.variants['format']
 
 		mechanism = build.mechanism.descriptor
@@ -754,7 +747,7 @@ class Mechanism(object):
 		commands = []
 		for src in f.sources():
 			fnx = src.extension
-			if ctxname != 'delineation' and fnx in ignores or src.identifier.startswith('.'):
+			if intention != 'fragments' and fnx in ignores or src.identifier.startswith('.'):
 				# Ignore header files and dot-files for non-delineation contexts.
 				continue
 			obj = File(loc['output'], src.points)
@@ -764,11 +757,16 @@ class Mechanism(object):
 
 			logfile = File(loc['log'], src.points)
 
-			src_type = languages.get(src.extension)
+			src_type = build.context.language(src.extension)
 			out_format = mechanism['formats'][f.type]
 
 			adapter = self.adaption(build, src_type, src, phase='transformations')
-			xf = context_interface(adapter['interface'])
+			if 'interface' in adapter:
+				print('transform', src)
+				xf = context_interface(adapter['interface'])
+			else:
+				print('no interface for transformation', src_type, str(src))
+				continue
 
 			# Compilation to out_format for integration.
 			seq = list(xf(build, adapter, out_format, obj, src_type, (src,)))
@@ -815,14 +813,13 @@ class Mechanism(object):
 		fmt = build.variants.get('format')
 		if fmt is None:
 			return
-		if 'integrations' not in mechanism or f.reflective:
+		if 'integrations' not in mechanism:# or f.reflective: XXX
+			# warn/note?
 			return
 
 		mechp = mechanism
-		preferred_suffix = self.suffix(f)
-
 		ftr = loc['integral']
-		rr = ftr / (f.name + preferred_suffix)
+		rr = ftr
 
 		# Discover the known sources in order to identify which objects should be selected.
 		objdir = loc['output']
@@ -830,12 +827,16 @@ class Mechanism(object):
 			x.points for x in f.sources()
 			if x.extension not in mechp.get('ignore-extensions', ())
 		])
-		# TODO: Filter objects whose suffix isn't in &sources or in output/.ext/*
 		objects = [
 			objdir.__class__(objdir, x) for x in sources
 		]
 
-		partials = [x for x in build.references[(f.domain, 'partial')]]
+		if build.requirements:
+			partials = [x for x in build.requirements[(f.domain, 'partial')]]
+		else:
+			partials = ()
+
+		# XXX: does not account for partials
 		if filtered((rr,), objects):
 			return
 
@@ -848,8 +849,12 @@ class Mechanism(object):
 			objects = [objdir / root]
 
 		# Libraries and partials of the same domain are significant.
-		libraries = [x for x in build.references[(f.domain, 'library')]]
+		if build.requirements:
+			libraries = [x for x in build.requirements[(f.domain, 'library')]]
+		else:
+			libraries = ()
 
+		print('integrate', str(f))
 		xf = context_interface(adapter['interface'])
 		seq = xf(transform_mechs, build, adapter, f.type, rr, fmt, objects, partials, libraries)
 		logfile = loc['log'] / 'Integration.log'
@@ -863,132 +868,34 @@ class Build(tuple):
 	context = property(operator.itemgetter(0))
 	mechanism = property(operator.itemgetter(1))
 	factor = property(operator.itemgetter(2))
-	references = property(operator.itemgetter(3))
+	requirements = property(operator.itemgetter(3))
 	dependents = property(operator.itemgetter(4))
 	variants = property(operator.itemgetter(5))
 	locations = property(operator.itemgetter(6))
 	parameters = property(operator.itemgetter(7))
+	environment = property(operator.itemgetter(8))
 
-	def pl_specification(self, language):
-		module = self.factor.module
-		return module.__dict__.get('pl', {}).get(language, (None, ()))
+	def required(self, domain, ftype):
+		ctx = self.context
+		needed_variants = ctx.variants(domain, ftype)
 
-class Parameters(object):
-	"""
-	# Stored Parameters interface for retrieving and updating parameters.
+		reqs = self.requirements.get((domain, ftype), ())
 
-	# [ Properties ]
-	# /routes/
-		# Route to the directory containing the context's parameters.
-	"""
+		srcvars = ctx.index['source']['variants']
+		for x in reqs:
+			if isinstance(x, SystemFactor):
+				yield x.integral(), x
+				continue
 
-	def __init__(self, routes):
-		self.routes = routes
-
-	@staticmethod
-	@functools.lru_cache(16)
-	def load_reference_xml(route:File):
-		"""
-		# Load the reference parameter required by a factor.
-		"""
-
-		with route.open('r') as f:
-			xml = lxml.etree.parse(f)
-		params = {}
-
-		xml.xinclude()
-		d = xml.xpath('/ctx:reference/d:dictionary', namespaces=xml_namespaces)
-
-		# Merge context data in the order they appear.
-		for x in d:
-			# Attributes on the context element define the variant.
-			data = libxml.Data.structure(x)
-			merge(params, data)
-
-		authority = xml.xpath('/ctx:reference/@authority', namespaces=xml_namespaces) or (None,)
-		authority = authority[0]
-
-		name = route.identifier.split('.', 1)[0]
-
-		return (name, authority, params)
-
-	def factors(self, *parameter) -> typing.Sequence[SystemFactor]:
-		"""
-		# Return the factors of the given reference parameter.
-		"""
-
-		return self.load(*parameter)[-1].get('factors', {})
-
-	def load(self, *parameter):
-		"""
-		# Return the factors of the given reference parameter.
-		"""
-
-		*suffix, name = parameter
-		name = name + '.xml'
-
-		for path in self.routes:
-			f = path.extend(suffix)
-			f = f / name
-			if f.exists():
-				break
-		else:
-			return name, None, {}
-
-		return self.load_reference_xml(f)
-
-	def tree(self, directory):
-		"""
-		# Construct and return a mapping of parameter paths to their
-		# correspeonding data. Used to load sets of parameters.
-
-		# The keys in the returned mapping do not include the named &directory.
-		"""
-		seq = directory.split('/')
-		out = {}
-		product = []
-		p_prefix_len = len(directory) + 1
-
-		for path in self.routes:
-			r = path.extend(seq)
-			files = r.tree()[1]
-			prefix = len(str(path)) + 1
-			files = [str(f)[prefix:-4] for f in files]
-
-			for f in files:
-				if f in out:
-					continue
-				out[f[p_prefix_len:]] = self.load(f)[-1]
-
-		return out
-
-	@staticmethod
-	def serialize_parameters(xml:libxml.Serialization, authority:str, data):
-		"""
-		# Construct an iterator producing the serialized form of a reference
-		# parameter for storage in a construction context.
-		"""
-		sdata = libxml.Data.serialize(xml, data)
-
-		x = xml.root("ctx:reference", sdata,
-			('xmlns:ctx', 'http://fault.io/xml/dev/ctx'),
-			('authority', authority),
-			namespace=libxml.Data.namespace
-		)
-
-		return x
-
-	@classmethod
-	def store(Class, route, authority, data):
-		xml = libxml.Serialization()
-		x = Class.serialize_parameters(xml, authority, data,)
-		route.store(b''.join(x))
+			v = {'name': x.name}
+			v.update(needed_variants)
+			g = ctx.groups(x.project.environment)
+			path = x.integral(g, v)
+			yield path, x
 
 class Context(object):
 	"""
-	# A sequence of mechanism sets, Construction Context, that
-	# can be used to supply a given build with factor processing tools
-	# processing.
+	# A collection of mechanism sets and parameters used to construct processing instructions.
 
 	# [ Engineering ]
 	# This class is actually a Context implementation and should be relocated
@@ -997,65 +904,160 @@ class Context(object):
 	# intended as it's used to house the mechanisms.
 	"""
 
-	def __init__(self, sequence, parameters):
-		self.sequence = sequence or ()
-		self.parameters = parameters
+	@staticmethod
+	def systemfactors(ifactors) -> typing.Iterator[SystemFactor]:
+		"""
+		# Load the system factors in the parameters file identified by &sf_name.
+		"""
 
-	def f_target(self, factor):
+		for domain, types in ifactors.items():
+			for ft, sf in types.items():
+				for sf_int in sf:
+					if sf_int is not None:
+						sf_route = File.from_absolute(sf_int)
+					else:
+						sf_route = None
+
+					for sf_name in sf[sf_int]:
+						yield SystemFactor(
+							domain = domain,
+							type = ft,
+							integral = sf_route,
+							name = sf_name
+						)
+
+	def __init__(self, sequence, symbols):
+		self.sequence = sequence or ()
+		self.symbols = symbols
+		self._languages = {}
+
+		self.index = dict()
+		for mid, slots in self.sequence:
+			for name, data in slots.items():
+				merge(self.index, data)
+
+		syntax = self.index.get('syntax')
+		if syntax:
+			s = syntax.get('target-file-extensions')
+			for pl, exts in s.items():
+				for x in exts.split(' '):
+					self._languages[x] = pl
+
+	def variants(self, domain, ftype):
 		"""
-		# Return the &libroutes.File route to the factor's target file built
-		# using this Construction Context.
+		# Get the variants associated with the domain using the cached view provided by &select.
 		"""
-		vars, mech = self.select(factor.domain)
-		#refs = self.references(factor.dependencies())
-		refs = []
-		(sp, (vl, key, loc)), = factor.link(dict(vars), self, mech, refs, ())
-		primary = loc['integral'] / 'pf.lnk'
-		return primary
+		return self.select(domain)[0]
+
+	@functools.lru_cache(8)
+	def groups(self, environment) -> typing.Sequence[typing.Sequence[str]]:
+		"""
+		# Parse and cache the contents of the (filename)`groups.txt` file in the
+		# &environment route.
+
+		# This is the context's perspective; effectively consistent across reads
+		# due to the cache. If no (filename)`groups.txt` is found, the
+		# default (format)`system-architecture/name` is returned.
+		"""
+
+		if environment is None:
+			return [['system', 'architecture'], ['name']]
+
+		gtxt = environment / '.environment' / 'groups.txt'
+		if gtxt.exists():
+			groups = list(libproject.parse_integral_descriptor_1(gtxt.get_text_content()))
+		else:
+			# No groups.txt file.
+			groups = [['system', 'architecture'], ['name']]
+
+		return groups
+
+	def extrapolate(self, factors):
+		"""
+		# Rewrite factor directories into sets of specialized domain factors.
+		# Query implementations have no knowledge of specialized domains. This
+		# method interprets the files in those directories and creates a proper
+		# typed factor for the source.
+		"""
+		ftype = 'library'
+
+		for path, files in factors:
+			for f in files[-1]:
+				# Split from left to capture name.
+				try:
+					stem, suffix = f.identifier.split('.', 1)
+				except ValueError:
+					stem = f.identifier
+					suffix = None
+					# XXX: data factor
+					continue
+
+				# Find domain.
+				try:
+					domain = self.language(suffix)
+				except:
+					# XXX: map to void domain indicating/warning about unprocessed factor?
+					continue
+
+				yield (libroutes.Segment(None, path + (stem,)), (domain, ftype, [f]))
+
+	def language(self, extension):
+		"""
+		# Syntax domain query selecting the language associated with a file extension.
+		"""
+		return self._languages.get(extension, 'void')
 
 	@property
-	@functools.lru_cache(8)
 	def name(self):
 		"""
 		# The context name identifying the target architectures.
 		"""
-		return self.parameters.load('context')[-1]['name']
+		return self.index['context']['name']
 
-	@functools.lru_cache(8)
-	def intention(self, fdomain):
-		"""
-		# The intention of the Context for the given factor domain.
-
-		# While usually consistent across the mechanism sets, there are
-		# cases where an implementation chooses to reduce the intentions
-		# where it is known that the builds are consistent. Python bytecode
-		# being the notable case where (intention)`debug` is consistent
-		# with (intention)`test` and (intention)`measure`.
-
-		# Presumes optimal if the mechanism sets did not define a intention.
-		# This is used for compensating cases where the generated mechanism
-		# sets have consistent intentions for automated builds.
-		"""
-		return self.parameters.load('context')[-1]['intention']
+	@property
+	def intention(self):
+		return self.index['context']['intention']
 
 	@functools.lru_cache(8)
 	def select(self, fdomain):
 		# Scan the paths (loaded data sets) for the domain.
-		for x in self.sequence:
-			if fdomain in x:
-				mechdata = x[fdomain]
-				if 'inherit' in mechdata:
-					# Find implementation and merge.
-					inner = mechdata['inherit']
-					variants, mech = self.select(inner)
-					merge(mechdata, mech.descriptor)
+		variants = {'intention': self.intention}
 
-				return x['variants'], Mechanism(mechdata)
+		if fdomain in self.index:
+			mechdata = copy.deepcopy(self.index[fdomain])
+			variants.update(mechdata.get('variants', ()))
+
+			if 'inherit' in mechdata:
+				# Recursively merge inherit's.
+				inner = mechdata['inherit']
+				ivariants, imech = self.select(inner)
+				merge(mechdata, imech.descriptor)
+				variants.update(ivariants)
+				mechdata['path'] = [fdomain] + mechdata['path']
+			else:
+				mechdata['path'] = [fdomain]
+
+			mech = Mechanism(mechdata)
 		else:
-			# Select the [trap] if available.
-			for x in self.sequence:
-				if '[trap]' in x:
-					return x['variants'], Mechanism(x['[trap]'])
+			# Unsupported domain.
+			mech = Mechanism(self.index['void'])
+			mech.descriptor['path'] = [fdomain]
+
+		print(mech.descriptor['path'])
+		return variants, mech
+
+	@functools.lru_cache(16)
+	def field(self, path, prefix):
+		"""
+		# Retrieve a field from the set of mechanisms.
+		"""
+		domain, *start = prefix.split('/')
+		variants, cwd = self.select(domain)
+		for key in start:
+			cwd = cwd[key]
+		for key in path.split('/'):
+			cwd = cwd[key]
+		return cwd
 
 	def __bool__(self):
 		"""
@@ -1064,220 +1066,56 @@ class Context(object):
 		return bool(self.sequence)
 
 	@staticmethod
-	def load_xml(route:File):
-		"""
-		# Load the XML context designated by the &route.
-		"""
-
-		with route.open('r') as f:
-			xml = lxml.etree.parse(f)
-
-		variants = {}
-		context = {}
-
-		xml.xinclude()
-		context_mechanisms = xml.xpath('/lc:context/lc:mechanism', namespaces=xml_namespaces)
-
-		# Merge context data in the order they appear.
-		for x in context_mechanisms:
-			# Attributes on the context element define the variant.
-			variants.update(x.attrib)
-
-			for dictionary in x:
-				data = libxml.Data.structure(dictionary)
-				merge(context, data)
-
-		if 'xml:id' in variants:
-			del variants['xml:id']
-
-		context['variants'] = variants
-		return xml, context
+	def load(route:File):
+		for x in route.files():
+			yield x.identifier, pickle.loads(x.load())
 
 	@classmethod
-	def from_environment(Class, envvar='FPI_MECHANISMS', pev='FPI_PARAMETERS'):
+	def from_environment(Class, envvar='FPI_MECHANISMS'):
 		mech_refs = os.environ.get(envvar, '').split(os.pathsep)
 		seq = []
 		for mech in mech_refs:
-			xml, ctx = Class.load_xml(File.from_absolute(mech))
-			seq.append(ctx)
+			mech = File.from_absolute(mech)
+			seq.extend(list(Class.load(mech)))
 
-		param_paths = os.environ.get(pev, '').split(os.pathsep)
-		param_paths = [libroutes.File.from_absolute(x) for x in param_paths if x]
-
-		r = Class(seq, Parameters(param_paths))
+		ctx = File.from_absolute(os.environ.get('CONTEXT'))
+		r = Class(seq, dict(Class.load(ctx/'symbols')))
 		return r
 
 	@classmethod
 	def from_directory(Class, route):
-		p = Parameters([route / 'parameters'])
-		xml, intent = Class.load_xml(route/'mechanisms'/'intent.xml')
-		xml, static = Class.load_xml(route/'mechanisms'/'static.xml')
-		return Class([intent,static], p)
+		syms = (route / 'symbols')
+		mechs = Class.load(route/'mechanisms')
 
-# Specifically for identifying files to be compiled and how.
-extensions = {
-	'txt': ('txt',),
-	'c-header': ('h',),
-	'c++-header': ('hpp', 'hxx',),
-	'objective-c-header': ('hm',),
+		return Class(list(mechs), dict(Class.load(syms)))
 
-	'c': ('c',),
-	'c++': ('c++', 'cpp', 'cxx',),
-	'objective-c': ('m',),
-	'objective-c++': ('mm',),
-
-	'ada': ('ads', 'ada'),
-	'assembly': ('asm',),
-	'bitcode': ('bc',), # clang
-	'haskell': ('hs', 'hsc'),
-
-	'python': ('py',),
-	'bytecode.python': ('pyo', 'pyc',),
-	'pyrex.python': ('pyx',),
-
-	'javascript': ('json', 'js'),
-	'css': ('css',),
-	'xml': ('xml', 'xsl', 'rdf', 'rng',),
-	'html': ('html', 'htm'),
-	'archive.system': ('a',),
-	'library.system': ('dll', 'so', 'lib'),
-	'jar.java': ('jar',),
-	'wheel.python': ('whl',),
-	'egg.python': ('egg',),
-
-	'awk': ('awk',),
-	'sed': ('sed',),
-	'c-shell': ('csh',),
-	'korn-shell': ('ksh',),
-	'bourne-shell': ('sh',),
-
-	'perl': ('pl',),
-	'ruby': ('ruby',),
-	'php': ('php',),
-	'lisp': ('lisp',),
-	'lua': ('lua',),
-	'io': ('io',),
-	'java': ('java',),
-	'ocaml': ('ml',),
-	'ada': ('ads', 'ada'),
-}
-
-languages = {}
-for k, v in extensions.items():
-	for y in v:
-		languages[y] = k
-del k, y, v
-
-def simulate_composite(route):
+def traverse(descent, working, tree, inverse, node):
 	"""
-	# Simulate a composite for processing (factor/qtype)`factor.library` directories.
-	"""
-	pkgs, modules = route.subnodes()
-
-	if not route.exists():
-		raise ValueError(route) # module does not exist?
-
-	modules.append(route)
-	sources = [
-		x.__class__(x.container, (x.identifier,))
-		for x in [x.file() for x in modules if x.exists()]
-		if x is not None and not x.is_directory() and x.identifier.endswith('.py')
-	]
-	pkgfile = route.file()
-
-	mod = types.ModuleType(str(route), "factor.library module")
-	mod.__factor_domain__ = 'factor'
-	mod.__factor_type__ = 'library' # Truthfully, a [python] Package Module.
-	mod.__factor_sources__ = sources # Modules in the package.
-	mod.__file__ = str(pkgfile)
-
-	return mod, pkgs
-
-def gather_simulations(packages:typing.Sequence[Import]):
-	"""
-	# Gather all (factor/qtype)`factor.library` modules.
-	"""
-	# Get the simulations for the bytecode files.
-	next_set = packages
-
-	while next_set:
-		current_set = next_set
-		next_set = []
-
-		for pkg in current_set:
-			mod, adds = simulate_composite(pkg)
-			f = Factor(Import.from_fullname(mod.__name__), mod, None)
-			next_set.extend(adds)
-
-			yield f
-
-# The extension suffix to use for *this* Python installation.
-python_extension_suffix = importlib.machinery.EXTENSION_SUFFIXES[0]
-
-def extension_link(route, factor):
-	"""
-	# Link an inducted Python extension module so that the constructed binary
-	# can be used by (python/statement)`import`.
-
-	# Used by &.bin.induct after copying the target's factor to the &libfactor.
-
-	# [ Parameters ]
-	# /route/
-		# The &Import selecting the composite factor to induct.
+	# Invert the directed graph of dependencies from the node.
 	"""
 
-	# system.extension being built for this Python
-	# construct links to optimal.
-	# ece's use a special context derived from the Python install
-	# usually consistent with the triplet of the first ext suffix.
-	src = os.readlink(str(factor / 'pf.lnk'))
-	src = factor / src
-
-	# peel until it's outside the first extensions directory.
-	pkg = route
-	while pkg.identifier != 'extensions':
-		pkg = pkg.container
-	names = route.absolute[len(pkg.absolute):]
-	pkg = pkg.container
-
-	link_target = pkg.file().container.extend(names)
-	final = link_target.suffix(python_extension_suffix)
-
-	return (final, src)
-
-def traverse(working, tree, inverse, factor):
-	"""
-	# Invert the directed graph of dependencies from the target modules.
-
-	# System factor modules import their dependencies into their global
-	# dictionary forming a directed graph. The imported factor modules are
-	# identified as dependencies that need to be constructed in order
-	# to process the subject module. The inverted graph is constructed to manage
-	# completion signalling for processing purposes.
-	"""
-
-	deps = set(factor.dependencies())
+	deps = set(descent(node))
 
 	if not deps:
 		# No dependencies, add to working set and return.
-		working.add(factor)
+		working.add(node)
 		return
-	elif factor in tree:
+	elif node in tree:
 		# It's already been traversed in a previous run.
 		return
 
 	# dependencies present, assign them inside the tree.
-	tree[factor] = deps
+	tree[node] = deps
 
 	for x in deps:
 		# Note the factor as depending on &x and build
 		# its tree.
-		inverse[x].add(factor)
-		traverse(working, tree, inverse, x)
+		inverse[x].add(node)
+		traverse(descent, working, tree, inverse, x)
 
-def sequence(factors):
+def sequence(descent, nodes, defaultdict=collections.defaultdict, tuple=tuple):
 	"""
-	# Generator maintaining the state of sequencing a traversed factor depedency
+	# Generator maintaining the state of the sequencing of a traversed depedency
 	# graph. This generator emits factors as they are ready to be processed and receives
 	# factors that have completed processing.
 
@@ -1290,39 +1128,39 @@ def sequence(factors):
 	# completion state.
 	"""
 
-	refs = dict()
+	reqs = dict()
 	tree = dict() # dependency tree; F -> {DF1, DF2, ..., DFN}
-	inverse = collections.defaultdict(set)
+	inverse = defaultdict(set)
 	working = set()
-	for factor in factors:
-		traverse(working, tree, inverse, factor)
+
+	for node in nodes:
+		traverse(descent, working, tree, inverse, node)
 
 	new = working
 	# Copy tree.
 	for x, y in tree.items():
-		cs = refs[x] = collections.defaultdict(set)
+		cs = reqs[x] = defaultdict(set)
 		for f in y:
 			cs[f.pair].add(f)
 
 	yield None
 
 	while working:
-		# Build categorized dependency set for use by mechanisms.
 		for x in new:
-			if x not in refs:
-				refs[x] = collections.defaultdict(set)
+			if x not in reqs:
+				reqs[x] = defaultdict(set)
 
-		completion = (yield tuple(new), refs, {x: tuple(inverse[x]) for x in new if inverse[x]})
+		completion = (yield tuple(new), reqs, {x: tuple(inverse[x]) for x in new if inverse[x]})
 		for x in new:
-			refs.pop(x, None)
+			reqs.pop(x, None)
 		new = set() # &completion triggers new additions to &working
 
-		for factor in (completion or ()):
+		for node in (completion or ()):
 			# completed.
-			working.discard(factor)
+			working.discard(node)
 
-			for deps in inverse[factor]:
-				tree[deps].discard(factor)
+			for deps in inverse[node]:
+				tree[deps].discard(node)
 				if not tree[deps]:
 					# Add to both; new is the set reported to caller,
 					# and working tracks when the graph has been fully sequenced.
@@ -1331,32 +1169,6 @@ def sequence(factors):
 
 					del tree[deps]
 
-def identity(module):
-	"""
-	# Discover the base identity of the target.
-
-	# Primarily, used to identify the proper basename of a library.
-	# The (python/attribute)`name` on a target module provides an explicit
-	# override. If the `name` is not present, then the first `'lib'` prefix
-	# is removed from the module's name if any. The result is returned as the identity.
-	# The removal of the `'lib'` prefix only occurs when the target factor is a
-	# `'system.library'`.
-	"""
-	na = getattr(module, 'name', None)
-	if na is not None:
-		# explicit name attribute providing an override.
-		return na
-
-	idx = module.__name__.rfind('.')
-	basename = module.__name__[idx+1:]
-	if module.__factor_type__ == 'library':
-		if basename.startswith('lib'):
-			# strip the leading lib from module identifier.
-			# 'libNAME' returns 'NAME'
-			return basename[3:]
-
-	return basename
-
 def disabled(*args, **kw):
 	"""
 	# A transformation that can be assigned to a subject's mechanism
@@ -1364,15 +1176,20 @@ def disabled(*args, **kw):
 	"""
 	return ()
 
-def transparent(build, adapter, o_type, output, i_type, inputs,
-		verbose=True,
-	):
+def transparent(build, adapter, o_type, output, i_type, inputs, verbose=True):
 	"""
 	# Create links from the input to the output; used for zero transformations.
 	"""
 
 	input, = inputs # Rely on exception from unpacking; expecting one input.
 	return [None, '-f', input, output]
+
+def void(build, adapter, o_type, output, i_type, inputs, verbose=True):
+	"""
+	# Command constructor executing &.bin.void with the intent of emitting
+	# an error designating that the factor could not be processed.
+	"""
+	return [None, output] + list(inputs)
 
 def standard_io(build, adapter, o_type, output, i_type, inputs, verbose=True):
 	"""
@@ -1431,401 +1248,26 @@ def empty(context, mechanism, factor, output, inputs,
 	"""
 	# Create the factor by executing a command without arguments.
 	# Used to create constant outputs for reduction.
-
-	# ! DEVELOPMENT:
-		# Rewrite in terms of (system:command)`cat`.
 	"""
 	return ['empty']
 
-def unix_compiler_collection(
-		build, adapter, o_type, output, i_type, inputs,
-		options=(), # Direct option injection.
-		verbose=True, # Enable verbose output.
-		root=False, # Designates the input as a root.
-		includes:typing.Sequence[str]=(),
-
-		verbose_flag='-v',
-		language_flag='-x', standard_flag='-std',
-		visibility='-fvisibility=hidden',
-		color='-fcolor-diagnostics',
-
-		output_flag='-o',
-		compile_flag='-c',
-		sid_flag='-isystem',
-		id_flag='-I', si_flag='-include',
-		debug_flag='-g',
-		format_map = {
-			'pic': '-fPIC',
-			'pie': '-fPIE',
-			'pdc': ({
-				'darwin': '-mdynamic-no-pic',
-			}).get(sys.platform)
-		},
-		co_flag='-O', define_flag='-D',
-		overflow_map = {
-			'wrap': '-fwrapv',
-			'none': '-fstrict-overflow',
-			'undefined': '-fno-strict-overflow',
-		},
-		dependency_options = (
-			('exclude_system_dependencies', '-MM', True),
-		),
-		optimizations = {
-			'optimal': '3',
-			'injections': '0',
-			'instruments': '0',
-			'debug': '0',
-			'fragments': '0',
-		},
-		empty = {}
-	):
-	"""
-	# Construct an argument sequence for a common compiler collection command.
-
-	# &unix_compiler_collection is the interface for constructing compilation
-	# commands for a compiler collection.
-	"""
-
-	f = build.factor
-	ctx = build.context
-	intention = ctx.intention(None)
-	lang = adapter.get('language', i_type)
-	f_ctl = adapter.get('feature-control', empty).get(lang, empty)
-
-	command = [None, compile_flag]
-	if verbose:
-		command.append(verbose_flag)
-
-	# Add language flag if it's a compiler collection.
-	if i_type is not None:
-		command.extend((language_flag, lang))
-
-	pl_version, pl_features = build.pl_specification(lang)
-	if pl_version:
-		command.append(standard_flag + '=' + pl_version)
-
-	for feature, (f_on, f_off) in f_ctl.items():
-		if feature in pl_features:
-			command.append(f_on)
-		else:
-			command.append(f_off)
-
-	command.append(visibility) # Encourage use of SYMBOL() define.
-	command.append(color)
-
-	# -fPIC, -fPIE or nothing. -mdynamic-no-pic for MacOS X.
-	format_flags = format_map.get(o_type)
-	if format_flags is not None:
-		command.append(format_flags)
-	else:
-		if o_type is not None:
-			# The selected output type did not have
-			# a corresponding flag. Noting this
-			# may illuminate an error.
-			pass
-
-	# Compiler optimization target: -O0, -O1, ..., -Ofast, -Os, -Oz
-	co = optimizations[intention]
-	command.append(co_flag + co)
-
-	# Include debugging symbols unconditionally.
-	# Filter or separate later.
-	command.append(debug_flag)
-
-	# TODO: incorporate parameter
-	overflow_spec = getattr(build.factor.module, 'overflow', None)
-	if overflow_spec is not None:
-		command.append(overflow_map[overflow_spec])
-
-	command.extend(adapter.get('options', ()))
-	command.extend(options)
-
-	# Include Directories; -I option.
-	sid = []
-
-	# Get the source libraries referenced by the module.
-	srclib = build.references.get(('source', 'library'), ())
-	for x in srclib:
-		path = x.integral()
-		sid.append(path)
-
-	command.extend([id_flag + str(x) for x in sid])
-
-	arch = build.mechanism.descriptor.get('architecture', None)
-	if arch is not None:
-		command.append(define_flag + 'F_TARGET_ARCHITECTURE=' + arch)
-
-	# -D defines.
-	sp = [
-		define_flag + '='.join(x)
-		for x in build.parameters or ()
-		if x[1] is not None
-	]
-	command.extend(sp)
-
-	# -U undefines.
-	spo = ['-U' + x[0] for x in (build.parameters or ()) if x[1] is None]
-	command.extend(spo)
-
-	# -include files. Forced inclusion.
-	for x in includes:
-		command.extend((si_flag, x))
-
-	# finally, the output file and the inputs as the remainder.
-	command.extend((output_flag, output))
-	command.extend(inputs)
-
-	return command
-compiler_collection = unix_compiler_collection
-
-def python_bytecode_compiler(context, mechanism, factor,
-		output, inputs,
-		format=None,
-		verbose=True,
-		filepath=str
-	):
-	"""
-	# Command constructor for compiling Python bytecode to an arbitrary file.
-	# Executes in a distinct process.
-	"""
-	intention = context.intention(factor.domain)
-	inf, = inputs
-
-	command = [None, filepath(output), filepath(inf), '2' if intention == 'optimal' else '0']
-	return command
-
-def local_bytecode_compiler(
-		build, adapter, o_type, output, i_type, inputs,
-		verbose=True, filepath=str):
-	"""
-	# Command constructor for compiling Python bytecode to an arbitrary file.
-	# Executes locally to minimize overhead.
-	"""
-	from .bin.pyc import compile_python_bytecode
-
-	intention = build.context.intention(None)
-	inf, = inputs # One source file.
-
-	command = [
-		compile_python_bytecode, filepath(output), filepath(inf),
-		'2' if intention == 'optimal' else '0'
-	]
-	return command
-
-def macos_link_editor(
-		transform_mechanisms,
-		build, adapter, o_type, output, i_type, inputs,
-		partials, libraries,
-		filepath=str,
-
-		pie_flag='-pie',
-		libdir_flag='-L',
-		rpath_flag='-rpath',
-		output_flag='-o',
-		link_flag='-l',
-		ref_flags={
-			'weak': '-weak-l',
-			'lazy': '-lazy-l',
-			'default': '-l',
-		},
-		type_map={
-			'executable': '-execute',
-			'library': '-dylib',
-			'extension': '-bundle',
-			'partial': '-r',
-		},
-		lto_preserve_exports='-export_dynamic',
-		platform_version_flag='-macosx_version_min',
-	):
-	"""
-	# Command constructor for Mach-O link editor provided on Apple MacOS X systems.
-	"""
-	assert build.factor.domain == 'system'
-	factor = build.factor
-	sysarch = build.mechanism.descriptor['architecture']
-
-	command = [None, '-t', lto_preserve_exports, platform_version_flag, '10.13.0', '-arch', sysarch]
-
-	intention = build.context.intention(None)
-	format = build.variants['format']
-	ftype = build.factor.type
-	mech = build.mechanism.descriptor
-
-	loutput_type = type_map[ftype]
-	command.append(loutput_type)
-	if ftype == 'executable':
-		if format == 'pie':
-			command.append(pie_flag)
-
-	if factor.type == 'partial':
-		# Fragments use a partial link.
-		command.extend(inputs)
-	else:
-		libs = [f for f in build.references[(factor.domain, 'library')]]
-		libs.sort(key=lambda x: (getattr(x, '_position', 0), x.name))
-
-		dirs = (x.integral() for x in libs)
-		command.extend([libdir_flag+filepath(x) for x in libc.unique(dirs, None)])
-
-		support = mech['objects'][ftype][format]
-		if support is not None:
-			prefix, suffix = support
-		else:
-			prefix = suffix = ()
-
-		command.extend(prefix)
-		command.extend(inputs)
-
-		command.extend([link_flag+x.name for x in libs])
-		command.append(link_flag+'System')
-
-		command.extend(suffix)
-
-		# For each source transformation mechanism, extract the link time requirements
-		# that are needed by the compiler. When building targets with mixed compilers,
-		# each may have their own runtime dependency that needs to be fulfilled.
-		resources = set()
-		for xfmech in transform_mechanisms.values():
-			for x in xfmech.get('resources').values():
-				resources.add(x)
-
-		command.extend(list(resources))
-
-	command.extend((output_flag, filepath(output)))
-
-	return command
-
-def unix_link_editor(
-		transform_mechanisms,
-		build, adapter, o_type, output, i_type, inputs,
-		partials, libraries, filepath=str,
-
-		pie_flag='-pie',
-		verbose_flag='-v',
-		link_flag='-l',
-		libdir_flag='-L',
-		rpath_flag='-rpath',
-		soname_flag='-soname',
-		output_flag='-o',
-		type_map={
-			'executable': None,
-			'library': '-shared',
-			'extension': '-shared',
-			'partial': '-r',
-		},
-		allow_runpath='--enable-new-dtags',
-		use_static='-Bstatic',
-		use_shared='-Bdynamic',
-	):
-	"""
-	# Command constructor for the unix link editor. For platforms other than Darwin and
-	# Windows, this is the default interface indirectly selected by &.development.bin.configure.
-
-	# Traditional link editors have an insane characteristic that forces the user to decide what
-	# the appropriate order of archives are. The
-	# (system/command)`lorder` command was apparently built long ago to alleviate this while
-	# leaving the interface to (system/command)`ld` to be continually unforgiving.
-
-	# [ Parameters ]
-
-	# /output/
-		# The file system location to write the linker output to.
-
-	# /inputs/
-		# The set of object files to link.
-
-	# /verbose/
-		# Enable or disable the verbosity of the command. Defaults to &True.
-	"""
-	factor = build.factor
-	ftype = factor.type
-	intention = build.variants['intention']
-	format = build.variants['format']
-	mech = build.mechanism.descriptor
-
-	command = [None]
-	add = command.append
-	iadd = command.extend
-
-	if mech['integrations'][None].get('name') == 'lld':
-		add('-flavor')
-		add('gnu')
-	else:
-		add(verbose_flag)
-
-	loutput_type = type_map[ftype] # failure indicates bad type parameter to libfactor.load()
-	if loutput_type:
-		add(loutput_type)
-
-	if ftype == 'partial':
-		# partial is an incremental link. Most options are irrelevant.
-		command.extend(map(filepath, inputs))
-	else:
-		libs = [f for f in build.references[(factor.domain, 'library')]]
-		libs.sort(key=lambda x: (getattr(x, '_position', 0), x.name))
-
-		dirs = (x.integral() for x in libs)
-		libdirs = [libdir_flag+filepath(x) for x in libc.unique(dirs, None)]
-
-		link_parameters = [link_flag + y for y in set([x.name for x in libs])]
-
-		if False:
-			command.extend((soname_flag, sys['abi']))
-
-		if allow_runpath:
-			# Enable by default, but allow override.
-			add(allow_runpath)
-
-		prefix, suffix = mech['objects'][ftype][format]
-
-		command.extend(prefix)
-		command.extend(map(filepath, inputs))
-		command.extend(libdirs)
-		command.append('-(')
-		command.extend(link_parameters)
-		command.append('-lc')
-		command.append('-)')
-
-		resources = set()
-		for xfmech in transform_mechanisms.values():
-			for x in xfmech.get('resources').values():
-				resources.add(x)
-
-		command.extend(suffix)
-
-	command.extend((output_flag, output))
-	return command
-
-if sys.platform == 'darwin':
-	link_editor = macos_link_editor
-else:
-	link_editor = unix_link_editor
-
-def initial_factor_defines(module_fullname):
+def initial_factor_defines(factor, factorpath):
 	"""
 	# Generate a set of defines that describe the factor being created.
 	# Takes the full module path of the factor as a string.
 	"""
-	modname = module_fullname.split('.')
+	parts = factorpath.split('.')
+	project = '.'.join(factor.project.segment.absolute)
+
+	tail = factorpath[len(project)+1:].split('.')[1:]
 
 	return [
-		('FACTOR_QNAME', module_fullname),
-		('FACTOR_BASENAME', modname[-1]),
-		('FACTOR_PACKAGE', '.'.join(modname[:-1])),
+		('FACTOR_SUBPATH', '.'.join(tail)),
+		('FACTOR_PROJECT', project),
+		('FACTOR_QNAME', factorpath),
+		('FACTOR_BASENAME', parts[-1]),
+		('FACTOR_PACKAGE', '.'.join(parts[:-1])),
 	]
-
-@functools.lru_cache(6)
-def context_interface(path):
-	"""
-	# Resolves the construction interface for processing a source or performing
-	# the final reduction (link-stage).
-	"""
-
-	mod, apath = Import.from_attributes(path)
-	obj = importlib.import_module(str(mod))
-	for x in apath:
-		obj = getattr(obj, x)
-	return obj
 
 class Construction(libio.Context):
 	"""
@@ -1843,20 +1285,27 @@ class Construction(libio.Context):
 		self.exit()
 
 	def __init__(self,
-			context, factors,
-			requirement=None,
+			context,
+			symbols,
+			index,
+			project,
+			factor,
+			factors,
+			core_include,
 			reconstruct=False,
 			processors=4
 		):
 		self.reconstruct = reconstruct
 		self.failures = 0
 		self.exits = 0
+		self.c_sequence = None
 
-		self.c_context = context # series of context resources for supporting subjects
+		self.c_factor = factor
+		self.c_symbols = symbols
+		self.c_index = index
+		self.c_context = context
+		self.c_project = project
 		self.c_factors = factors
-
-		# Manages the dependency order.
-		self.c_sequence = sequence(factors)
 
 		self.tracking = collections.defaultdict(list) # module -> sequence of sets of tasks
 		self.progress = collections.Counter()
@@ -1867,18 +1316,27 @@ class Construction(libio.Context):
 
 		self.continued = False
 		self.activity = set()
-		self.requirement = requirement # outputs must be newer.
-		self.include_factor = Factor(None, include, None)
+		self.include_factor = core_include
 
 		super().__init__()
 
 	def actuate(self):
 		if self.reconstruct:
-			self._filter = rebuild
+			if self.reconstruct > 1:
+				self._filter = functools.partial(updated, never=True, cascade=True)
+			else:
+				self._filter = functools.partial(updated, never=True, cascade=False)
 		else:
-			self._filter = functools.partial(updated, requirement=self.requirement)
+			self._filter = functools.partial(updated)
 
-		next(self.c_sequence) # generator init
+		descent = functools.partial(requirements, self.c_index, self.c_symbols)
+
+		# Manages the dependency order.
+		self.c_sequence = sequence(descent, self.c_factors)
+
+		initial = next(self.c_sequence) # generator init
+		assert initial is None
+
 		self.finish(())
 		self.drain_process_queue()
 
@@ -1893,99 +1351,76 @@ class Construction(libio.Context):
 				del self.progress[x]
 				del self.tracking[x]
 
-			work, refs, deps = self.c_sequence.send(factors)
+			work, reqs, deps = self.c_sequence.send(factors) # raises StopIteration
 			for x in work:
-				if x.module.__name__ != include.__name__:
-					# Add the standard include module.
-					refs[x][('source','library')].add(self.include_factor)
-
-				self.collect(x, refs, deps.get(x, ()))
+				self.collect(x, reqs, deps.get(x, ()))
 		except StopIteration:
 			self.terminate()
 
-	def collect(self, factor, references, dependents=()):
+	def collect(self, factor, requirements, dependents=()):
 		"""
 		# Collect the parameters and work to be done for processing the &factor.
 
 		# [ Parameters ]
 		# /factor/
-			# The &Factor being built.
-		# /references/
+			# The &Target being built.
+		# /requirements/
 			# The set of factors referred to by &factor. Often, the
 			# dependencies that need to be built in order to build the factor.
 		# /dependents/
 			# The set of factors that refer to &factor.
 		"""
 		tracks = self.tracking[factor]
+
+		if isinstance(factor, SystemFactor):
+			# SystemFactors require no processing.
+			self.finish([factor])
+			return
+
 		ctx = self.c_context
-		fm = factor.module
-		refs = references[factor]
-		intention = ctx.intention(None)
+		reqs = requirements.get(factor, ())
+		intention = ctx.intention
+		f_name = factor.absolute_path_string
 
-		common_src_params = initial_factor_defines(fm.__name__)
-		if libfactor.python_extension(fm):
-			# Initialize source parameters declaring the extension module's
-			# access name so that full names can be properly initialized in types.
-			ean = libfactor.extension_access_name(fm.__name__)
-			mp = fm.__name__.rfind('.')
-			tp = ean.rfind('.')
-
-			common_src_params += [
-				('MODULE_QNAME', ean),
-				('MODULE_PACKAGE', ean[:tp]),
-			]
-
+		common_src_params = initial_factor_defines(factor, f_name)
 		selection = ctx.select(factor.domain)
 		if selection is not None:
 			variants, mech = selection
 		else:
 			# No mechanism found.
-			raise Exception("no mechanism set for factor domain in context", factor.domain)
+			sys.stderr.write("*! WARNING: no mechanism set for %r factors\n"%(factor.domain))
+			return
 
-		# Populate system factors in refs from factor requirements.
-		reqs = getattr(fm, 'requirements', ())
-		sf_factor_id = 0
-		for sf_name in reqs:
-			sf = ctx.parameters.factors(*sf_name.split('/'))
-			for domain, types in sf.items():
-				for ft, sf in types.items():
-					for sf_int in sf:
-						if sf_int is not None:
-							sf_route = libroutes.File.from_absolute(sf_int)
-						else:
-							sf_route = None
+		variants['name'] = factor.name
+		variant_set = factor.link(variants, ctx, mech, reqs, dependents)
 
-						for sf_name in sf[sf_int]:
-							refs[(domain, ft)].add(SystemFactor(
-								domain = domain,
-								type = ft,
-								integral = sf_route,
-								name = sf_name
-							))
-
-		variant_set = factor.link(variants, ctx, mech, refs, dependents)
+		# Subfactor of c_factor (selected path)
+		subfactor = factor.absolute in self.c_factor
+		xfilter = functools.partial(self._filter, subfactor=subfactor)
+		envpath = factor.project.environment
 
 		for src_params, (vl, key, locations) in variant_set:
 			v = dict(vl)
 
 			# The context parameters for rendering FPI.
 			b_src_params = [
+				('F_SYSTEM', v.get('system', 'void')),
 				('F_INTENTION', intention),
 				('F_FACTOR_DOMAIN', factor.domain),
 				('F_FACTOR_TYPE', factor.type),
 			] + src_params + common_src_params
 
-			if not mech.integrates() or factor.reflective:
+			if not mech.integrates():
 				# For mechanisms that do not specify reductions,
 				# the transformed set is the factor.
 				# XXX: Incomplete; check if specific output is absent.
 				locations['output'] = locations['integral']
 
 			build = Build((
-				ctx, mech, factor, refs, dependents,
-				v, locations, b_src_params,
+				ctx, mech, factor, reqs, dependents,
+				v, locations, b_src_params, envpath
 			))
-			xf = list(mech.transform(build, filtered=self._filter))
+			xf = list(mech.transform(build, filtered=xfilter))
 
 			# If any commands or calls are made by the transformation,
 			# rebuild the target.
@@ -1995,12 +1430,12 @@ class Construction(libio.Context):
 					break
 			else:
 				# Otherwise, update if out dated.
-				f = self._filter
+				f = xfilter
 
 			# Collect the exact mechanisms used for reference by integration.
 			xfmechs = {}
 			for src in build.factor.sources():
-				langname = languages.get(src.extension)
+				langname = ctx.language(src.extension)
 				xfmech = build.mechanism.adaption(build, langname, src, phase='transformations')
 				if langname not in xfmechs:
 					xfmechs[langname] = xfmech
@@ -2056,7 +1491,7 @@ class Construction(libio.Context):
 				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
 				sp = libio.Subprocess(pid)
 
-		fpath = factor.module.__name__
+		fpath = factor.absolute_path_string
 		pidstr = str(pid)
 		formatted = {str(target): f_target_path(target)}
 		printed_command = tuple(formatted.get(x, x) for x in map(str, cmd))
@@ -2097,26 +1532,26 @@ class Construction(libio.Context):
 			if message is not None:
 				duration = repr(start.measure(libtime.now()))
 				prefix = "%s: %d -> %s in %s\n\t" %(
-					_color + factor.module.__name__ + _normal,
+					_color + factor.absolute_path_string + _normal,
 					pid,
 					_color + str(exit_code) + _normal,
 					str(duration)
 				)
-				print(prefix+message[message.find(' ')+1:])
+				print(prefix+message)
 
 		l = ''
 		l += ('\n[Profile]\n')
-		l += ('/factor\n\t%s\n' %(factor,))
+		l += ('/factor/\n\t%s\n' %(factor,))
 
 		if log.points[-1] != 'reduction':
-			l += ('/subject\n\t%s\n' %('/'.join(log.points),))
+			l += ('/subject/\n\t%s\n' %('/'.join(log.points),))
 		else:
-			l += ('/subject\n\treduction\n')
+			l += ('/subject/\n\treduction\n')
 
-		l += ('/pid\n\t%d\n' %(pid,))
-		l += ('/status\n\t%s\n' %(str(status),))
-		l += ('/start\n\t%s\n' %(start.select('iso'),))
-		l += ('/stop\n\t%s\n' %(libtime.now().select('iso'),))
+		l += ('/pid/\n\t%d\n' %(pid,))
+		l += ('/status/\n\t%s\n' %(str(status),))
+		l += ('/start/\n\t%s\n' %(start.select('iso'),))
+		l += ('/stop/\n\t%s\n' %(libtime.now().select('iso'),))
 
 		log.store(l.encode('utf-8'), mode='ba')
 
@@ -2215,7 +1650,7 @@ class Construction(libio.Context):
 					self.failures += 1
 					pi_call = cmd[0]
 					pi_call_id = '.'.join((pi_call.__module__, pi_call.__name__))
-					print(factor.fullname, 'call (%s) raised' % (pi_call_id,), err.__class__.__name__, str(err))
+					print(factor.absolute_path_string, 'call (%s) raised' % (pi_call_id,), err.__class__.__name__, str(err))
 
 					from traceback import format_exception
 					out = format_exception(err.__class__, err, err.__traceback__)

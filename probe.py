@@ -10,17 +10,18 @@ import collections.abc
 import typing
 import types
 
-from . import cc
-
-from fault.routes import library as libroutes
+from fault.system import files
+from fault.system import python
 from fault.io import library as libio
 
-def fs_routes(i:typing.Iterator[str]) -> typing.Sequence[libroutes.File]:
-	return list(map(libroutes.File.from_absolute, i))
+from . import cc
+
+def fs_routes(i:typing.Iterator[str]) -> typing.Sequence[files.Path]:
+	return list(map(files.Path.from_absolute, i))
 
 def environ_paths(env='PATH', sep=os.pathsep):
 	"""
-	# Construct a sequence of &libroutes.File instances to the paths stored
+	# Construct a sequence of &files.Path instances to the paths stored
 	# in an environment variable. &os.environ is referred to upon
 	# each invocation, no caching is performed so each call represents
 	# the latest version.
@@ -46,7 +47,7 @@ def environ_paths(env='PATH', sep=os.pathsep):
 def search(
 		search_paths:typing.Sequence[str],
 		xset:typing.Set[str]
-	) -> typing.Tuple[typing.Mapping[str, libroutes.File], typing.Set[str]]:
+	) -> typing.Tuple[typing.Mapping[str, files.Path], typing.Set[str]]:
 	"""
 	# Query the sequence of search paths for the given set of files.
 
@@ -96,7 +97,7 @@ def prepare(
 			'c++': 'cxx',
 			'objective-c': 'm',
 		}
-	) -> typing.Tuple[libroutes.File, cc.Construction]:
+	) -> typing.Tuple[files.Path, cc.Construction]:
 	"""
 	# Prepare a probe by initializing the given &directory as a composite factor
 	# containing a single source file whose content is defined by &source. Often, &directory
@@ -110,7 +111,7 @@ def prepare(
 
 	output = None
 
-	r = libroutes.Import.from_fullname('fault.development.probes') # fake composite.
+	r = python.Import.from_fullname('fault.development.probes') # fake composite.
 
 	src = directory/'src'
 	exe = directory/'fault_probe_runtime_check.exe'
@@ -160,7 +161,7 @@ def runtime(mechanisms, language, source, **parameters):
 		c = cc.Construction(mechanisms, [f])
 		s.dispatch(c)
 
-	with libroutes.File.temporary() as tr:
+	with files.Path.temporary() as tr:
 		with libio.parallel(init) as u:
 			pass
 

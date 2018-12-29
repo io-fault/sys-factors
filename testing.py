@@ -19,8 +19,8 @@ import importlib
 import importlib.machinery
 import contextlib
 
-from fault.routes import library as libroutes
-from fault.system import libfactor, library as libsys
+from fault.system import library as libsys
+from fault.system import files
 
 class RedirectFinder(object):
 	"""
@@ -92,9 +92,8 @@ class RedirectFinder(object):
 		r_ext = {}
 		redirects_files = [x for x in paths.split(os.path.pathsep) if x.strip() != '']
 
-		import fault.routes.library as lr
 		for path in redirects_files:
-			f=lr.File.from_absolute(path)
+			f=files.Path.from_absolute(path)
 			with open(path, 'rb') as f:
 				bytecodes, extensions = pickle.load(f)
 				r_bc.update(bytecodes)
@@ -116,7 +115,7 @@ class RedirectFinder(object):
 		suppress = False
 		finder = Class(*mappings)
 
-		tmp = libroutes.File.from_absolute(libroutes.tempfile.mkdtemp())
+		tmp = files.Path.from_absolute(files.tempfile.mkdtemp())
 		f = tmp/'import-redirects.pickle'
 		ser = []
 		for x in mappings:

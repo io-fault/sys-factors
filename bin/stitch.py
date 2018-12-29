@@ -9,12 +9,12 @@ import os.path
 from copy import deepcopy
 
 from fault.system import libfactor
-from fault.system import library as libsys
+from fault.system import process
+from fault.system import python
 
 from .. import xml as devxml
 from .. import cc
 
-from fault.routes import library as libroutes
 from fault.xml import libfactor as xmlfactor
 from fault.filesystem import library as libfs
 from fault.xml import library as libxml
@@ -41,7 +41,7 @@ def copy(ctx, target, package):
 	# be presented as &copy will provide it along with other factor metadata.
 	"""
 
-	import_r = libroutes.Import.from_fullname
+	import_r = python.Import.from_fullname
 
 	docs = libfs.Dictionary.create(libfs.Hash(), os.path.realpath(target))
 	pkg = import_r(package)
@@ -218,7 +218,7 @@ def copy(ctx, target, package):
 			xml = libxml.Serialization()
 			emit(docs, rkey, lxml.etree.tostringlist(rdoc, method='xml', encoding='utf-8'))
 
-def main(inv):
+def main(inv:process.Invocation) -> process.Exit:
 	target, package = inv.args
 
 	ctx = cc.Context.from_environment() # delineation
@@ -227,4 +227,4 @@ def main(inv):
 	return inv.exit(0)
 
 if __name__ == '__main__':
-	libsys.control(main, libsys.Invocation.system())
+	process.control(main, process.Invocation.system())

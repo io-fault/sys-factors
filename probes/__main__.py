@@ -2,12 +2,15 @@
 # Instantiate the standard set of construction context probes.
 """
 import sys
-from fault.system import library as libsys
-from fault.routes import library as libroutes
+
+from fault.system import process
+from fault.system import libfactor
+from fault.system import files
+from fault.system import python
+
 from fault.xml import lxml
 from fault.text import library as libtxt
 from fault.text import xml as txtxml
-from fault.system import libfactor
 
 def emit(route, elements):
 	element = None
@@ -38,14 +41,14 @@ def process(document, route):
 		sid, = section.select('@identifier')
 		emit(route / sid, section.select('txt:dictionary'))
 
-def main(inv:libsys.Invocation) -> libsys.Exit:
+def main(inv:process.Invocation) -> process.Exit:
 	try:
 		route, *ignored = inv.args
 	except:
-		inv.exit(libsys.Exit.exiting_from_bad_usage)
+		inv.exit(process.Exit.exiting_from_bad_usage)
 
-	route = libroutes.File.from_path(route)
-	documents = libfactor.selected(libroutes.Import.from_fullname(__name__))
+	route = files.Path.from_path(route)
+	documents = libfactor.selected(python.Import.from_fullname(__name__))
 
 	dirs, files = documents.tree()
 	for f in files:
@@ -53,7 +56,7 @@ def main(inv:libsys.Invocation) -> libsys.Exit:
 		bname = f.identifier[:-(len(f.extension)+1)]
 		process(doc, route / bname)
 
-	inv.exit(libsys.Exit.exiting_from_success)
+	inv.exit(process.Exit.exiting_from_success)
 
 if __name__ == '__main__':
-	libsys.control(main, libsys.Invocation.system())
+	process.control(main, process.Invocation.system())

@@ -26,8 +26,8 @@ import importlib
 from fault.system import library as libsys
 from fault.system import corefile
 from fault.system import libfactor
+from fault.system import python
 
-from fault.routes import library as libroutes
 from fault.filesystem import library as libfs
 from fault.range import library as librange
 from fault.syntax import library as libsyntax
@@ -264,7 +264,7 @@ def statistics(
 
 	return agg
 
-def source_file_map(interests:typing.Sequence[libroutes.Import]) -> typing.Mapping[str, str]:
+def source_file_map(interests:typing.Sequence[python.Import]) -> typing.Mapping[str, str]:
 	"""
 	# Query Python for the entire package tree of all the given Import routes.
 

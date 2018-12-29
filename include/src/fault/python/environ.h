@@ -7,6 +7,8 @@
 #include <structmember.h>
 #include <pythread.h>
 
+#define PYTHON_MODULE_PATH_STR (STRING_FROM_IDENTIFIER(FACTOR_PROJECT) "." STRING_FROM_IDENTIFIER(FACTOR_SUBPATH))
+
 typedef PyObject * PyObj;
 
 #if FV_INJECTIONS()

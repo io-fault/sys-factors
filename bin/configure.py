@@ -3,15 +3,17 @@
 """
 import sys
 import os
-from fault.system import library as libsys
-from fault.routes import library as libroutes
+
+from fault.system import process
+from fault.system import files
+
 from .. import fs
 
-def main(inv:libsys.Invocation) -> libsys.Exit:
+def main(inv:process.Invocation) -> process.Exit:
 	typ, path, *args = inv.args
 	typ = typ.capitalize()
 	Imp = getattr(fs, typ) # get class for specified directory protocol
-	i = Imp(libroutes.File.from_path(path))
+	i = Imp(files.Path.from_path(path))
 
 	ctx = os.environ['CONTEXT']
 	dev = os.path.join(ctx, 'execute')
@@ -37,4 +39,4 @@ def main(inv:libsys.Invocation) -> libsys.Exit:
 	return inv.exit(0)
 
 if __name__ == '__main__':
-	libsys.control(main, libsys.Invocation.system())
+	process.control(main, process.Invocation.system())

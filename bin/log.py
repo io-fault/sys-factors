@@ -10,13 +10,13 @@ import collections
 from .. import cc
 
 from fault.system import libfactor
-from fault.routes import library as libroutes
+from fault.system import python
 
 if __name__ == '__main__':
 	env = os.environ
 	command, module_fullname, *files = sys.argv
 
-	factor = cc.Factor(libroutes.Import.from_fullname(module_fullname), None, None)
+	factor = cc.Factor(python.Import.from_fullname(module_fullname), None, None)
 
 	ctx = cc.Context.from_environment()
 	variants, mech = ctx.select(factor.domain)

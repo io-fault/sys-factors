@@ -1,5 +1,5 @@
 """
-# Emit an empty (xml/fragments)`instance`.
+# Emit an empty (fragments)`instance`.
 
 # In cases where language introspection is not supported, a fallback must be
 # available for making product snapshots possible. &.bin.configure uses
@@ -7,8 +7,8 @@
 """
 import sys
 
-from fault.system import library as libsys
-from fault.routes import library as libroutes
+from fault.system import process
+from fault.system import files
 from fault.xml import library as libxml
 from .. import fragments
 
@@ -18,9 +18,9 @@ suffix = b'</void></factor>\n'
 def main(inv):
 	try:
 		filepath, = inv.args
-		route = libroutes.File.from_path(filepath)
+		route = files.Path.from_path(filepath)
 	except ValueError:
-		route = libroutes.File.from_absolute('/dev/stdin')
+		route = files.Path.from_absolute('/dev/stdin')
 
 	out = sys.stdout.buffer
 	out.write(prefix)
@@ -31,4 +31,4 @@ def main(inv):
 	return inv.exit(0)
 
 if __name__ == '__main__':
-	libsys.control(main, libsys.Invocation.system())
+	process.control(main, process.Invocation.system())

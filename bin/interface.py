@@ -3,8 +3,10 @@
 """
 import sys
 import os
-from fault.system import library as libsys
-from fault.routes import library as libroutes
+
+from fault.system import process
+from fault.system import files
+
 from .. import fs
 
 flags = {
@@ -22,11 +24,11 @@ assignments = {
 	'I': ('name', 'inspect'),
 }
 
-def main(inv:libsys.Invocation):
+def main(inv:process.Invocation) -> process.Exit:
 	typ, path, *args = inv.args
 	typ = typ.capitalize()
 	Imp = getattr(fs, typ) # get class for specified directory protocol
-	i = Imp(libroutes.File.from_path(path))
+	i = Imp(files.Path.from_path(path))
 
 	parameters = {
 		'python': sys.executable,
@@ -60,8 +62,7 @@ def main(inv:libsys.Invocation):
 				sys.stderr.write("unknown option %r\n" %(char,))
 				return inv.exit(64) # EX_USAGE
 
-	x = i.mechanisms(('intent.xml', 'static.xml'))
-	os.environ['FPI_MECHANISMS'] = ':'.join(map(str, x))
+	os.environ['FPI_MECHANISMS'] = ':'.join(map(str, [i.route / 'mechanisms']))
 
 	# Initialize imaginary for subcommands.
 	ifactors = os.environ.get('FPI_PARAMETERS', '')
@@ -95,4 +96,4 @@ def main(inv:libsys.Invocation):
 	return inv.exit(1)
 
 if __name__ == '__main__':
-	libsys.control(main, libsys.Invocation.system())
+	process.control(main, process.Invocation.system())

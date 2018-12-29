@@ -74,4 +74,4 @@ def parse(arguments):
 	if not root['parameters']:
 		del root['parameters']
 
-	return root
+	return factors

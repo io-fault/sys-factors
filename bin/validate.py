@@ -7,9 +7,11 @@ import functools
 import collections
 import signal
 
-from fault.system import corefile
 from fault.system import library as libsys
-from fault.routes import library as libroutes
+from fault.system import process
+from fault.system import python
+from fault.system import corefile
+
 from fault.test import library as libtest
 
 # The escapes are used directly to avoid dependencies.
@@ -28,7 +30,7 @@ def failure_report_file(test):
 	"""
 	# Return the route to the failure report for the given test.
 	"""
-	ir, rpath = libroutes.Import.from_attributes(test.identity)
+	ir, rpath = python.Import.from_attributes(test.identity)
 	cd = (ir.floor() / 'test').directory()
 
 	return cd / 'failures', test.identity
@@ -124,7 +126,7 @@ class Harness(libtest.Harness):
 				fail.store(''.join(fex), 'w')
 			return {test.fate.impact: 1}
 
-def main(inv:libsys.Invocation) -> libsys.Exit:
+def main(inv:process.Invocation) -> process.Exit:
 	packages = inv.args
 	timeout = int(inv.environ.get('TEST_TIMEOUT', 6))
 	log=sys.stderr
@@ -136,7 +138,7 @@ def main(inv:libsys.Invocation) -> libsys.Exit:
 
 	pkgset = []
 	for package in packages:
-		root = libroutes.Import.from_fullname(package)
+		root = python.Import.from_fullname(package)
 
 		ft = getattr(root.module(), '__factor_type__', None)
 		if ft == 'context':
@@ -189,4 +191,4 @@ if __name__ == '__main__':
 		pass
 
 	with corefile.constraint():
-		libsys.control(main, libsys.Invocation.system(environ=('TEST_TIMEOUT',)))
+		process.control(main, process.Invocation.system(environ=('TEST_TIMEOUT',)))

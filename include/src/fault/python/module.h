@@ -106,7 +106,7 @@ do { \
 	static struct PyModuleDef \
 	module = { \
 		PyModuleDef_HEAD_INIT, \
-		MODULE_QNAME_STR, \
+		PYTHON_MODULE_PATH_STR, \
 		DOCUMENTATION, \
 		-1, \
 		methods \
@@ -167,7 +167,7 @@ do { \
 
 #define CREATE_MODULE(MOD) \
 	do { \
-		PyObj _MOD = Py_InitModule(MODULE_QNAME_STR, methods); \
+		PyObj _MOD = Py_InitModule(PYTHON_MODULE_PATH_STR, methods); \
 		if (_MOD) { \
 			__dict__ = PyModule_GetDict(_MOD); \
 			if (__dict__ == NULL) { Py_DECREF(_MOD); *MOD = NULL; } \

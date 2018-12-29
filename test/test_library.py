@@ -1,7 +1,10 @@
-import os.path
 import types
+import os.path
+
+from ...system import files
+from ...system import python
+
 from .. import cc as library
-from ...routes import library as libroutes
 
 def test_Factor(test):
 	"""
@@ -9,8 +12,8 @@ def test_Factor(test):
 	"""
 	f = library.Factor.from_fullname(__name__)
 	test.isinstance(f.module, types.ModuleType)
-	test.isinstance(f.route, libroutes.Import)
-	test.isinstance(f.module_file, libroutes.File)
+	test.isinstance(f.route, python.Import)
+	test.isinstance(f.module_file, files.Path)
 
 	# Check cache directory.
 	pkgdir = os.path.dirname(__file__)
@@ -105,7 +108,7 @@ def test_unix_compiler_collection(test):
 		'system': {
 			'refs': {
 				('source', 'library'): [
-					library.iFactor.headers(x) for x in [
+					library.SystemFactor.headers(x) for x in [
 						'incdir1', 'incdir2',
 					]
 				]
@@ -176,7 +179,7 @@ def test_unix_compiler_collection(test):
 	test/cmd == stdhead[0:3] + ['-x', 'c', '-std=c99'] + stdhead[3:] + ['-o', 'out.o', 'input.c']
 
 def test_updated(test):
-	tr = test.exits.enter_context(libroutes.File.temporary())
+	tr = test.exits.enter_context(files.Path.temporary())
 
 	of = tr / 'obj'
 	sf = tr / 'src'
@@ -185,19 +188,19 @@ def test_updated(test):
 	# object older than source
 	of.init('file')
 	sf.init('file')
-	of.set_last_modified(sf.last_modified().rollback(second=10))
+	of.set_last_modified(sf.get_last_modified().rollback(second=10))
 	test/library.updated([of], [sf], None) == False
 
 	of.void()
 	of.init('file')
-	of.set_last_modified(sf.last_modified().elapse(second=10))
+	of.set_last_modified(sf.get_last_modified().elapse(second=10))
 	test/library.updated([of], [sf], None) == True
 
 def test_sequence(test):
 	"""
 	# Check the sequencing of a traversed Sources graph.
 	"""
-	tr = test.exits.enter_context(libroutes.File.temporary())
+	tr = test.exits.enter_context(files.Path.temporary())
 	m = [
 		types.ModuleType("M0"),
 		types.ModuleType("M1"),
@@ -287,7 +290,7 @@ def test_construction_sequence(test):
 	# ! WARNING:
 		# Performs no tests aside from execution.
 	"""
-	tr = test.exits.enter_context(libroutes.File.temporary())
+	tr = test.exits.enter_context(files.Path.temporary())
 	import builtins
 	import sys
 	import collections

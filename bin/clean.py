@@ -6,11 +6,11 @@ import os
 import sys
 import types
 
-from fault.routes import library as libroutes
+from fault.system import python
 from fault.io import library as libio
 
-import_from_fullname = libroutes.Import.from_fullname
-import_from_module = libroutes.Import.from_module
+import_from_fullname = python.Import.from_fullname
+import_from_module = python.Import.from_module
 
 def main():
 	"""
