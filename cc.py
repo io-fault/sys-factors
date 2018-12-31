@@ -358,7 +358,7 @@ class Target(object):
 		# Explicitly designated variants.
 	"""
 
-	default_cache_name = '__f_cache__'
+	default_cache_name = '__f-cache__'
 	default_integral_name = '__f-int__'
 
 	def __repr__(self):
