@@ -1,6 +1,6 @@
 /**
 	# Objective-C is not particularly interesting outside of this context, so Apple specific.
-**/
+*/
 #import "CoreFoundation/CoreFoundation.h"
 #import "Foundation/NSArray.h"
 #import "Foundation/NSDictionary.h"

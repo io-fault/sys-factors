@@ -174,5 +174,4 @@ do { \
 			else *MOD = _MOD; \
 		} \
 	} while(0)
-
 #endif
