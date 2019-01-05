@@ -53,7 +53,7 @@ def copy(ctx, target, package):
 		x for x in pkg.tree()[0]
 		if x.absolute[-1] == 'extensions'
 	]
-	from ...adapters.python import xml as d_python
+	from ...tools.python import xml as d_python
 
 	for pex in pexset:
 		# Get the list of extension modules

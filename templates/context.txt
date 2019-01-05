@@ -14,10 +14,10 @@ f_intention template for support modules and extensions.
 	! CONTEXT:
 		/protocol/
 			&<http://if.fault.io/project/infrastructure>
-	/kit-llvm-instrumentation/
-		- &<http://fault.io/engineering/adapters.llvm#instrumentation>
-	/kit-llvm-delineation/
-		- &<http://fault.io/engineering/adapters.llvm#delineation>
+	/sdk-llvm-instrumentation/
+		- &<http://fault.io/engineering/tools.llvm#instrumentation>
+	/sdk-llvm-delineation/
+		- &<http://fault.io/engineering/tools.llvm#delineation>
 /project.txt/#!/text/fault
 	! CONTEXT:
 		/protocol/
