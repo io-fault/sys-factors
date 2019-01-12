@@ -1,0 +1,22 @@
+! CONTEXT:
+	/protocol/
+		&<http://if.fault.io/project/information>
+
+/identifier/
+	`http://fault.io/engineering/factors`
+/name/
+	`factors`
+/abstract/
+	Factor processing tools for materializing actionable tools.
+/icon/
+	- (emoji)`🛠`
+
+/versioning/
+	continuous
+/status/
+	experimental
+
+/controller/
+	`fault.io`
+/contact/
+	`http://fault.io/critical`
