@@ -1388,7 +1388,7 @@ class Construction(libio.Context):
 			variants, mech = selection
 		else:
 			# No mechanism found.
-			sys.stderr.write("*! WARNING: no mechanism set for %r factors\n"%(factor.domain))
+			sys.stderr.write("[!# WARNING: no mechanism set for %r factors]\n"%(factor.domain))
 			return
 
 		variants['name'] = factor.name
@@ -1496,7 +1496,7 @@ class Construction(libio.Context):
 		formatted = {str(target): f_target_path(target)}
 		printed_command = tuple(formatted.get(x, x) for x in map(str, cmd))
 		command_string = ' '.join(printed_command) + iostr
-		sys.stderr.write("-> [%s:%d] %s\n" %(fpath, pid, command_string))
+		sys.stderr.write("[-> %s:%d %s]\n" %(fpath, pid, command_string))
 
 		self.sector.dispatch(sp)
 		sp.atexit(functools.partial(
