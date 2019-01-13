@@ -43,7 +43,7 @@ main(int argc, char *argv[])
 	Py_Initialize();
 	if (!Py_IsInitialized())
 	{
-		fprintf(stderr, "! ERROR: could not initialize python\n");
+		fprintf(stderr, "[!# ERROR: could not initialize python]\n");
 		return(200);
 	}
 	_PyRandom_Init();
@@ -52,7 +52,7 @@ main(int argc, char *argv[])
 	wargv = PyMem_RawMalloc(nbytes);
 	if (wargv == NULL)
 	{
-		fprintf(stderr, "! ERROR: failed to allocate %d bytes of memory for system arguments\n", nbytes);
+		fprintf(stderr, "[!# ERROR: failed to allocate %d bytes of memory for system arguments]\n", nbytes);
 		return(210);
 	}
 
@@ -61,7 +61,7 @@ main(int argc, char *argv[])
 		wargv[r] = Py_DecodeLocale(argv[r], NULL);
 		if (wargv[r] == NULL)
 		{
-			fprintf(stderr, "! ERROR: failed to decode system arguments\n");
+			fprintf(stderr, "[!# ERROR: failed to decode system arguments]\n");
 			return(210);
 		}
 	}
@@ -71,14 +71,14 @@ main(int argc, char *argv[])
 	PyEval_InitThreads();
 	if (!PyEval_ThreadsInitialized())
 	{
-		fprintf(stderr, "! ERROR: failed to initialize threading\n");
+		fprintf(stderr, "[!# ERROR: failed to initialize threading]\n");
 		return(199);
 	}
 
 	ob = PySys_GetObject("path");
 	if (ob == NULL)
 	{
-		fprintf(stderr, "! ERROR: failed to initialize execution context\n");
+		fprintf(stderr, "[!# ERROR: failed to initialize execution context]\n");
 		return(198);
 	}
 
@@ -88,7 +88,7 @@ main(int argc, char *argv[])
 	mod = PyImport_ImportModule(MODULE_NAME);
 	if (mod == NULL)
 	{
-		fprintf(stderr, "! ERROR: failed to import implementation module: " MODULE_NAME "\n");
+		fprintf(stderr, "[!# ERROR: failed to import implementation module: " MODULE_NAME "]\n");
 		return(197);
 	}
 	else
@@ -135,7 +135,7 @@ main(int argc, char *argv[])
 		}
 		else
 		{
-			fprintf(stderr, "[implementation module raised exception]\n");
+			fprintf(stderr, "[!# CONTROL: implementation module raised exception]\n");
 			PyErr_Print();
 			fflush(stderr);
 			r = 1;
