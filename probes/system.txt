@@ -2,47 +2,43 @@
 
 Construct executable that causes a segmentation violation.
 
-/__init__.py
-	#!/pl/python
-		__factor_domain__ = 'system'
-		__factor_type__ = 'executable'
+/__init__.py/#!/pl/python
+	__factor_domain__ = 'system'
+	__factor_type__ = 'executable'
 
-/src
-	/program.c
-		#!/pl/c
-			#include <stdio.h>
+/src/
+	/program.c/#!/pl/c
+		#include <stdio.h>
 
-			int
-			main(int argc, char *argv[])
-			{
-				int *i;
-				i = 0;
-				*i = 5;
-				return(1);
-			}
+		int
+		main(int argc, char *argv[])
+		{
+			int *i;
+			i = 0;
+			*i = 5;
+			return(1);
+		}
 
 [ abort ]
 
 Construct executable that performs abort in a function.
 
-/__init__.py
-	#!/pl/python
-		__factor_domain__ = 'system'
-		__factor_type__ = 'executable'
+/__init__.py/#!/pl/python
+	__factor_domain__ = 'system'
+	__factor_type__ = 'executable'
 
-/src
-	/program.c
-		#!/pl/c
-			#include <stdio.h>
-			void
-			sub(void)
-			{
-				abort();
-			}
+/src/
+	/program.c/#!/pl/c
+		#include <stdio.h>
+		void
+		sub(void)
+		{
+			abort();
+		}
 
-			int
-			main(int argc, char *argv[])
-			{
-				sub();
-				return(1);
-			}
+		int
+		main(int argc, char *argv[])
+		{
+			sub();
+			return(1);
+		}

@@ -2,102 +2,94 @@
 
 C++ executable using cout.
 
-/__init__.py
-	#!/pl/python
-		__factor_domain__ = 'system'
-		__factor_type__ = 'executable'
-		requirements = ('c++',)
+/__init__.py/#!/pl/python
+	__factor_domain__ = 'system'
+	__factor_type__ = 'executable'
+	requirements = ('c++',)
 
-/src
-	/program.cxx
-		#!/pl/c++
-			#include <iostream>
-			int
-			main(int argc, char *argv[])
-			{
-				int i = 5;
-				std::cout << "i=" << i << std::endl;
+/src/
+	/program.cxx/#!/pl/c++
+		#include <iostream>
+		int
+		main(int argc, char *argv[])
+		{
+			int i = 5;
+			std::cout << "i=" << i << std::endl;
 
-				if (argc > 1)
-					std::cout << "a=" << argv[1] << std::endl;
-				return(200);
-			}
+			if (argc > 1)
+				std::cout << "a=" << argv[1] << std::endl;
+			return(200);
+		}
 
 [ exceptions ]
 
 C++ executable throwing and catching exceptions.
 
-/__init__.py
-	#!/pl/python
-		__factor_domain__ = 'system'
-		__factor_type__ = 'executable'
-		requirements = ('c++',)
-		pl = {
-			'c++': (None, {'exceptions'})
+/__init__.py/#!/pl/python
+	__factor_domain__ = 'system'
+	__factor_type__ = 'executable'
+	requirements = ('c++',)
+	pl = {
+		'c++': (None, {'exceptions'})
+	}
+
+/src/
+	/program.cxx/#!/pl/c++
+		#include <iostream>
+		#include <exception>
+
+		class LocalException : public std::exception {};
+
+		void
+		throwing(void)
+		{
+			std::cout << "! EVENT: throwing exception" << std::endl;
+			throw LocalException();
+		}
+		void
+		catching(void)
+		{
+			try {
+				throwing();
+			} catch (const LocalException& e) {
+				std::cout << "! EVENT: caught exception" << std::endl;
+				return;
+			}
+
+			std::cout << "! FATAL: exception not caught" << std::endl;
 		}
 
-/src
-	/program.cxx
-		#!/pl/c++
-			#include <iostream>
-			#include <exception>
-
-			class LocalException : public std::exception {};
-
-			void
-			throwing(void)
-			{
-				std::cout << "! EVENT: throwing exception" << std::endl;
-				throw LocalException();
-			}
-			void
-			catching(void)
-			{
-				try {
-					throwing();
-				} catch (const LocalException& e) {
-					std::cout << "! EVENT: caught exception" << std::endl;
-					return;
-				}
-
-				std::cout << "! FATAL: exception not caught" << std::endl;
-			}
-
-			int
-			main(int argc, char *argv[])
-			{
-				catching();
-				return(200);
-			}
+		int
+		main(int argc, char *argv[])
+		{
+			catching();
+			return(200);
+		}
 
 [ library ]
 
-/__init__.py
-	#!/pl/python
-		__factor_domain__ = 'system'
-		__factor_type__ = 'library'
+/__init__.py/#!/pl/python
+	__factor_domain__ = 'system'
+	__factor_type__ = 'library'
 
-/src
-	/main.cxx
-		#!/pl/c++
-			int
-			exported_symbol(int args, char *argv[])
-			{
-				int i;
-			}
+/src/
+	/main.cxx/#!/pl/c++
+		int
+		exported_symbol(int args, char *argv[])
+		{
+			int i;
+		}
 
 [ extension ]
 
-/__init__.py
-	#!/pl/python
-		__factor_domain__ = 'system'
-		__factor_type__ = 'extension'
+/__init__.py/#!/pl/python
+	__factor_domain__ = 'system'
+	__factor_type__ = 'extension'
 
-/src
-	/main.cxx
-		#!/pl/c++
-			int
-			main(int args, char *argv[])
-			{
-				int i;
-			}
+/src/
+	/main.cxx/#!/pl/c++
+		int
+		main(int args, char *argv[])
+		{
+			int i;
+		}
