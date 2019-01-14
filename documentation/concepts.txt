@@ -1,0 +1,27 @@
+The concepts described here are also defined briefly in terms. The sections here are offered for a
+more detailed description with some rationale for their presence.
+
+[ Factors ]
+
+Factors are the primitives of projects. They are project targets that can consist of Fractions or be
+Whole. Confusingly, Factors can contain Subfactors as well as Fractions. Metaphorically, it is similar
+to a filesystem whose directories can contain files and have content.
+
+[ Products ]
+
+A Product is an arbitrary set of Factors. Products are rarely discussed directly as the focus is
+usually on individual Factors and their respective build and type.
+
+[ Construction Context ]
+
+A Construction Context is a user defined adaption providing access to factor processing
+tools that can perform builds. Contexts are used to perform Instantiation of a Product for use
+in the target Environment.
+
+[ Environments ]
+
+Collection of &[Products].
+
+[ Software Corpus ]
+
+Collection of &[Products] created by an entity.
