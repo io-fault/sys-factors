@@ -13,6 +13,7 @@ from fault.system import library as libsys
 
 from .. import probe
 from .. import cc
+from .. import constructors
 
 def select(paths, possibilities, preferences):
 	"""
@@ -54,7 +55,7 @@ def factor_domain(paths):
 
 		'transformations': {
 			'text': {
-				'interface': cc.__name__ + '.transparent',
+				'interface': constructors.__name__ + '.transparent',
 				'type': 'transparent',
 				'command': '/bin/cp',
 			},
@@ -82,7 +83,7 @@ def source_domain(paths):
 
 		'transformations': {
 			None: {
-				'interface': cc.__name__ + '.transparent',
+				'interface': constructors.__name__ + '.transparent',
 				'type': 'transparent',
 				'command': '/bin/cp',
 			},
@@ -109,12 +110,12 @@ def resource_domain(paths):
 
 		'transformations': {
 			None: {
-				'interface': cc.__name__ + '.transparent',
+				'interface': constructors.__name__ + '.transparent',
 				'type': 'transparent',
 				'command': '/bin/cp',
 			},
 			'uri': {
-				'interface': cc.__name__ + '.transparent',
+				'interface': constructors.__name__ + '.transparent',
 				'method': 'python',
 				'command': __package__ + '.stream',
 				'redirect': 'stdout',
@@ -153,7 +154,7 @@ def skeleton(intention, paths):
 
 			'transformations': {
 				None: {
-					'interface': cc.__name__ + '.void',
+					'interface': constructors.__name__ + '.void',
 					'type': 'void',
 					'method': 'python',
 					'command': __package__ + '.void',
@@ -161,7 +162,7 @@ def skeleton(intention, paths):
 			},
 			'integration': {
 				None: {
-					'interface': cc.__name__ + '.void',
+					'interface': constructors.__name__ + '.void',
 					'type': 'void',
 					'method': 'python',
 					'command': __package__ + '.void',
