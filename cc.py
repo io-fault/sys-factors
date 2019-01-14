@@ -1,5 +1,5 @@
 """
-# Construction Context implementation in Python.
+# Software Construction Context implementation in Python.
 
 # [ Engineering ]
 # /Mechanism Load Order/
@@ -21,6 +21,7 @@ import pickle
 import copy
 
 from . import include
+from . import graph
 
 from fault.computation import library as libc
 from fault.time import library as libtime
@@ -1089,168 +1090,6 @@ class Context(object):
 
 		return Class(list(mechs), dict(Class.load(syms)))
 
-def traverse(descent, working, tree, inverse, node):
-	"""
-	# Invert the directed graph of dependencies from the node.
-	"""
-
-	deps = set(descent(node))
-
-	if not deps:
-		# No dependencies, add to working set and return.
-		working.add(node)
-		return
-	elif node in tree:
-		# It's already been traversed in a previous run.
-		return
-
-	# dependencies present, assign them inside the tree.
-	tree[node] = deps
-
-	for x in deps:
-		# Note the factor as depending on &x and build
-		# its tree.
-		inverse[x].add(node)
-		traverse(descent, working, tree, inverse, x)
-
-def sequence(descent, nodes, defaultdict=collections.defaultdict, tuple=tuple):
-	"""
-	# Generator maintaining the state of the sequencing of a traversed depedency
-	# graph. This generator emits factors as they are ready to be processed and receives
-	# factors that have completed processing.
-
-	# When a set of dependencies has been processed, they should be sent to the generator
-	# as a collection; the generator identifies whether another set of modules can be
-	# processed based on the completed set.
-
-	# Completion is an abstract notion, &sequence has no requirements on the semantics of
-	# completion and its effects; it merely communicates what can now be processed based
-	# completion state.
-	"""
-
-	reqs = dict()
-	tree = dict() # dependency tree; F -> {DF1, DF2, ..., DFN}
-	inverse = defaultdict(set)
-	working = set()
-
-	for node in nodes:
-		traverse(descent, working, tree, inverse, node)
-
-	new = working
-	# Copy tree.
-	for x, y in tree.items():
-		cs = reqs[x] = defaultdict(set)
-		for f in y:
-			cs[f.pair].add(f)
-
-	yield None
-
-	while working:
-		for x in new:
-			if x not in reqs:
-				reqs[x] = defaultdict(set)
-
-		completion = (yield tuple(new), reqs, {x: tuple(inverse[x]) for x in new if inverse[x]})
-		for x in new:
-			reqs.pop(x, None)
-		new = set() # &completion triggers new additions to &working
-
-		for node in (completion or ()):
-			# completed.
-			working.discard(node)
-
-			for deps in inverse[node]:
-				tree[deps].discard(node)
-				if not tree[deps]:
-					# Add to both; new is the set reported to caller,
-					# and working tracks when the graph has been fully sequenced.
-					new.add(deps)
-					working.add(deps)
-
-					del tree[deps]
-
-def disabled(*args, **kw):
-	"""
-	# A transformation that can be assigned to a subject's mechanism
-	# in order to describe it as being disabled.
-	"""
-	return ()
-
-def transparent(build, adapter, o_type, output, i_type, inputs, verbose=True):
-	"""
-	# Create links from the input to the output; used for zero transformations.
-	"""
-
-	input, = inputs # Rely on exception from unpacking; expecting one input.
-	return [None, '-f', input, output]
-
-def void(build, adapter, o_type, output, i_type, inputs, verbose=True):
-	"""
-	# Command constructor executing &.bin.void with the intent of emitting
-	# an error designating that the factor could not be processed.
-	"""
-	return [None, output] + list(inputs)
-
-def standard_io(build, adapter, o_type, output, i_type, inputs, verbose=True):
-	"""
-	# Interface returning a command with no arguments.
-	# Used by transformation mechanisms that operate using standard I/O.
-	"""
-	return [None]
-
-def standard_out(build, adapter, o_type, output, i_type, inputs, verbose=True, root=False):
-	"""
-	# Takes the set of files as the initial parameters and emits
-	# the processed result to standard output.
-	"""
-
-	return [None] + list(inputs)
-
-def package_module_parameter(build, adapter, o_type, output, i_type, inputs,
-		verbose=True,
-		root=False,
-		filepath=str,
-	):
-	"""
-	# Reconstruct the qualified module path from the inputs and
-	# the build's factor route.
-	"""
-	f = build.factor
-	ir = f.route
-
-	src, = inputs
-	modname = src.identifier[:-3]
-	if modname != '__init__':
-		modpath = ir / modname
-	else:
-		modpath = ir
-
-	return [None, str(modpath)]
-
-def concatenation(build, adapter, o_type, output, i_type, inputs,
-		partials, libraries,
-		verbose=True,
-		filepath=str,
-	):
-	"""
-	# Create the factor by concatenating the files. Only used in cases
-	# where the order of concatentation is already managed or irrelevant.
-
-	# Requires 'execute-redirect'.
-	"""
-	return ['cat'] + list(inputs)
-
-def empty(context, mechanism, factor, output, inputs,
-		language=None,
-		format=None,
-		verbose=True,
-	):
-	"""
-	# Create the factor by executing a command without arguments.
-	# Used to create constant outputs for reduction.
-	"""
-	return ['empty']
-
 def initial_factor_defines(factor, factorpath):
 	"""
 	# Generate a set of defines that describe the factor being created.
@@ -1332,7 +1171,7 @@ class Construction(libio.Context):
 		descent = functools.partial(requirements, self.c_index, self.c_symbols)
 
 		# Manages the dependency order.
-		self.c_sequence = sequence(descent, self.c_factors)
+		self.c_sequence = graph.sequence(descent, self.c_factors)
 
 		initial = next(self.c_sequence) # generator init
 		assert initial is None
