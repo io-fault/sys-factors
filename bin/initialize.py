@@ -238,14 +238,6 @@ def context(route, intention, reference, symbols, options):
 	dev.store(b'#!' + sys.executable.encode('utf-8') + pypath.encode('utf-8') + src)
 	os.chmod(str(dev), 0o744)
 
-	cfg = (ctx / 'configure')
-	cfg.init('file')
-	src = ep_template % (
-		repr(__package__ + '.configure').encode('utf-8'),
-	)
-	cfg.store(b'#!' + sys.executable.encode('utf-8') + pypath.encode('utf-8') + src)
-	os.chmod(str(cfg), 0o744)
-
 	if reference is not None:
 		support = str(reference)
 	else:
