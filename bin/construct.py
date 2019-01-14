@@ -25,7 +25,7 @@ def set_exit_code(project, unit, cxn):
 	fcount = cxn.failures
 	segstr = '.'.join(project)
 
-	sys.stderr.write("#! SUMMARY: In %s, %d factor processing instructions failed.\n" %(segstr, fcount,))
+	sys.stderr.write("[!# SUMMARY: In %s, %d factor processing instructions failed]\n" %(segstr, fcount,))
 
 	if fcount:
 		unit.result = 70 # EX_SOFTWARE
