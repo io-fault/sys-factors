@@ -3,7 +3,6 @@
 """
 import os
 import sys
-import functools
 import pickle
 
 from fault.system import files
@@ -11,36 +10,9 @@ from fault.system import python
 from fault.system import process
 from fault.system import library as libsys
 
-from .. import probe
-from .. import cc
 from .. import constructors
 
-def select(paths, possibilities, preferences):
-	"""
-	# Select a file from the given &paths using the &possibilities and &preferences
-	# to identify the most desired.
-	"""
-
-	# Override for particular version
-	possible = set(possibilities)
-
-	found, missing = probe.search(paths, tuple(possible))
-	if not found:
-		return None
-	else:
-		for x in preferences:
-			if x in found:
-				path = found[x]
-				name = x
-				break
-		else:
-			# select one randomly
-			name = tuple(found)[0]
-			path = found[name]
-
-	return name, path
-
-def factor_domain(paths):
+def factor_domain():
 	"""
 	# Factor Library processing.
 	# Generally only supports libraries which are directories of whole factors and composites.
@@ -62,7 +34,7 @@ def factor_domain(paths):
 		}
 	}
 
-def source_domain(paths):
+def source_domain():
 	"""
 	# Initialize (factor/domain)`source` for inclusion in a Context.
 	"""
@@ -92,7 +64,7 @@ def source_domain(paths):
 
 	return mech
 
-def resource_domain(paths):
+def resource_domain():
 	"""
 	# Initialize a (factor/type)`resource` subject for inclusion in a context.
 	"""
@@ -125,7 +97,7 @@ def resource_domain(paths):
 
 	return mech
 
-def skeleton(intention, paths):
+def skeleton(intention):
 	"""
 	# Initialize a construction context for host targets.
 	"""
@@ -134,9 +106,9 @@ def skeleton(intention, paths):
 		'context': {
 			'intention': intention,
 		},
-		'factor': factor_domain(paths),
-		'source': source_domain(paths),
-		'resource': resource_domain(paths),
+		'factor': factor_domain(),
+		'source': source_domain(),
+		'resource': resource_domain(),
 
 		# Trap domain that emits failure.
 		'void': {
@@ -244,9 +216,7 @@ def context(route, intention, reference, symbols, options):
 	else:
 		support = ''
 
-	paths = probe.environ_paths()
-
-	coredata = skeleton(intention, paths)
+	coredata = skeleton(intention)
 	coredata['context']['options'] = options
 	corefile = mechdir / 'core'
 	corefile.store(pickle.dumps({'root': coredata}))
