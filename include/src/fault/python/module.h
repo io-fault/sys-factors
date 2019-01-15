@@ -1,7 +1,7 @@
 /**
 	# Included once by the source file defining module initialization.
 */
-#include "../symbols.h"
+#include <fault/symbols.h>
 
 #ifndef MODULE_FUNCTIONS
 	#warning MODULE_FUNCTIONS() macro not defined. Should be defined by importer. Using empty set.
