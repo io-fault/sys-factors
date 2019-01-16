@@ -20,9 +20,6 @@ import typing
 import pickle
 import copy
 
-from . import include
-from . import graph
-
 from fault.computation import library as libc
 from fault.time import library as libtime
 from fault.routes import library as libroutes
@@ -36,6 +33,7 @@ from fault.text import struct as libstruct
 from fault.project import library as libproject
 from fault.internet import ri
 
+from . import graph
 File = system_files.Path
 fpi_addressing = libfs.Hash('fnv1a_32', depth=1, length=2)
 
@@ -763,10 +761,9 @@ class Mechanism(object):
 
 			adapter = self.adaption(build, src_type, src, phase='transformations')
 			if 'interface' in adapter:
-				print('transform', src)
 				xf = context_interface(adapter['interface'])
 			else:
-				print('no interface for transformation', src_type, str(src))
+				sys.stdout.write('[!# ERROR: no interface for transformation %r %s]\n' % (src_type, str(src)))
 				continue
 
 			# Compilation to out_format for integration.
@@ -855,7 +852,6 @@ class Mechanism(object):
 		else:
 			libraries = ()
 
-		print('integrate', str(f))
 		xf = context_interface(adapter['interface'])
 		seq = xf(transform_mechs, build, adapter, f.type, rr, fmt, objects, partials, libraries)
 		logfile = loc['log'] / 'Integration.log'
@@ -1044,7 +1040,6 @@ class Context(object):
 			mech = Mechanism(self.index['void'])
 			mech.descriptor['path'] = [fdomain]
 
-		print(mech.descriptor['path'])
 		return variants, mech
 
 	@functools.lru_cache(16)
@@ -1227,7 +1222,7 @@ class Construction(libio.Context):
 			variants, mech = selection
 		else:
 			# No mechanism found.
-			sys.stderr.write("[!# WARNING: no mechanism set for %r factors]\n"%(factor.domain))
+			sys.stdout.write("[!# WARNING: no mechanism set for %r factors]\n"%(factor.domain))
 			return
 
 		variants['name'] = factor.name
@@ -1335,7 +1330,7 @@ class Construction(libio.Context):
 		formatted = {str(target): f_target_path(target)}
 		printed_command = tuple(formatted.get(x, x) for x in map(str, cmd))
 		command_string = ' '.join(printed_command) + iostr
-		sys.stderr.write("[-> %s:%d %s]\n" %(fpath, pid, command_string))
+		sys.stdout.write("[-> %s:%d %s]\n" %(fpath, pid, command_string))
 
 		self.sector.dispatch(sp)
 		sp.atexit(functools.partial(
