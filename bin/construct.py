@@ -32,6 +32,27 @@ def set_exit_code(project, unit, cxn):
 	else:
 		unit.result = 0
 
+def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(__file__) ** 3)):
+	include_dir = (root / project / 'include')
+	src = include_dir / 'src'
+	include_fc = libproject.factorcontext(libproject.identify_filesystem_context(include_dir))
+	include_project = cc.Project(
+		include_fc,
+		libproject.infrastructure(include_fc),
+		libproject.information(include_fc),
+	)
+
+	ii = cc.Target(
+		include_project,
+		libroutes.Segment(None, ('include',)),
+		'source',
+		'library',
+		{},
+		[src.__class__(src, (src>>x)[1]) for x in src.tree()[1]],
+	)
+
+	return ii
+
 def main(domain='system'):
 	"""
 	# Prepare the entire package building factor targets and writing bytecode.
@@ -93,27 +114,8 @@ def main(domain='system'):
 	for k in list(local_symbols):
 		local_symbols[k] = options.parse(local_symbols[k])
 
-	# Merge?
 	local_symbols.update(ctx.symbols.items())
-
-	include_dir = ((files.Path.from_absolute(__file__) ** 2) / 'include')
-	src = include_dir/'src'
-	include_fc = libproject.factorcontext(libproject.identify_filesystem_context(include_dir))
-	include_project = cc.Project(
-		include_fc,
-		libproject.infrastructure(include_fc),
-		libproject.information(include_fc),
-	)
-
-	ii = cc.Target(
-		include_project,
-		libroutes.Segment(None, ('include',)),
-		'source',
-		'library',
-		{},
-		[src.__class__(src, (src>>x)[1]) for x in src.tree()[1]],
-	)
-	local_symbols['fault:c-interfaces'] = [ii]
+	local_symbols['fault:c-interfaces'] = [local_include_factor('posix'), local_include_factor('python')]
 
 	for root, project, fc in roots:
 		assert libproject.enclosure(fc) == False # Resolved enclosure contents in the first pass.
@@ -152,7 +154,6 @@ def main(domain='system'):
 			project,
 			factor,
 			w_factors + c_factors,
-			ii,
 			processors = max(8, ncpu),
 			reconstruct = rebuild,
 		)

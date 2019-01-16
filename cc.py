@@ -1125,7 +1125,6 @@ class Construction(libio.Context):
 			project,
 			factor,
 			factors,
-			core_include,
 			reconstruct=False,
 			processors=4
 		):
@@ -1150,7 +1149,6 @@ class Construction(libio.Context):
 
 		self.continued = False
 		self.activity = set()
-		self.include_factor = core_include
 
 		super().__init__()
 
