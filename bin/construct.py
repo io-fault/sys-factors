@@ -115,6 +115,8 @@ def main(domain='system'):
 		local_symbols[k] = options.parse(local_symbols[k])
 
 	local_symbols.update(ctx.symbols.items())
+
+	# XXX: relocate symbols to context intialization
 	local_symbols['fault:c-interfaces'] = [local_include_factor('posix'), local_include_factor('python')]
 
 	for root, project, fc in roots:

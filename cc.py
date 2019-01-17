@@ -1358,6 +1358,7 @@ class Construction(libio.Context):
 		exit_method, exit_code, core_produced = status
 
 		self.exits += 1
+		sys.stdout.write("[<- %s %s %d %d]\n" %(factor.absolute_path_string, cmd[0], pid, exit_code))
 		if exit_code != 0:
 			self.failures += 1
 
