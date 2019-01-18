@@ -487,7 +487,7 @@ class Target(object):
 		wd = self.fpi_set.route(key, filename=str)
 
 		i = libproject.integrals(self.project.route, self.route)
-		out = libproject.compose(groups, variants)
+		out = libproject.compose_integral_path(variants, groups=groups)
 		out = i.extend(out).suffix('.i')
 
 		return vl, key, {
@@ -524,7 +524,7 @@ class Target(object):
 		"""
 
 		i = libproject.integrals(self.project.route, self.route)
-		path = libproject.compose(groups, variants)
+		path = libproject.compose_integral_path(variants, groups=groups)
 		i = i.extend(path)
 
 		return i.suffix('.i')
