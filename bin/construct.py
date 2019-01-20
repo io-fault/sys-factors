@@ -61,9 +61,10 @@ def main(domain='system'):
 	# Compensate for what appears to be parsing bug in Python.
 	# When loaded by the task queue thread, the module import would
 	# SIGSEGV.
-	import sdk.tools.llvm.library
-	import sdk.tools.host.apple
-	import sdk.tools.host.elf
+	# Apparently fixed: Fri Jan 18 21:07:28 UTC 2019
+		#import sdk.tools.llvm.library
+		#import sdk.tools.host.apple
+		#import sdk.tools.host.elf
 
 	Segment = libroutes.Segment.from_sequence
 	call = libio.context()
