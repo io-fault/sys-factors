@@ -17,7 +17,6 @@ import importlib
 import importlib.machinery
 import types
 import typing
-import pickle
 import copy
 
 from fault.computation import library as libc
@@ -25,7 +24,6 @@ from fault.time import library as libtime
 from fault.routes import library as libroutes
 from fault.io import library as libio
 from fault.system import library as libsys
-from fault.system import libfactor
 from fault.system import python as system_python
 from fault.system import files as system_files
 from fault.filesystem import library as libfs
@@ -34,41 +32,10 @@ from fault.project import library as libproject
 from fault.internet import ri
 
 from . import graph
+from . import data
+
 File = system_files.Path
 fpi_addressing = libfs.Hash('fnv1a_32', depth=1, length=2)
-
-def update_named_mechanism(route:File, name:str, data):
-	"""
-	# Given a route to a mechanism file in a construction context,
-	# overwrite the file's mechanism entry with the given &data.
-
-	# [ Parameters ]
-	# /route/
-		# The route to the file that is to be modified.
-	# /name/
-		# The component in the mechanism file to replace.
-	# /data/
-		# The dictionary to set as the mechanism's content.
-	"""
-
-	if route.exists():
-		stored = pickle.loads(route.load())
-	else:
-		stored = {}
-
-	stored[name] = data
-	route.store(pickle.dumps(stored))
-
-def load_named_mechanism(route:File, name:str):
-	"""
-	# Given a route to a mechanism file in a construction context,
-	# load the file's mechanism entry.
-
-	# [ Parameters ]
-	# /route/
-		# The route to the mechanisms 
-	"""
-	return pickle.loads(route.load())[name]
 
 import faulthandler
 faulthandler.enable()
@@ -178,9 +145,9 @@ def interpret_reference(index, factor, symbol, url):
 	factor = libroutes.Segment.from_sequence(rfactor.split('.'))
 	factor_dir = project.route.extend(factor.absolute)
 	from fault.project import explicit
-	ctx, data = explicit.struct.parse((factor_dir/'factor.txt').get_text_content())
+	ctx, fdata = explicit.struct.parse((factor_dir/'factor.txt').get_text_content())
 
-	t = Target(project, factor, data['domain'] or 'system', data['type'], rreqs, [])
+	t = Target(project, factor, fdata['domain'] or 'system', fdata['type'], rreqs, [])
 	return t
 
 def requirements(index, symbols, factor):
@@ -578,37 +545,6 @@ class Target(object):
 
 			yield [], self.fpi_initialize(groups, vars, format=fmt)
 
-merge_operations = {
-	set: set.update,
-	list: list.extend,
-	int: int.__add__,
-	tuple: (lambda x, y: x + tuple(y)),
-	str: (lambda x, y: y), # override strings
-	tuple: (lambda x, y: y), # override tuple sequences
-	None.__class__: (lambda x, y: y),
-}
-
-def merge(parameters, source, operations = merge_operations):
-	"""
-	# Merge the given &source into &parameters applying merge functions
-	# defined in &operations. Dictionaries are merged using recursion.
-	"""
-	for key in source:
-		if key in parameters:
-			# merge parameters by class
-			cls = parameters[key].__class__
-			if cls is dict:
-				merge_op = merge
-			else:
-				merge_op = operations[cls]
-
-			# DEFECT: The manipulation methods often return None.
-			r = merge_op(parameters[key], source[key])
-			if r is not None and r is not parameters[key]:
-				parameters[key] = r
-		else:
-			parameters[key] = source[key]
-
 class Mechanism(object):
 	"""
 	# The mechanics used to produce an Integral from a set of Sources associated
@@ -720,7 +656,7 @@ class Mechanism(object):
 		cmech = {}
 		for x in layers:
 			if x is not None:
-				merge(cmech, x)
+				data.merge(cmech, x)
 		cmech.pop('inherit', None)
 
 		# cache merged mechanism
@@ -930,8 +866,8 @@ class Context(object):
 
 		self.index = dict()
 		for mid, slots in self.sequence:
-			for name, data in slots.items():
-				merge(self.index, data)
+			for name, mdata in slots.items():
+				data.merge(self.index, mdata)
 
 		syntax = self.index.get('syntax')
 		if syntax:
@@ -1028,7 +964,7 @@ class Context(object):
 				# Recursively merge inherit's.
 				inner = mechdata['inherit']
 				ivariants, imech = self.select(inner)
-				merge(mechdata, imech.descriptor)
+				data.merge(mechdata, imech.descriptor)
 				variants.update(ivariants)
 				mechdata['path'] = [fdomain] + mechdata['path']
 			else:
@@ -1064,7 +1000,7 @@ class Context(object):
 	@staticmethod
 	def load(route:File):
 		for x in route.files():
-			yield x.identifier, pickle.loads(x.load())
+			yield x.identifier, data.load(x)
 
 	@classmethod
 	def from_environment(Class, envvar='FPI_MECHANISMS'):

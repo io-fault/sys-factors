@@ -8,9 +8,7 @@ import functools
 from .. import options
 from .. import cc
 
-from fault.system import libfactor
 from fault.system import files
-
 from fault.routes import library as libroutes
 from fault.time import library as libtime
 from fault.io import library as libio
