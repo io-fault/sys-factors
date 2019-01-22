@@ -5,6 +5,7 @@
 # data; a simple merge is implemented here for combining those layers.
 """
 import pickle
+from fault.system import files
 
 def load(route, _load=pickle.loads):
 	return _load(route.load())
@@ -12,7 +13,7 @@ def load(route, _load=pickle.loads):
 def store(route, data, _dump=pickle.dumps):
 	return route.store(_dump(data))
 
-def update_named_mechanism(route:File, name:str, mechanism):
+def update_named_mechanism(route:files.Path, name:str, mechanism):
 	"""
 	# Given a route to a mechanism file in a construction context,
 	# overwrite the file's mechanism entry with the given &mechanism.
@@ -34,7 +35,7 @@ def update_named_mechanism(route:File, name:str, mechanism):
 	stored[name] = mechanism
 	store(route, stored)
 
-def load_named_mechanism(route:File, name:str):
+def load_named_mechanism(route:files.Path, name:str):
 	"""
 	# Given a route to a mechanism file in a construction context,
 	# load the file's mechanism entry.

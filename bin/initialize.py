@@ -40,7 +40,6 @@ def source_domain():
 	"""
 
 	mech = {
-		'invariant': True,
 		'variants': {
 			'system': 'void',
 			'architecture': 'sources',
@@ -70,7 +69,6 @@ def resource_domain():
 	"""
 
 	mech = {
-		'invariant': True,
 		'variants': {
 			'system': 'void',
 			'architecture': 'fs',
@@ -223,7 +221,7 @@ def context(route, intention, reference, symbols, options):
 
 	materialize_support_project(pylib / 'f_intention', 'intention')
 
-def main(inv:(process.Invocation)) -> process.Exit:
+def main(inv:(process.Invocation)) -> (process.Exit):
 	refctx = None
 	intention, target, *args = inv.args
 	syms = {}

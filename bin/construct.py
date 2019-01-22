@@ -5,6 +5,7 @@ import os
 import sys
 import functools
 
+from .. import core
 from .. import options
 from .. import cc
 
@@ -34,13 +35,13 @@ def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(
 	include_dir = (root / project / 'include')
 	src = include_dir / 'src'
 	include_fc = libproject.factorcontext(libproject.identify_filesystem_context(include_dir))
-	include_project = cc.Project(
+	include_project = core.Project(
 		include_fc,
 		libproject.infrastructure(include_fc),
 		libproject.information(include_fc),
 	)
 
-	ii = cc.Target(
+	ii = core.Target(
 		include_project,
 		libroutes.Segment(None, ('include',)),
 		'source',
@@ -132,17 +133,17 @@ def main(domain='system'):
 		# Resolve relative references to absolute while maintaining set/sequence.
 		fc_infra = libproject.infrastructure(fc)
 		info = libproject.information(fc)
-		project = cc.Project(fc, fc_infra, info)
+		project = core.Project(fc, fc_infra, info)
 
 		sr_composites = {
 			k: (v[0] or domain, v[1], {x: cc.resolve(fc_infra, local_symbols, x) for x in v[2]}, v[3])
 			for k, v in composites.items()
 		}
-		c_factors = [cc.Target(project, Segment(k), *v) for k, v in sr_composites.items()]
+		c_factors = [core.Target(project, Segment(k), *v) for k, v in sr_composites.items()]
 
 		w_symbols = {}
 		w_factors = [
-			cc.Target(project, Segment(k), v[0], v[1], w_symbols, *v[2:], variants={'name':k.identifier})
+			core.Target(project, Segment(k), v[0], v[1], w_symbols, *v[2:], variants={'name':k.identifier})
 			for k, v in wholes.items()
 		]
 
