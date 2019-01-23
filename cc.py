@@ -23,7 +23,7 @@ from fault.computation import library as libc
 from fault.time import library as libtime
 from fault.routes import library as libroutes
 from fault.io import library as libio
-from fault.system import library as libsys
+from fault.system import execution as libexec
 from fault.system import python as system_python
 from fault.system import files as system_files
 from fault.text import struct as libstruct
@@ -873,7 +873,7 @@ class Construction(libio.Context):
 			f.write(' '.join(strcmd).encode('utf-8'))
 			f.write(b'\n\n[Standard Error]\n')
 
-			ki = libsys.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
+			ki = libexec.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
 			with open(stdin, 'rb') as ci, open(stdout, 'wb') as co:
 				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
 				sp = libio.Subprocess(pid)
@@ -909,8 +909,8 @@ class Construction(libio.Context):
 		self.activity.add(factor)
 
 		typ, cmd, log = descriptor
-		pid, status = processor.only
-		exit_method, exit_code, core_produced = status
+		pid, delta = processor.only
+		exit_code = delta.status
 
 		self.exits += 1
 		sys.stdout.write("[<- %s %s %d %d]\n" %(factor.absolute_path_string, cmd[0], pid, exit_code))
@@ -937,7 +937,7 @@ class Construction(libio.Context):
 			l += ('/subject/\n\treduction\n')
 
 		l += ('/pid/\n\t%d\n' %(pid,))
-		l += ('/status/\n\t%s\n' %(str(status),))
+		l += ('/status/\n\t%s\n' %(str(exit_code),))
 		l += ('/start/\n\t%s\n' %(start.select('iso'),))
 		l += ('/stop/\n\t%s\n' %(libtime.now().select('iso'),))
 

@@ -8,7 +8,7 @@ import pickle
 from fault.system import files
 from fault.system import python
 from fault.system import process
-from fault.system import library as libsys
+from fault.system import execution as libexec
 
 from .. import constructors
 
@@ -173,7 +173,7 @@ def materialize_support_project(directory, name, fault='fault'):
 		str(directory), str(tmpl_path), name,
 	]
 
-	pid, status, data = libsys.effect(libsys.KInvocation(sys.executable, command))
+	pid, status, data = libexec.effect(libexec.KInvocation(sys.executable, command))
 	if status != 0:
 		sys.stderr.write("! ERROR: adapter tool instantiation failed\n")
 		sys.stderr.write("\t/command\n\t\t" + " ".join(command) + "\n")
