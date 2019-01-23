@@ -5,12 +5,12 @@ import typing
 import functools
 import itertools
 
-from fault.filesystem import library as libfs
+from fault.hkp import library as libhkp
 from fault.routes import library as libroutes
 from fault.project import library as libproject
 from fault.system import files
 
-fpi_addressing = libfs.Hash('fnv1a_32', depth=1, length=2)
+fpi_addressing = libhkp.Hash('fnv1a_32', depth=1, length=2)
 
 class Project(object):
 	"""
@@ -302,12 +302,12 @@ class Target(object):
 
 	@property
 	@functools.lru_cache(32)
-	def fpi_set(self) -> libfs.Dictionary:
+	def fpi_set(self) -> libhkp.Dictionary:
 		"""
-		# &libfs.Dictionary containing the builds of different variants.
+		# &libhkp.Dictionary containing the builds of different variants.
 		"""
 		fr = self.fpi_root
-		wd = libfs.Dictionary.use(fr, addressing=fpi_addressing)
+		wd = libhkp.Dictionary.use(fr, addressing=fpi_addressing)
 		return wd
 
 	def fpi_work_exists(self, key):

@@ -6,15 +6,18 @@
 # related
 """
 import typing
-from fault.filesystem import library as libfs
 
-class Corpus(libfs.Protocol):
+class Protocol(object):
+	def __init__(self, route):
+		self.route = route
+
+class Corpus(Protocol):
 	"""
 	# Directory containing a Software Corpus.
 	"""
 	pass
 
-class Product(libfs.Protocol):
+class Product(Protocol):
 	"""
 	# Directory containing a set of factors.
 	"""
@@ -28,7 +31,7 @@ class Product(libfs.Protocol):
 			if x[0:1] != '.'
 		])
 
-class Context(libfs.Protocol):
+class Context(Protocol):
 	"""
 	# Directory representing a Construction Context for performing builds.
 
