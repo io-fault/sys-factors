@@ -4,13 +4,35 @@
 import typing
 import functools
 import itertools
+import importlib
+import operator
 
 from fault.hkp import library as libhkp
 from fault.routes import library as libroutes
 from fault.project import library as libproject
 from fault.system import files
+from fault.system import python
+
+from . import data
 
 fpi_addressing = libhkp.Hash('fnv1a_32', depth=1, length=2)
+
+def context_interface(path):
+	"""
+	# Resolves the construction interface for processing a source or performing
+	# the final reduction (link-stage).
+	"""
+
+	# Avoid at least one check as it is known there is at least
+	# one attribute in the path.
+	leading, final = path.rsplit('.', 1)
+	mod, apath = python.Import.from_attributes(leading)
+	obj = importlib.import_module(str(mod))
+
+	for x in apath:
+		obj = getattr(obj, x)
+
+	return getattr(obj, final)
 
 class Project(object):
 	"""
@@ -118,7 +140,7 @@ class SystemFactor(object):
 			for ft, sf in types.items():
 				for sf_int in sf:
 					if sf_int is not None:
-						sf_route = system_files.Path.from_absolute(sf_int)
+						sf_route = files.Path.from_absolute(sf_int)
 					else:
 						sf_route = None
 
@@ -378,3 +400,286 @@ class Target(object):
 			vars['format'] = fmt
 
 			yield [], self.fpi_initialize(groups, vars, format=fmt)
+
+class Mechanism(object):
+	"""
+	# The mechanics used to produce an Integral from a set of Sources associated
+	# with a Factor. &Mechanism instances are usually created by &Context instances
+	# using &Context.select.
+
+	# [ Properties ]
+
+	# /descriptor/
+		# The data structure referring to the interface used
+		# to construct processing instructions for the selected mechanism.
+	# /cache/
+		# Mapping of resolved adapters. Used internally for handling
+		# adapter inheritance.
+	"""
+
+	def __init__(self, descriptor):
+		self.descriptor = descriptor
+		self.cache = {}
+
+	@property
+	def symbol(self):
+		return self.descriptor['path'][0]
+
+	@property
+	def groups(self):
+		return self.descriptor['groups']
+
+	@property
+	def integrations(self):
+		return self.descriptor['integrations']
+
+	@property
+	def transformations(self):
+		return self.descriptor['transformations']
+
+	def integrates(self):
+		ints = self.descriptor.get('integrations')
+		if ints:
+			return True
+		else:
+			return False
+
+	def suffix(self, factor):
+		"""
+		# Return the suffix that the given factor should use for its integral.
+		"""
+		tfe = self.descriptor.get('target-file-extensions', {None: '.v'})
+		return (
+			tfe.get(factor.type) or \
+			tfe.get(None) or '.i'
+		)
+
+	def prepare(self, build):
+		"""
+		# Generate any requisite filesystem requirements.
+		"""
+
+		loc = build.locations
+		f = build.factor
+		ftr = loc['integral']
+
+		yield ('directory', None, None, (None, ftr.container))
+
+		od = loc['output']
+		ld = loc['log']
+		emitted = set((od, ld))
+
+		for src in f.sources():
+			outfile = files.Path(od, src.points)
+			logfile = files.Path(ld, src.points)
+
+			for x in (outfile, logfile):
+				d = x.container
+				emitted.add(d)
+
+		for x in emitted:
+			if not x.exists():
+				yield ('directory', None, None, (None, x))
+
+	def adaption(self, build, domain, source, phase='transformations'):
+		"""
+		# Select the adapter of the mechanism for the given source.
+
+		# Adapters with inheritance will be cached by the mechanism.
+		"""
+		acache = self.cache
+		aset = self.descriptor[phase]
+
+		# Mechanisms support explicit inheritance.
+		if (phase, domain) in acache:
+			return acache[(phase, domain)]
+
+		if domain in aset:
+			key = domain
+		else:
+			# For transformations, usually a compiler collection.
+			# Integrations usually only consist of one.
+			key = None
+
+		lmech = aset[key]
+		layers = [lmech]
+		while 'inherit' in (lmech or ()):
+			basemech = lmech['inherit']
+			layers.append(aset[basemech]) # mechanism inheritance
+			lmech = aset[basemech]
+		layers.reverse()
+
+		cmech = {}
+		for x in layers:
+			if x is not None:
+				data.merge(cmech, x)
+		cmech.pop('inherit', None)
+
+		# cache merged mechanism
+		acache[(phase, domain)] = cmech
+
+		return cmech
+
+	def transform(self, build, filtered):
+		"""
+		# Transform the sources using the mechanisms defined in &context.
+		"""
+
+		f = build.factor
+		fdomain = f.domain
+		loc = build.locations
+		logs = loc['log']
+		intention = build.context.intention
+		fmt = build.variants['format']
+
+		mechanism = build.mechanism.descriptor
+		ignores = mechanism.get('ignore-extensions', ())
+
+		commands = []
+		for src in f.sources():
+			fnx = src.extension
+			if intention != 'fragments' and fnx in ignores or src.identifier.startswith('.'):
+				# Ignore header files and dot-files for non-delineation contexts.
+				continue
+			obj = files.Path(loc['output'], src.points)
+
+			if filtered((obj,), (src,)):
+				continue
+
+			logfile = files.Path(loc['log'], src.points)
+
+			src_type = build.context.language(src.extension)
+			out_format = mechanism['formats'][f.type]
+
+			adapter = self.adaption(build, src_type, src, phase='transformations')
+			if 'interface' in adapter:
+				xf = context_interface(adapter['interface'])
+			else:
+				sys.stdout.write('[!# ERROR: no interface for transformation %r %s]\n' % (src_type, str(src)))
+				continue
+
+			# Compilation to out_format for integration.
+			seq = list(xf(build, adapter, out_format, obj, src_type, (src,)))
+
+			yield self.formulate(obj, (src,), logfile, adapter, seq)
+
+	def formulate(self, route, sources, logfile, adapter, sequence):
+		"""
+		# Convert a generated instruction into a form accepted by &Construction.
+		"""
+
+		method = adapter.get('method')
+		command = adapter.get('command')
+		redirect = adapter.get('redirect')
+
+		if method == 'python':
+			# XXX: Force tool to resolve proper executable.
+			import sys
+			sequence[0:1] = (sys.executable, '-m', command)
+		elif method == 'internal':
+			return ('call', sequence, logfile, (sources, route))
+		else:
+			# Adapter interface leaves this as None or a relative name.
+			# Update to absolute path entered into adapter.
+			sequence[0] = command
+
+		if redirect == 'io':
+			return ('execute-stdio', sequence, logfile, (sources, route))
+		elif redirect:
+			return ('execute-redirection', sequence, logfile, (sources, route))
+		else:
+			# No redirect.
+			return ('execute', sequence, logfile, (sources, route))
+
+	def integrate(self, transform_mechs, build, filtered):
+		"""
+		# Construct the operations for reducing the object files created by &transform
+		# instructions into a set of targets that can satisfy
+		# the set of dependents.
+		"""
+
+		f = build.factor
+		loc = build.locations
+		mechanism = build.mechanism.descriptor
+
+		fmt = build.variants.get('format')
+		if fmt is None:
+			return
+		if 'integrations' not in mechanism:# or f.reflective: XXX
+			# warn/note?
+			return
+
+		mechp = mechanism
+		ftr = loc['integral']
+		rr = ftr
+
+		# Discover the known sources in order to identify which objects should be selected.
+		objdir = loc['output']
+		sources = set([
+			x.points for x in f.sources()
+			if x.extension not in mechp.get('ignore-extensions', ())
+		])
+		objects = [
+			objdir.__class__(objdir, x) for x in sources
+		]
+
+		if build.requirements:
+			partials = [x for x in build.requirements[(f.domain, 'partial')]]
+		else:
+			partials = ()
+
+		# XXX: does not account for partials
+		if filtered((rr,), objects):
+			return
+
+		adapter = self.adaption(build, f.type, objects, phase='integrations')
+
+		# Mechanisms with a configured root means that the
+		# transformed objects will be referenced by the root file.
+		root = adapter.get('root')
+		if root is not None:
+			objects = [objdir / root]
+
+		# Libraries and partials of the same domain are significant.
+		if build.requirements:
+			libraries = [x for x in build.requirements[(f.domain, 'library')]]
+		else:
+			libraries = ()
+
+		xf = context_interface(adapter['interface'])
+		seq = xf(transform_mechs, build, adapter, f.type, rr, fmt, objects, partials, libraries)
+		logfile = loc['log'] / 'Integration.log'
+
+		yield self.formulate(rr, objects, logfile, adapter, seq)
+
+class Build(tuple):
+	"""
+	# Container for the set of build parameters used by the configured abstraction functions.
+	"""
+	context = property(operator.itemgetter(0))
+	mechanism = property(operator.itemgetter(1))
+	factor = property(operator.itemgetter(2))
+	requirements = property(operator.itemgetter(3))
+	dependents = property(operator.itemgetter(4))
+	variants = property(operator.itemgetter(5))
+	locations = property(operator.itemgetter(6))
+	parameters = property(operator.itemgetter(7))
+	environment = property(operator.itemgetter(8))
+
+	def required(self, domain, ftype):
+		ctx = self.context
+		needed_variants = ctx.variants(domain, ftype)
+
+		reqs = self.requirements.get((domain, ftype), ())
+
+		srcvars = ctx.index['source']['variants']
+		for x in reqs:
+			if isinstance(x, SystemFactor):
+				yield x.integral(), x
+				continue
+
+			v = {'name': x.name}
+			v.update(needed_variants)
+			g = ctx.groups(x.project.environment)
+			path = x.integral(g, v)
+			yield path, x

@@ -9,6 +9,7 @@ from .. import core
 from .. import options
 from .. import cc
 
+from fault.system import process
 from fault.system import files
 from fault.routes import library as libroutes
 from fault.time import library as libtime
@@ -16,20 +17,6 @@ from fault.io import library as libio
 
 from fault.project import library as libproject
 from fault.project import explicit
-
-def set_exit_code(project, unit, cxn):
-	"""
-	# Report failure and not exit status.
-	"""
-	fcount = cxn.failures
-	segstr = '.'.join(project)
-
-	sys.stderr.write("[!# SUMMARY: In %s, %d factor processing instructions failed]\n" %(segstr, fcount,))
-
-	if fcount:
-		unit.result = 70 # EX_SOFTWARE
-	else:
-		unit.result = 0
 
 def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(__file__) ** 3)):
 	include_dir = (root / project / 'include')
@@ -52,20 +39,67 @@ def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(
 
 	return ii
 
-def main(domain='system'):
+def mkconstruct(context, symbols, projects, work, root, project, fc, rebuild, domain='system'):
+	assert libproject.enclosure(fc) == False # Resolved enclosure contents in the first pass.
+
+	Segment = libroutes.Segment.from_sequence
+	constraint = (project >> root)[1] # Path from project to factor selection.
+	path = (work.extend(project).extend(constraint))
+	factor = project.extend(constraint)
+
+	context_name = getattr(fc.context, 'identifier', None)
+	wholes, composites = explicit.query(path)
+	wholes = dict(context.extrapolate(wholes.items()))
+
+	# Resolve relative references to absolute while maintaining set/sequence.
+	fc_infra = libproject.infrastructure(fc)
+	info = libproject.information(fc)
+	project = core.Project(fc, fc_infra, info)
+
+	sr_composites = {
+		k: (v[0] or domain, v[1], {x: cc.resolve(fc_infra, symbols, x) for x in v[2]}, v[3])
+		for k, v in composites.items()
+	}
+	c_factors = [core.Target(project, Segment(k), *v) for k, v in sr_composites.items()]
+
+	w_symbols = {}
+	w_factors = [
+		core.Target(project, Segment(k), v[0], v[1], w_symbols, *v[2:], variants={'name':k.identifier})
+		for k, v in wholes.items()
+	]
+
+	return cc.Construction(
+		context,
+		symbols,
+		projects,
+		project,
+		factor,
+		w_factors + c_factors,
+		processors = 16, # overcommit significantly
+		reconstruct = rebuild,
+	)
+
+def continuation(sector, hold, iterator, processor):
+	"""
+	# Called atexit in order to dispatch the next.
+	"""
+
+	try:
+		nj = next(iterator)
+		sector.dispatch(nj)
+		nj.atexit(functools.partial(continuation, sector, hold, iterator))
+	except StopIteration:
+		# Success unless a crash occurs.
+		hold.terminate()
+		hold.exit()
+		unit = processor.unit
+		unit.result = 0
+
+def iomain(domain='system'):
 	"""
 	# Prepare the entire package building factor targets and writing bytecode.
 	"""
 
-	# Compensate for what appears to be parsing bug in Python.
-	# When loaded by the task queue thread, the module import would
-	# SIGSEGV.
-	# Apparently fixed: Fri Jan 18 21:07:28 UTC 2019
-		#import sdk.tools.llvm.library
-		#import sdk.tools.host.apple
-		#import sdk.tools.host.elf
-
-	Segment = libroutes.Segment.from_sequence
 	call = libio.context()
 	sector = call.sector
 	proc = sector.context.process
@@ -75,11 +109,8 @@ def main(domain='system'):
 
 	rebuild = int(env.get('FPI_REBUILD', '0').strip())
 	ctx = cc.Context.from_environment()
-	factor_paths = [files.Path.from_absolute(x) for x in env.get('FACTORPATH', '').split(':') if x.strip()]
 	work = files.Path.from_cwd()
-
-	if work not in factor_paths:
-		factor_paths.append(work)
+	factor_paths = [work]
 
 	# Collect the index for each directory.
 	project_index = {}
@@ -119,52 +150,46 @@ def main(domain='system'):
 	# XXX: relocate symbols to context intialization
 	local_symbols['fault:c-interfaces'] = [local_include_factor('posix'), local_include_factor('python')]
 
-	for root, project, fc in roots:
-		assert libproject.enclosure(fc) == False # Resolved enclosure contents in the first pass.
+	hold = libio.Processor()
+	sector.dispatch(hold)
 
-		constraint = (project >> root)[1] # Path from project to factor selection.
-		path = (work.extend(project).extend(constraint))
-		factor = project.extend(constraint)
+	# Initial job.
+	root, project, fc = roots[0]
+	cxn = mkconstruct(ctx, local_symbols, project_index, work, root, project, fc, rebuild)
+	sector.dispatch(cxn)
 
-		context_name = getattr(fc.context, 'identifier', None)
-		wholes, composites = explicit.query(path)
-		wholes = dict(ctx.extrapolate(wholes.items()))
+	# Chain subsequents.
+	seq = [
+		mkconstruct(ctx, local_symbols, project_index, work, root, project, fc, rebuild)
+		for root, project, fc in roots[1:]
+	]
+	iseq = iter(seq)
 
-		# Resolve relative references to absolute while maintaining set/sequence.
-		fc_infra = libproject.infrastructure(fc)
-		info = libproject.information(fc)
-		project = core.Project(fc, fc_infra, info)
+	cxn.atexit(functools.partial(continuation, sector, hold, iseq))
 
-		sr_composites = {
-			k: (v[0] or domain, v[1], {x: cc.resolve(fc_infra, local_symbols, x) for x in v[2]}, v[3])
-			for k, v in composites.items()
-		}
-		c_factors = [core.Target(project, Segment(k), *v) for k, v in sr_composites.items()]
+def ioinit(unit):
+	s = libio.Sector()
+	s.subresource(unit)
+	unit.place(s, "bin", "main")
 
-		w_symbols = {}
-		w_factors = [
-			core.Target(project, Segment(k), v[0], v[1], w_symbols, *v[2:], variants={'name':k.identifier})
-			for k, v in wholes.items()
-		]
+	main_proc = libio.Call.partial(iomain)
 
-		# Controls process execution queue.
-		ncpu = 2
-		cxn = cc.Construction(
-			ctx,
-			local_symbols,
-			project_index,
-			project,
-			factor,
-			w_factors + c_factors,
-			processors = max(8, ncpu),
-			reconstruct = rebuild,
-		)
+	enqueue = unit.context.enqueue
+	enqueue(s.actuate)
+	enqueue(functools.partial(s.dispatch, main_proc))
 
-		sector.dispatch(cxn)
-		sec = functools.partial(set_exit_code, project.segment.absolute, sector.unit)
-		cxn.atexit(sec)
+def main(inv:process.Invocation) -> process.Exit:
+	"""
+	# ...
+	"""
+
+	import sdk.tools.python.bin.compile
+	import sdk.tools.llvm.library
+	import sdk.tools.host.library
+
+	spr = libio.system.Process.spawn(inv, libio.Unit, {'command':(ioinit,)}, 'root')
+	spr.boot(())
 
 if __name__ == '__main__':
 	sys.dont_write_bytecode = True
-	from fault.io import command
-	command.execute()
+	process.control(main, process.Invocation.system())
