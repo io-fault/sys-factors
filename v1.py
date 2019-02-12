@@ -70,16 +70,7 @@ class Context(object):
 
 	@functools.lru_cache(8)
 	def groups(self, environment) -> typing.Sequence[typing.Sequence[str]]:
-		"""
-		# Parse and cache the contents of the (filename)`groups.txt` file in the
-		# &environment route.
-
-		# This is the context's perspective; effectively consistent across reads
-		# due to the cache. If no (filename)`groups.txt` is found, the
-		# default (format)`system-architecture/name` is returned.
-		"""
-
-		return [['system', 'architecture'], ['name']]
+		return [['system', 'architecture'], ['name','intention']]
 
 	def extrapolate(self, factors):
 		"""
