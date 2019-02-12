@@ -53,8 +53,8 @@ class Project(object):
 	@property
 	def symbol(self):
 		i = self.information
-		url = i['identifier']
-		return '[{1}{0}]:{2}'.format(url, i['icon'].get('emoji', ''), self.route)
+		url = i.identifier
+		return '{1}{0}:{2}'.format(url, i.icon or '', self.route)
 
 	@property
 	def segment(self):
