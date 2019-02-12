@@ -39,7 +39,7 @@ def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(
 
 	return ii
 
-def mkconstruct(context, symbols, projects, work, root, project, fc, rebuild, domain='system'):
+def mkconstruct(log, context, symbols, projects, work, root, project, fc, rebuild, domain='system'):
 	assert libproject.enclosure(fc) == False # Resolved enclosure contents in the first pass.
 
 	Segment = libroutes.Segment.from_sequence
@@ -69,6 +69,7 @@ def mkconstruct(context, symbols, projects, work, root, project, fc, rebuild, do
 	]
 
 	return cc.Construction(
+		log,
 		context,
 		symbols,
 		projects,
@@ -79,7 +80,7 @@ def mkconstruct(context, symbols, projects, work, root, project, fc, rebuild, do
 		reconstruct = rebuild,
 	)
 
-def continuation(sector, hold, iterator, processor):
+def continuation(log, sector, hold, iterator, processor):
 	"""
 	# Called atexit in order to dispatch the next.
 	"""
@@ -87,9 +88,10 @@ def continuation(sector, hold, iterator, processor):
 	try:
 		nj = next(iterator)
 		sector.dispatch(nj)
-		nj.atexit(functools.partial(continuation, sector, hold, iterator))
+		nj.atexit(functools.partial(continuation, log, sector, hold, iterator))
 	except StopIteration:
 		# Success unless a crash occurs.
+		log.write("[<- 🚧]\n")
 		hold.terminate()
 		hold.exit()
 		unit = processor.unit
@@ -100,6 +102,7 @@ def iomain(domain='system'):
 	# Prepare the entire package building factor targets and writing bytecode.
 	"""
 
+	log = sys.stdout
 	call = libio.context()
 	sector = call.sector
 	proc = sector.context.process
@@ -150,22 +153,23 @@ def iomain(domain='system'):
 	# XXX: relocate symbols to context intialization
 	local_symbols['fault:c-interfaces'] = [local_include_factor('posix'), local_include_factor('python')]
 
-	hold = libio.Processor()
+	log.write("[-> 🚧 %s]\n" %(str(args[0],)))
+	hold = libio.Processor() # temporary solution until this gets rewritten
 	sector.dispatch(hold)
 
 	# Initial job.
 	root, project, fc = roots[0]
-	cxn = mkconstruct(ctx, local_symbols, project_index, work, root, project, fc, rebuild)
+	cxn = mkconstruct(sys.stdout, ctx, local_symbols, project_index, work, root, project, fc, rebuild)
 	sector.dispatch(cxn)
 
 	# Chain subsequents.
 	seq = [
-		mkconstruct(ctx, local_symbols, project_index, work, root, project, fc, rebuild)
+		mkconstruct(sys.stdout, ctx, local_symbols, project_index, work, root, project, fc, rebuild)
 		for root, project, fc in roots[1:]
 	]
 	iseq = iter(seq)
 
-	cxn.atexit(functools.partial(continuation, sector, hold, iseq))
+	cxn.atexit(functools.partial(continuation, sys.stdout, sector, hold, iseq))
 
 def ioinit(unit):
 	s = libio.Sector()
@@ -182,10 +186,6 @@ def main(inv:process.Invocation) -> process.Exit:
 	"""
 	# ...
 	"""
-
-	import sdk.tools.python.bin.compile
-	import sdk.tools.llvm.library
-	import sdk.tools.host.library
 
 	spr = libio.system.Process.spawn(inv, libio.Unit, {'command':(ioinit,)}, 'root')
 	spr.boot(())

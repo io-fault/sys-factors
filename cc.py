@@ -89,7 +89,6 @@ def interpret_reference(index, factor, symbol, url):
 	# that should be connected in order to use the &symbol.
 	"""
 
-	print(url, index)
 	i = ri.parse(url)
 	rfactor = i.pop('fragment', None)
 	rproject_name = i['path'][-1]
@@ -173,9 +172,14 @@ class Construction(libio.Context):
 	def terminate(self, by=None):
 		# Manages the dispatching of processes,
 		# so termination is immediate.
+		p = self.c_project.information
+		itxt = p.icon.get('emoji', '')
+		self.log.write("[<- %s%s %s %d]\n" %(itxt and itxt+' ', p.name, p.identifier, self.failures))
+
 		self.exit()
 
 	def __init__(self,
+			log,
 			context,
 			symbols,
 			index,
@@ -185,6 +189,8 @@ class Construction(libio.Context):
 			reconstruct=False,
 			processors=4
 		):
+		self.log = log
+
 		self.reconstruct = reconstruct
 		self.failures = 0
 		self.exits = 0
@@ -210,6 +216,10 @@ class Construction(libio.Context):
 		super().__init__()
 
 	def actuate(self):
+		p = self.c_project.information
+		itxt = p.icon.get('emoji', '')
+		self.log.write("[-> %s%s %s %s]\n" %(itxt and itxt+' ', p.name, p.identifier, self.c_context.intention))
+
 		if self.reconstruct:
 			if self.reconstruct > 1:
 				self._filter = functools.partial(updated, never=True, cascade=True)
@@ -277,7 +287,7 @@ class Construction(libio.Context):
 			variants, mech = selection
 		else:
 			# No mechanism found.
-			sys.stdout.write("[!# WARNING: no mechanism set for %r factors]\n"%(factor.domain))
+			self.log.write("[!# WARNING: no mechanism set for %r factors]\n"%(factor.domain))
 			return
 
 		variants['name'] = factor.name
@@ -385,7 +395,7 @@ class Construction(libio.Context):
 		formatted = {str(target): f_target_path(target)}
 		printed_command = tuple(formatted.get(x, x) for x in map(str, cmd))
 		command_string = ' '.join(printed_command) + iostr
-		sys.stdout.write("[-> %s:%d %s]\n" %(fpath, pid, command_string))
+		self.log.write("[-> %s:%d %s]\n" %(fpath, pid, command_string))
 
 		self.sector.dispatch(sp)
 		sp.atexit(functools.partial(
@@ -413,9 +423,11 @@ class Construction(libio.Context):
 		typ, cmd, log = descriptor
 		pid, delta = processor.only
 		exit_code = delta.status
+		if exit_code is None:
+			exit_code = -0xFFFF
 
 		self.exits += 1
-		sys.stdout.write("[<- %s %s %d %d]\n" %(factor.absolute_path_string, cmd[0], pid, exit_code))
+		self.log.write("[<- %s %s %d %d]\n" %(factor.absolute_path_string, cmd[0], pid, exit_code))
 		if exit_code != 0:
 			self.failures += 1
 
@@ -427,7 +439,7 @@ class Construction(libio.Context):
 					_color + str(exit_code) + _normal,
 					str(duration)
 				)
-				print(prefix+message)
+				self.log.write(prefix+message+'\n')
 
 		l = ''
 		l += ('\n[Profile]\n')
@@ -540,7 +552,10 @@ class Construction(libio.Context):
 					self.failures += 1
 					pi_call = cmd[0]
 					pi_call_id = '.'.join((pi_call.__module__, pi_call.__name__))
-					print(factor.absolute_path_string, 'call (%s) raised' % (pi_call_id,), err.__class__.__name__, str(err))
+					error = '%s call (%s) raised ' % (factor.absolute_path_string, pi_call_id,)
+					error += err.__class__.__name__ + ': '
+					error += str(err) + '\n'
+					sys.stderr.write(error)
 
 					from traceback import format_exception
 					out = format_exception(err.__class__, err, err.__traceback__)
@@ -549,7 +564,7 @@ class Construction(libio.Context):
 
 				self.progress[factor] += 1
 			else:
-				print('unknown instruction', x)
+				self.log.write('unknown instruction %s\n' %(x,))
 
 		if self.progress[factor] >= len(self.tracking[factor][0]):
 			self.activity.add(factor)
