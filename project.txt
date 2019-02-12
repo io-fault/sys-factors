@@ -9,7 +9,7 @@
 /abstract/
 	Factor processing tools for materializing actionable tools.
 /icon/
-	- (emoji)`🛠`
+	- (emoji)`🚨`
 
 /versioning/
 	continuous
