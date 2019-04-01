@@ -10,7 +10,7 @@ import typing
 
 from fault.time import library as libtime
 from fault.routes import library as libroutes
-from fault.io import library as libio
+from fault.kernel import library as libkernel
 from fault.system import execution as libexec
 from fault.system import files
 from fault.internet import ri
@@ -159,7 +159,7 @@ def initial_factor_defines(factor, factorpath):
 		('FACTOR_PACKAGE', '.'.join(parts[:-1])),
 	]
 
-class Construction(libio.Context):
+class Construction(libkernel.Context):
 	"""
 	# Construction process manager. Maintains the set of target modules to construct and
 	# dispatches the work to be performed for completion in the appropriate order.
@@ -356,7 +356,7 @@ class Construction(libio.Context):
 			if self.continued is False:
 				# Consolidate loading of the next set of processors.
 				self.continued = True
-				self.ctx_enqueue_task(self.continuation)
+				self.enqueue(self.continuation)
 
 	def process_execute(self, instruction, f_target_path=(lambda x: str(x))):
 		factor, ins = instruction
@@ -388,7 +388,7 @@ class Construction(libio.Context):
 			ki = libexec.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
 			with open(stdin, 'rb') as ci, open(stdout, 'wb') as co:
 				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
-				sp = libio.Subprocess(pid)
+				sp = libkernel.Subprocess(pid)
 
 		fpath = factor.absolute_path_string
 		pidstr = str(pid)
@@ -397,7 +397,7 @@ class Construction(libio.Context):
 		command_string = ' '.join(printed_command) + iostr
 		self.log.write("[-> %s:%d %s]\n" %(fpath, pid, command_string))
 
-		self.sector.dispatch(sp)
+		self.xact_dispatch(sp)
 		sp.atexit(functools.partial(
 			self.process_exit,
 			start=libtime.now(),
@@ -460,7 +460,7 @@ class Construction(libio.Context):
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.
 			self.continued = True
-			self.ctx_enqueue_task(self.continuation)
+			self.enqueue(self.continuation)
 
 	def drain_process_queue(self):
 		"""
@@ -571,4 +571,4 @@ class Construction(libio.Context):
 
 			if self.continued is False:
 				self.continued = True
-				self.ctx_enqueue_task(self.continuation)
+				self.enqueue(self.continuation)

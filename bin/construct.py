@@ -13,7 +13,7 @@ from fault.system import process
 from fault.system import files
 from fault.routes import library as libroutes
 from fault.time import library as libtime
-from fault.io import library as libio
+from fault.kernel import library as libkernel
 
 from fault.project import library as libproject
 from fault.project import explicit
@@ -39,156 +39,133 @@ def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(
 
 	return ii
 
-def mkconstruct(log, context, symbols, projects, work, root, project, fc, rebuild, domain='system'):
-	assert libproject.enclosure(fc) == False # Resolved enclosure contents in the first pass.
+symbol="🚧"
 
-	Segment = libroutes.Segment.from_sequence
-	constraint = (project >> root)[1] # Path from project to factor selection.
-	path = (work.extend(project).extend(constraint))
-	factor = project.extend(constraint)
+class Execution(libkernel.Executable):
+	def mkconstruct(self, symbols, projects, work, root, project, fc, rebuild):
+		assert libproject.enclosure(fc) == False # Resolved enclosure contents in the first pass.
+		Segment = libroutes.Segment.from_sequence
 
-	context_name = getattr(fc.context, 'identifier', None)
-	wholes, composites = explicit.query(path)
-	wholes = dict(context.extrapolate(wholes.items()))
+		constraint = (project >> root)[1] # Path from project to factor selection.
+		path = (work.extend(project).extend(constraint))
+		factor = project.extend(constraint)
 
-	# Resolve relative references to absolute while maintaining set/sequence.
-	fc_infra = libproject.infrastructure(fc)
-	info = libproject.information(fc)
-	project = core.Project(fc, fc_infra, info)
+		context_name = getattr(fc.context, 'identifier', None)
+		wholes, composites = explicit.query(path)
+		wholes = dict(self.cxn_context.extrapolate(wholes.items()))
 
-	sr_composites = {
-		k: (v[0] or domain, v[1], {x: cc.resolve(fc_infra, symbols, x) for x in v[2]}, v[3])
-		for k, v in composites.items()
-	}
-	c_factors = [core.Target(project, Segment(k), *v) for k, v in sr_composites.items()]
+		# Resolve relative references to absolute while maintaining set/sequence.
+		fc_infra = libproject.infrastructure(fc)
+		info = libproject.information(fc)
+		project = core.Project(fc, fc_infra, info)
 
-	w_symbols = {}
-	w_factors = [
-		core.Target(project, Segment(k), v[0], v[1], w_symbols, *v[2:], variants={'name':k.identifier})
-		for k, v in wholes.items()
-	]
+		sr_composites = {
+			k: (v[0] or self.cxn_domain, v[1], {x: cc.resolve(fc_infra, symbols, x) for x in v[2]}, v[3])
+			for k, v in composites.items()
+		}
+		c_factors = [core.Target(project, Segment(k), *v) for k, v in sr_composites.items()]
 
-	return cc.Construction(
-		log,
-		context,
-		symbols,
-		projects,
-		project,
-		factor,
-		w_factors + c_factors,
-		processors = 16, # overcommit significantly
-		reconstruct = rebuild,
-	)
+		w_symbols = {}
+		w_factors = [
+			core.Target(project, Segment(k), v[0], v[1], w_symbols, *v[2:], variants={'name':k.identifier})
+			for k, v in wholes.items()
+		]
 
-def continuation(log, sector, hold, iterator, processor):
-	"""
-	# Called atexit in order to dispatch the next.
-	"""
+		return cc.Construction(
+			self.cxn_log,
+			self.cxn_context,
+			symbols,
+			projects,
+			project,
+			factor,
+			w_factors + c_factors,
+			processors = 16, # overcommit significantly
+			reconstruct = rebuild,
+		)
 
-	try:
-		nj = next(iterator)
-		sector.dispatch(nj)
-		nj.atexit(functools.partial(continuation, log, sector, hold, iterator))
-	except StopIteration:
-		# Success unless a crash occurs.
-		log.write("[<- 🚧]\n")
-		hold.terminate()
-		hold.exit()
-		unit = processor.unit
-		unit.result = 0
+	def xact_void(self, final):
+		"""
+		# Called atexit in order to dispatch the next.
+		"""
 
-def iomain(domain='system'):
-	"""
-	# Prepare the entire package building factor targets and writing bytecode.
-	"""
+		try:
+			nj = next(self.cxn_state)
+			self.xact_dispatch(libkernel.Transaction.create(nj))
+		except StopIteration:
+			# Success unless a crash occurs.
+			self.cxn_log.write("[<- %s]\n" %(symbol,))
+			self.exe_invocation.exit(0)
 
-	log = sys.stdout
-	call = libio.context()
-	sector = call.sector
-	proc = sector.context.process
+	def run(self):
+		"""
+		# Prepare the entire package building factor targets and writing bytecode.
+		"""
 
-	args = proc.invocation.args
-	env = os.environ
+		self.cxn_domain = 'system'
+		self.cxn_log = sys.stdout
+		args = self.exe_invocation.args
+		env = os.environ
 
-	rebuild = int(env.get('FPI_REBUILD', '0').strip())
-	ctx = cc.Context.from_environment()
-	work = files.Path.from_cwd()
-	factor_paths = [work]
+		rebuild = int(env.get('FPI_REBUILD', '0').strip())
+		ctx = self.cxn_context = cc.Context.from_environment()
+		work = files.Path.from_cwd()
+		factor_paths = [work]
 
-	# Collect the index for each directory.
-	project_index = {}
-	for dirr in factor_paths:
-		tc = (dirr / 'project-index.txt')
-		if not tc.exists():
-			continue
+		# Collect the index for each directory.
+		project_index = {}
+		for dirr in factor_paths:
+			tc = (dirr / 'project-index.txt')
+			if not tc.exists():
+				continue
 
-		tc = tc.get_text_content().split()
-		project_index[dirr] = dict(zip(tc[1::2], tc[0::2]))
-	project_index = libproject.FactorSet(project_index)
+			tc = tc.get_text_content().split()
+			project_index[dirr] = dict(zip(tc[1::2], tc[0::2]))
+		project_index = libproject.FactorSet(project_index)
 
-	# collect packages to prepare from positional parameters
-	rsegments = [libproject.factorsegment(x) for x in args[:1]]
+		# collect packages to prepare from positional parameters
+		rsegments = [libproject.factorsegment(x) for x in args[:1]]
 
-	# Join root segment with projects.
-	roots = []
-	for x in rsegments:
-		for y in libproject.tree(work, x):
-			roots.append((x,)+y)
+		# Join root segment with projects.
+		roots = []
+		for x in rsegments:
+			for y in libproject.tree(work, x):
+				roots.append((x,)+y)
 
-	# Separate options into named slots.
-	local_symbols = {}
-	selection = None
-	for x in args[1:]:
-		if x[:1] != '-':
-			selection = local_symbols[x] = []
-		else:
-			selection.append(x)
+		# Separate options into named slots.
+		local_symbols = {}
+		selection = None
+		for x in args[1:]:
+			if x[:1] != '-':
+				selection = local_symbols[x] = []
+			else:
+				selection.append(x)
 
-	# Parse options for each slot.
-	for k in list(local_symbols):
-		local_symbols[k] = options.parse(local_symbols[k])
+		# Parse options for each slot.
+		for k in list(local_symbols):
+			local_symbols[k] = options.parse(local_symbols[k])
 
-	local_symbols.update(ctx.symbols.items())
+		local_symbols.update(ctx.symbols.items())
 
-	# XXX: relocate symbols to context intialization
-	local_symbols['fault:c-interfaces'] = [local_include_factor('posix'), local_include_factor('python')]
+		# XXX: relocate symbols to context intialization
+		local_symbols['fault:c-interfaces'] = [local_include_factor('posix'), local_include_factor('python')]
 
-	log.write("[-> 🚧 %s]\n" %(str(args[0],)))
-	hold = libio.Processor() # temporary solution until this gets rewritten
-	sector.dispatch(hold)
+		self.cxn_log.write("[-> %s %s]\n" %(symbol, str(args[0],)))
 
-	# Initial job.
-	root, project, fc = roots[0]
-	cxn = mkconstruct(sys.stdout, ctx, local_symbols, project_index, work, root, project, fc, rebuild)
-	sector.dispatch(cxn)
+		# Initial job.
+		root, project, fc = roots[0]
+		cxn = self.mkconstruct(local_symbols, project_index, work, root, project, fc, rebuild)
+		self.xact_dispatch(libkernel.Transaction.create(cxn))
 
-	# Chain subsequents.
-	seq = [
-		mkconstruct(sys.stdout, ctx, local_symbols, project_index, work, root, project, fc, rebuild)
-		for root, project, fc in roots[1:]
-	]
-	iseq = iter(seq)
-
-	cxn.atexit(functools.partial(continuation, sys.stdout, sector, hold, iseq))
-
-def ioinit(unit):
-	s = libio.Sector()
-	s.subresource(unit)
-	unit.place(s, "bin", "main")
-
-	main_proc = libio.Call.partial(iomain)
-
-	enqueue = unit.context.enqueue
-	enqueue(s.actuate)
-	enqueue(functools.partial(s.dispatch, main_proc))
+		# Chain subsequents.
+		seq = self.cxn_sequence = [
+			self.mkconstruct(local_symbols, project_index, work, root, project, fc, rebuild)
+			for root, project, fc in roots[1:]
+		]
+		self.cxn_state = iter(seq)
 
 def main(inv:process.Invocation) -> process.Exit:
-	"""
-	# ...
-	"""
-
-	spr = libio.system.Process.spawn(inv, libio.Unit, {'command':(ioinit,)}, 'root')
-	spr.boot(())
+	exe = Execution(inv, __name__)
+	libkernel.system.spawn('root', [exe]).boot(exe.run)
 
 if __name__ == '__main__':
 	sys.dont_write_bytecode = True
