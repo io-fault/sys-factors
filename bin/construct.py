@@ -13,7 +13,9 @@ from fault.system import process
 from fault.system import files
 from fault.routes import library as libroutes
 from fault.time import library as libtime
-from fault.kernel import library as libkernel
+
+from fault.kernel import core as kcore
+from fault.kernel import system as ksystem
 
 from fault.project import library as libproject
 from fault.project import explicit
@@ -41,7 +43,7 @@ def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(
 
 symbol="🚧"
 
-class Execution(libkernel.Executable):
+class Execution(kcore.Executable):
 	def mkconstruct(self, symbols, projects, work, root, project, fc, rebuild):
 		assert libproject.enclosure(fc) == False # Resolved enclosure contents in the first pass.
 		Segment = libroutes.Segment.from_sequence
@@ -90,7 +92,7 @@ class Execution(libkernel.Executable):
 
 		try:
 			nj = next(self.cxn_state)
-			self.xact_dispatch(libkernel.Transaction.create(nj))
+			self.xact_dispatch(kcore.Transaction.create(nj))
 		except StopIteration:
 			# Success unless a crash occurs.
 			self.cxn_log.write("[<- %s]\n" %(symbol,))
@@ -154,7 +156,7 @@ class Execution(libkernel.Executable):
 		# Initial job.
 		root, project, fc = roots[0]
 		cxn = self.mkconstruct(local_symbols, project_index, work, root, project, fc, rebuild)
-		self.xact_dispatch(libkernel.Transaction.create(cxn))
+		self.xact_dispatch(kcore.Transaction.create(cxn))
 
 		# Chain subsequents.
 		seq = self.cxn_sequence = [
@@ -165,7 +167,7 @@ class Execution(libkernel.Executable):
 
 def main(inv:process.Invocation) -> process.Exit:
 	exe = Execution(inv, __name__)
-	libkernel.system.spawn('root', [exe]).boot(exe.run)
+	ksystem.spawn('root', [exe]).boot(exe.run)
 
 if __name__ == '__main__':
 	sys.dont_write_bytecode = True

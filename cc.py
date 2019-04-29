@@ -10,10 +10,12 @@ import typing
 
 from fault.time import library as libtime
 from fault.routes import library as libroutes
-from fault.kernel import library as libkernel
 from fault.system import execution as libexec
 from fault.system import files
 from fault.internet import ri
+
+from fault.kernel import core as kcore
+from fault.kernel import dispatch as kdispatch
 
 from . import graph
 from . import core
@@ -159,7 +161,7 @@ def initial_factor_defines(factor, factorpath):
 		('FACTOR_PACKAGE', '.'.join(parts[:-1])),
 	]
 
-class Construction(libkernel.Context):
+class Construction(kcore.Context):
 	"""
 	# Construction process manager. Maintains the set of target modules to construct and
 	# dispatches the work to be performed for completion in the appropriate order.
@@ -388,7 +390,7 @@ class Construction(libkernel.Context):
 			ki = libexec.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
 			with open(stdin, 'rb') as ci, open(stdout, 'wb') as co:
 				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
-				sp = libkernel.Subprocess(pid)
+				sp = kdispatch.Subprocess(pid)
 
 		fpath = factor.absolute_path_string
 		pidstr = str(pid)

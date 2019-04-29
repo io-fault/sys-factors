@@ -5,7 +5,6 @@ import os
 from .. import probe as module
 
 from fault.routes import library as libroutes
-from fault.kernel import library as libkernel
 
 def test_executables(test):
 	with libroutes.File.temporary() as td:
@@ -32,7 +31,6 @@ def test_executables(test):
 		test/found == {}
 
 def test_runtime(test):
-	test.fail("depends on libkernel.parallel()")
 	src = "#include <stdio.h>\nint main(int ac, char *av[]) {printf(\"test\\n\");return(0);}"
 	test/b'test\n' == module.runtime([], 'c', src, libraries=['c'])
 
@@ -40,7 +38,6 @@ def test_runtime(test):
 	test/None == module.runtime([], 'c', syntax_error)
 
 def test_includes(test):
-	test.fail("depends on libkernel.parallel()")
 	test/module.includes([], "c", ("fault/libc.h",)) == True
 	test/module.includes([], "c", ("fault/nosuchfile.h",)) == False
 
