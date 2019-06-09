@@ -43,7 +43,7 @@ def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(
 
 symbol="🚧"
 
-class Execution(kcore.Executable):
+class Application(kcore.Context):
 	def mkconstruct(self, symbols, projects, work, root, project, fc, rebuild):
 		assert libproject.enclosure(fc) == False # Resolved enclosure contents in the first pass.
 		Segment = libroutes.Segment.from_sequence
@@ -96,16 +96,16 @@ class Execution(kcore.Executable):
 		except StopIteration:
 			# Success unless a crash occurs.
 			self.cxn_log.write("[<- %s]\n" %(symbol,))
-			self.exe_invocation.exit(0)
+			self.executable.exe_invocation.exit(0)
 
-	def run(self):
+	def actuate(self):
 		"""
 		# Prepare the entire package building factor targets and writing bytecode.
 		"""
 
 		self.cxn_domain = 'system'
 		self.cxn_log = sys.stdout
-		args = self.exe_invocation.args
+		args = self.executable.exe_invocation.args
 		env = os.environ
 
 		rebuild = int(env.get('FPI_REBUILD', '0').strip())
@@ -166,8 +166,8 @@ class Execution(kcore.Executable):
 		self.cxn_state = iter(seq)
 
 def main(inv:process.Invocation) -> process.Exit:
-	exe = Execution(inv, __name__)
-	ksystem.spawn('root', [exe]).boot(exe.run)
+	ksystem.dispatch(inv, Application())
+	ksystem.control()
 
 if __name__ == '__main__':
 	sys.dont_write_bytecode = True
