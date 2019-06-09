@@ -11,7 +11,7 @@ from .. import cc
 
 from fault.system import process
 from fault.system import files
-from fault.routes import library as libroutes
+from fault.routes import types as routes
 from fault.time import library as libtime
 
 from fault.kernel import core as kcore
@@ -32,7 +32,7 @@ def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(
 
 	ii = core.Target(
 		include_project,
-		libroutes.Segment(None, ('include',)),
+		routes.Segment(None, ('include',)),
 		'source',
 		'library',
 		{},
@@ -46,7 +46,7 @@ symbol="🚧"
 class Application(kcore.Context):
 	def mkconstruct(self, symbols, projects, work, root, project, fc, rebuild):
 		assert libproject.enclosure(fc) == False # Resolved enclosure contents in the first pass.
-		Segment = libroutes.Segment.from_sequence
+		Segment = routes.Segment.from_sequence
 
 		constraint = (project >> root)[1] # Path from project to factor selection.
 		path = (work.extend(project).extend(constraint))

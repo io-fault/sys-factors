@@ -8,7 +8,7 @@ import importlib
 import operator
 
 from fault.hkp import library as libhkp
-from fault.routes import library as libroutes
+from fault.routes import types as routes
 from fault.project import library as libproject
 from fault.system import files
 from fault.system import python
@@ -61,7 +61,7 @@ class Project(object):
 		"""
 		# Return the factor path of the Project.
 		"""
-		return libroutes.Segment(None, (self.paths.root >> self.paths.project)[1])
+		return routes.Segment(None, (self.paths.root >> self.paths.project)[1])
 
 	@property
 	def route(self):
@@ -220,11 +220,11 @@ class Target(object):
 
 	def __init__(self,
 			project:(Project),
-			route:(libroutes.Segment),
+			route:(routes.Segment),
 			domain:(str),
 			type:(str),
 			symbols:(typing.Sequence[str]),
-			sources:(typing.Sequence[libroutes.Route]),
+			sources:(typing.Sequence[routes.Selector]),
 			parameters:(typing.Mapping)=None,
 			variants:(typing.Mapping)=None,
 		):

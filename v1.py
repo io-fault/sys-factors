@@ -6,7 +6,7 @@ import functools
 import typing
 import copy
 
-from fault.routes import library as libroutes
+from fault.routes import types as routes
 from fault.system import files
 
 from . import data
@@ -99,7 +99,7 @@ class Context(object):
 					# XXX: map to void domain indicating/warning about unprocessed factor?
 					continue
 
-				yield (libroutes.Segment(None, path + (stem,)), (domain, ftype, [f]))
+				yield (routes.Segment(None, path + (stem,)), (domain, ftype, [f]))
 
 	def language(self, extension):
 		"""

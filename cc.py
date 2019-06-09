@@ -9,7 +9,7 @@ import contextlib
 import typing
 
 from fault.time import library as libtime
-from fault.routes import library as libroutes
+from fault.routes import types as routes
 from fault.system import execution as libexec
 from fault.system import files
 from fault.internet import ri
@@ -107,7 +107,7 @@ def interpret_reference(index, factor, symbol, url):
 	project_url = product + rproject_name
 
 	project = core.Project(*index.select(project_url))
-	factor = libroutes.Segment.from_sequence(rfactor.split('.'))
+	factor = routes.Segment.from_sequence(rfactor.split('.'))
 	factor_dir = project.route.extend(factor.absolute)
 	from fault.project import explicit
 	ctx, fdata = explicit.struct.parse((factor_dir/'factor.txt').get_text_content())
