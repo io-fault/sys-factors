@@ -1,7 +1,6 @@
 """
 # Construction Context tests.
 """
-from fault.routes import library as libroutes
 from fault.system import files
 from fault.system import python
 

@@ -4,10 +4,10 @@
 import os
 from .. import probe as module
 
-from fault.routes import library as libroutes
+from fault.system import files
 
 def test_executables(test):
-	with libroutes.File.temporary() as td:
+	with files.Path.temporary() as td:
 		b = td / 'bin'
 		x = b / 'x'
 		x.init('file')
