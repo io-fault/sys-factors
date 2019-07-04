@@ -8,7 +8,7 @@ import collections
 import contextlib
 import typing
 
-from fault.time import library as libtime
+from fault.time import sysclock
 from fault.routes import types as routes
 from fault.system import execution as libexec
 from fault.system import files
@@ -402,7 +402,7 @@ class Construction(kcore.Context):
 		self.xact_dispatch(sp)
 		sp.atexit(functools.partial(
 			self.process_exit,
-			start=libtime.now(),
+			start=sysclock.now(),
 			descriptor=(typ, cmd, log),
 			factor=factor,
 			message=command_string,
@@ -434,7 +434,7 @@ class Construction(kcore.Context):
 			self.failures += 1
 
 			if message is not None:
-				duration = repr(start.measure(libtime.now()))
+				duration = repr(start.measure(sysclock.now()))
 				prefix = "%s: %d -> %s in %s\n\t" %(
 					_color + factor.absolute_path_string + _normal,
 					pid,
@@ -455,7 +455,7 @@ class Construction(kcore.Context):
 		l += ('/pid/\n\t%d\n' %(pid,))
 		l += ('/status/\n\t%s\n' %(str(exit_code),))
 		l += ('/start/\n\t%s\n' %(start.select('iso'),))
-		l += ('/stop/\n\t%s\n' %(libtime.now().select('iso'),))
+		l += ('/stop/\n\t%s\n' %(sysclock.now().select('iso'),))
 
 		log.store(l.encode('utf-8'), mode='ba')
 

@@ -12,7 +12,6 @@ from .. import cc
 from fault.system import process
 from fault.system import files
 from fault.routes import types as routes
-from fault.time import library as libtime
 
 from fault.kernel import core as kcore
 from fault.kernel import system as ksystem
