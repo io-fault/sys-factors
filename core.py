@@ -15,7 +15,7 @@ from fault.system import python
 
 from . import data
 
-fpi_addressing = libhkp.Hash('fnv1a_32', depth=1, length=2)
+fpi_addressing = libhkp.Hash('fnv1a_64', depth=1, length=2)
 
 def context_interface(path):
 	"""
