@@ -399,14 +399,20 @@ class Construction(kcore.Context):
 		command_string = ' '.join(printed_command) + iostr
 		self.log.write("[-> %s:%d %s]\n" %(fpath, pid, command_string))
 
-		self.xact_dispatch(sp)
-		sp.atexit(functools.partial(
+		# Quick compensation for atexit removal.
+		original_ft = sp.finish_termination
+		signal_exit = functools.partial(
 			self.process_exit,
 			start=sysclock.now(),
 			descriptor=(typ, cmd, log),
 			factor=factor,
 			message=command_string,
-		))
+		)
+		def override(*args, original=sp.finish_termination, callback=signal_exit, proc=sp):
+			original(*args)
+			callback(proc)
+		sp.finish_termination = override
+		self.xact_dispatch(sp)
 
 	def process_exit(self, processor,
 			start=None, factor=None, descriptor=None,
