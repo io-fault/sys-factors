@@ -171,15 +171,6 @@ class Construction(kcore.Context):
 	# performed by the target modules being built.
 	"""
 
-	def terminate(self, by=None):
-		# Manages the dispatching of processes,
-		# so termination is immediate.
-		p = self.c_project.information
-		itxt = p.icon.get('emoji', '')
-		self.log.write("[<- %s%s %s %d]\n" %(itxt and itxt+' ', p.name, p.identifier, self.failures))
-
-		self.exit()
-
 	def __init__(self,
 			log,
 			context,
@@ -192,6 +183,7 @@ class Construction(kcore.Context):
 			processors=4
 		):
 		self.log = log
+		self._end_of_factors = False
 
 		self.reconstruct = reconstruct
 		self.failures = 0
@@ -220,7 +212,7 @@ class Construction(kcore.Context):
 	def actuate(self):
 		p = self.c_project.information
 		itxt = p.icon.get('emoji', '')
-		self.log.write("[-> %s%s %s %s]\n" %(itxt and itxt+' ', p.name, p.identifier, self.c_context.intention))
+		self.log.write("[<> %s%s %s %s]\n" %(itxt and itxt+' ', p.name, p.identifier, self.c_context.intention))
 
 		if self.reconstruct:
 			if self.reconstruct > 1:
@@ -256,7 +248,12 @@ class Construction(kcore.Context):
 			for x in work:
 				self.collect(x, reqs, deps.get(x, ()))
 		except StopIteration:
-			self.terminate()
+			self._end_of_factors = True
+			self.xact_exit_if_empty()
+
+	def xact_void(self, final):
+		if self._end_of_factors:
+			self.finish_termination()
 
 	def collect(self, factor, requirements, dependents=()):
 		"""
@@ -380,6 +377,10 @@ class Construction(kcore.Context):
 		assert typ in ('execute', 'execute-redirection', 'execute-stdio')
 
 		strcmd = tuple(map(str, cmd))
+		fpath = factor.absolute_path_string
+		formatted = {str(target): f_target_path(target)}
+		printed_command = tuple(formatted.get(x, x) for x in map(str, cmd))
+		command_string = ' '.join(printed_command) + iostr
 
 		pid = None
 		with log.open('wb') as f:
@@ -389,53 +390,35 @@ class Construction(kcore.Context):
 
 			ki = libexec.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
 			with open(stdin, 'rb') as ci, open(stdout, 'wb') as co:
-				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
-				sp = kdispatch.PSubprocess(pid)
+				pid = ki.spawn(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
+				sp = kdispatch.Subprocess(libexec.reap, {
+					pid: (sysclock.now(), typ, cmd, log, factor, command_string)
+				})
+				xact = kcore.Transaction.create(sp)
 
-		fpath = factor.absolute_path_string
-		pidstr = str(pid)
-		formatted = {str(target): f_target_path(target)}
-		printed_command = tuple(formatted.get(x, x) for x in map(str, cmd))
-		command_string = ' '.join(printed_command) + iostr
-		self.log.write("[-> %s:%d %s]\n" %(fpath, pid, command_string))
+		self.log.write("[-> (%s/system/%d) %s]\n" %(fpath, pid, command_string))
+		self.xact_dispatch(xact)
 
-		# Quick compensation for atexit removal.
-		original_ft = sp.finish_termination
-		signal_exit = functools.partial(
-			self.process_exit,
-			start=sysclock.now(),
-			descriptor=(typ, cmd, log),
-			factor=factor,
-			message=command_string,
-		)
-		def override(*args, original=sp.finish_termination, callback=signal_exit, proc=sp):
-			original(*args)
-			callback(proc)
-		sp.finish_termination = override
-		self.xact_dispatch(sp)
+	def xact_exit(self, xact):
+		sp = xact.xact_context
+		for pid, params, status in sp.sp_report():
+			self.process_exit(pid, status, *params)
 
-	def process_exit(self, processor,
-			start=None, factor=None, descriptor=None,
-			message=None,
+	def process_exit(self,
+			pid, delta, start, typ, cmd, log, factor, message,
 			_color='\x1b[38;5;1m',
-			_pid='\x1b[38;5;2m',
 			_normal='\x1b[0m'
 		):
-		assert factor is not None
-		assert descriptor is not None
-
 		self.progress[factor] += 1
 		self.process_count -= 1
 		self.activity.add(factor)
 
-		typ, cmd, log = descriptor
-		pid, delta = processor.only
 		exit_code = delta.status
 		if exit_code is None:
 			exit_code = -0xFFFF
 
 		self.exits += 1
-		self.log.write("[<- %s %s %d %d]\n" %(factor.absolute_path_string, cmd[0], pid, exit_code))
+		self.log.write("[<- (%s/system/%d) %d %s]\n" %(factor.absolute_path_string, pid, exit_code, cmd[0]))
 		if exit_code != 0:
 			self.failures += 1
 

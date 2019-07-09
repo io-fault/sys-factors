@@ -40,8 +40,6 @@ def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(
 
 	return ii
 
-symbol="🚧"
-
 class Application(kcore.Context):
 	def mkconstruct(self, symbols, projects, work, root, project, fc, rebuild):
 		assert libproject.enclosure(fc) == False # Resolved enclosure contents in the first pass.
@@ -94,7 +92,6 @@ class Application(kcore.Context):
 			self.xact_dispatch(kcore.Transaction.create(nj))
 		except StopIteration:
 			# Success unless a crash occurs.
-			self.cxn_log.write("[<- %s]\n" %(symbol,))
 			self.executable.exe_invocation.exit(0)
 
 	def actuate(self):
@@ -150,7 +147,7 @@ class Application(kcore.Context):
 		# XXX: relocate symbols to context intialization
 		local_symbols['fault:c-interfaces'] = [local_include_factor('posix'), local_include_factor('python')]
 
-		self.cxn_log.write("[-> %s %s]\n" %(symbol, str(args[0],)))
+		self.cxn_log.write("[<> construct %s]\n" %(str(args[0],)))
 
 		# Initial job.
 		root, project, fc = roots[0]
