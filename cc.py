@@ -390,7 +390,7 @@ class Construction(kcore.Context):
 			ki = libexec.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
 			with open(stdin, 'rb') as ci, open(stdout, 'wb') as co:
 				pid = ki(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
-				sp = kdispatch.Subprocess(pid)
+				sp = kdispatch.PSubprocess(pid)
 
 		fpath = factor.absolute_path_string
 		pidstr = str(pid)
