@@ -35,7 +35,7 @@ class Context(Protocol):
 	"""
 	# Directory representing a Construction Context for performing builds.
 
-	# A Construction Context is the primary focus of &..development.
+	# A Construction Context is the primary focus of &..factors.
 	# It provides the adaptors necessary for processing Factors for
 	# use by the Context's target system for a particular intention.
 	"""
