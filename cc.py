@@ -300,14 +300,6 @@ class Construction(kcore.Context):
 		for src_params, (vl, key, locations) in variant_set:
 			v = dict(vl)
 
-			# The context parameters for rendering FPI.
-			b_src_params = [
-				('F_SYSTEM', v.get('system', 'void')),
-				('F_INTENTION', intention),
-				('F_FACTOR_DOMAIN', factor.domain),
-				('F_FACTOR_TYPE', factor.type),
-			] + src_params + common_src_params
-
 			if not mech.integrates():
 				# For mechanisms that do not specify reductions,
 				# the transformed set is the factor.
@@ -316,7 +308,7 @@ class Construction(kcore.Context):
 
 			build = core.Build((
 				ctx, mech, factor, reqs, dependents,
-				v, locations, b_src_params, envpath
+				v, locations, src_params + common_src_params, envpath
 			))
 			xf = list(mech.transform(build, xfilter))
 

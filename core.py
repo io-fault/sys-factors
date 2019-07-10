@@ -683,3 +683,7 @@ class Build(tuple):
 			g = ctx.groups(x.project.environment)
 			path = x.integral(g, v)
 			yield path, x
+
+	@property
+	def system(self):
+		return self.variants.get('system', 'void')
