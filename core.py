@@ -669,9 +669,9 @@ class Build(tuple):
 	def required(self, domain, ftype):
 		ctx = self.context
 		needed_variants = ctx.variants(domain, ftype)
+		needed_variants.pop('name', None)
 
 		reqs = self.requirements.get((domain, ftype), ())
-
 		srcvars = ctx.index['source']['variants']
 		for x in reqs:
 			if isinstance(x, SystemFactor):
