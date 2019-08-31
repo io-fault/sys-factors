@@ -196,9 +196,15 @@ def context(route, intention, reference, symbols, options):
 		x.init('directory')
 
 	# Initialize entry point for context.
-	initial = __package__.split('.')[0]
-	kit = sys.modules[initial]
-	pypath = os.path.dirname(os.path.dirname(kit.__file__))
+
+	if 'PYTHONPATH' in os.environ:
+		pypath = os.environ['PYTHONPATH']
+	else:
+		depth = __package__.count('.')
+		pypath = __file__
+		for x in range(depth+2):
+			pypath = os.path.dirname(pypath)
+
 	pypath = '\nfpath = ' + repr(pypath)
 
 	dev = (ctx / 'execute')
