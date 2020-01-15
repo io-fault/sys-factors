@@ -64,6 +64,10 @@ class Project(object):
 		return routes.Segment(None, (self.paths.root >> self.paths.project)[1])
 
 	@property
+	def path(self):
+		return '.'.join(self.segment.absolute)
+
+	@property
 	def route(self):
 		return self.paths.project
 
