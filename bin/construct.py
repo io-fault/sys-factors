@@ -106,8 +106,15 @@ class Application(kcore.Context):
 
 		rebuild = int(env.get('FPI_REBUILD', '0').strip())
 		ctx = self.cxn_context = cc.Context.from_environment()
-		work = files.Path.from_cwd()
-		factor_paths = [work]
+
+		try:
+			work = files.Path.from_absolute(os.environ['PWD'])
+		except:
+			work = files.Path.from_cwd()
+
+		factor_paths = [work] + [
+			files.Path.from_absolute(x) for x in env.get('FACTORPATH', '').split(':')
+		]
 
 		# Collect the index for each directory.
 		project_index = {}
@@ -147,7 +154,7 @@ class Application(kcore.Context):
 		# XXX: relocate symbols to context intialization
 		local_symbols['fault:c-interfaces'] = [local_include_factor('posix'), local_include_factor('python')]
 
-		self.cxn_log.write("[<> construct %s]\n" %(str(args[0],)))
+		self.cxn_log.write("[<> construct %s]\n" %(str(args[0]),))
 
 		# Initial job.
 		root, project, fc = roots[0]
