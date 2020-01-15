@@ -279,16 +279,15 @@ class Construction(kcore.Context):
 		reqs = requirements.get(factor, ())
 		intention = ctx.intention
 		f_name = factor.absolute_path_string
-
 		common_src_params = initial_factor_defines(factor, f_name)
 		selection = ctx.select(factor.domain)
-		if selection is not None:
-			variants, mech = selection
-		else:
+
+		if selection is None:
 			# No mechanism found.
 			self.log.write("[!# WARNING: no mechanism set for %r factors]\n"%(factor.domain))
 			return
 
+		variants, mech = selection
 		variants['name'] = factor.name
 		variant_set = factor.link(variants, ctx, mech, reqs, dependents)
 
