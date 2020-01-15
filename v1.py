@@ -152,6 +152,8 @@ class Context(object):
 		"""
 		domain, *start = prefix.split('/')
 		variants, cwd = self.select(domain)
+		cwd = cwd.descriptor
+
 		for key in start:
 			cwd = cwd[key]
 		for key in path.split('/'):
