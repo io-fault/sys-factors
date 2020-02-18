@@ -8,7 +8,7 @@ import importlib
 import operator
 
 from fault.hkp import library as libhkp
-from fault.routes import types as routes
+from fault import routes
 from fault.project import library as libproject
 from fault.system import files
 from fault.system import python
@@ -61,7 +61,7 @@ class Project(object):
 		"""
 		# Return the factor path of the Project.
 		"""
-		return routes.Segment(None, (self.paths.root >> self.paths.project)[1])
+		return self.paths.project.segment(self.paths.root)
 
 	@property
 	def path(self):
@@ -74,11 +74,9 @@ class Project(object):
 	@property
 	def product(self):
 		"""
-		# The route to the parent directory of the context, category, or project.
+		# Path to the product directory containing the project.
 		"""
-		p = self.paths
-		base = p.context or p.category or p.project
-		return base.container
+		return self.paths.root
 
 	@property
 	def environment(self):
@@ -210,7 +208,7 @@ class Target(object):
 
 	@property
 	def absolute(self):
-		return (self.project.segment.extend(self.route))
+		return (self.project.segment + self.route)
 
 	@property
 	def absolute_path_string(self):
@@ -275,7 +273,7 @@ class Target(object):
 		"""
 		# Factor build cache directory.
 		"""
-		p = self.project.paths.project.extend(self.route)
+		p = self.project.paths.project + self.route
 		if p.is_directory():
 			return p / self.default_cache_name
 		else:
@@ -315,7 +313,7 @@ class Target(object):
 
 		i = libproject.integrals(self.project.route, self.route)
 		out = libproject.compose_integral_path(variants, groups=groups)
-		out = i.extend(out).suffix('.i')
+		out = (i + out).suffix('.i')
 
 		return vl, key, {
 			'integral': out,
@@ -352,7 +350,7 @@ class Target(object):
 
 		i = libproject.integrals(self.project.route, self.route)
 		path = libproject.compose_integral_path(variants, groups=groups)
-		i = i.extend(path)
+		i += path
 
 		return i.suffix('.i')
 

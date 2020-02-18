@@ -9,15 +9,16 @@ from .. import core
 from .. import options
 from .. import cc
 
-from fault.system import process
+from fault import routes
 from fault.system import files
-from fault.routes import types as routes
 
 from fault.kernel import core as kcore
 from fault.kernel import system as ksystem
 
 from fault.project import library as libproject
 from fault.project import explicit
+
+from fault.system import process
 
 def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(__file__) ** 3)):
 	include_dir = (root / project / 'include')
@@ -35,7 +36,7 @@ def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(
 		'source',
 		'library',
 		{},
-		[src.__class__(src, (src>>x)[1]) for x in src.tree()[1]],
+		[src.__class__(src, x.segment(src)) for x in src.tree()[1]],
 	)
 
 	return ii
@@ -54,14 +55,13 @@ class Application(kcore.Context):
 		return Class(work, [factors], symbols)
 
 	def mkconstruct(self, symbols, projects, work, root, project, fc, rebuild):
-		assert libproject.enclosure(fc) == False # Resolved enclosure contents in the first pass.
+		assert fc.enclosure == False # Resolved enclosure contents in the first pass.
 		Segment = routes.Segment.from_sequence
 
-		constraint = (project >> root)[1] # Path from project to factor selection.
-		path = (work.extend(project).extend(constraint))
-		factor = project.extend(constraint)
+		constraint = root.segment(project)
+		path = work//project//constraint
+		factor = project//constraint
 
-		context_name = getattr(fc.context, 'identifier', None)
 		wholes, composites = explicit.query(path)
 		wholes = dict(self.cxn_context.extrapolate(wholes.items()))
 
@@ -74,11 +74,11 @@ class Application(kcore.Context):
 			k: (v[0] or self.cxn_domain, v[1], {x: cc.resolve(fc_infra, symbols, x) for x in v[2]}, v[3])
 			for k, v in composites.items()
 		}
-		c_factors = [core.Target(project, Segment(k), *v) for k, v in sr_composites.items()]
+		c_factors = [core.Target(project, k, *v) for k, v in sr_composites.items()]
 
 		w_symbols = {}
 		w_factors = [
-			core.Target(project, Segment(k), v[0], v[1], w_symbols, *v[2:], variants={'name':k.identifier})
+			core.Target(project, k, v[0], v[1], w_symbols, *v[2:], variants={'name':k.identifier})
 			for k, v in wholes.items()
 		]
 

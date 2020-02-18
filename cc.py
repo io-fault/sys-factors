@@ -9,10 +9,10 @@ import contextlib
 import typing
 
 from fault.time import sysclock
-from fault.routes import types as routes
 from fault.system import execution as libexec
 from fault.system import files
 from fault.internet import ri
+from fault import routes
 
 from fault.kernel import core as kcore
 from fault.kernel import dispatch as kdispatch
@@ -108,7 +108,7 @@ def interpret_reference(index, factor, symbol, url):
 
 	project = core.Project(*index.select(project_url))
 	factor = routes.Segment.from_sequence(rfactor.split('.'))
-	factor_dir = project.route.extend(factor.absolute)
+	factor_dir = project.route // factor
 	from fault.project import explicit
 	ctx, fdata = explicit.struct.parse((factor_dir/'factor.txt').get_text_content())
 
@@ -292,7 +292,7 @@ class Construction(kcore.Context):
 		variant_set = factor.link(variants, ctx, mech, reqs, dependents)
 
 		# Subfactor of c_factor (selected path)
-		subfactor = factor.absolute in self.c_factor
+		subfactor = (factor.project.segment == self.c_factor)
 		xfilter = functools.partial(self._filter, subfactor=subfactor)
 		envpath = factor.project.environment
 
@@ -385,7 +385,7 @@ class Construction(kcore.Context):
 				sp = kdispatch.Subprocess(libexec.reap, {
 					pid: (sysclock.now(), typ, cmd, log, factor, command_string)
 				})
-				xact = kcore.Transaction.create(sp)
+			xact = kcore.Transaction.create(sp)
 
 		self.log.write("[-> (%s/system/%d) %s]\n" %(fpath, pid, command_string))
 		self.xact_dispatch(xact)
