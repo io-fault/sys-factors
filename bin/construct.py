@@ -41,6 +41,18 @@ def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(
 	return ii
 
 class Application(kcore.Context):
+	def __init__(self, work, factors, symbols, domain='system'):
+		self.cxn_work_dir = work # Product Directory
+		self.cxn_factors = factors
+		self.cxn_local_symbols = symbols
+		self.cxn_domain = domain
+
+	@classmethod
+	def from_command(Class, arguments):
+		work, factors, *symbols = arguments
+		work = files.Path.from_absolute(work)
+		return Class(work, [factors], symbols)
+
 	def mkconstruct(self, symbols, projects, work, root, project, fc, rebuild):
 		assert libproject.enclosure(fc) == False # Resolved enclosure contents in the first pass.
 		Segment = routes.Segment.from_sequence
@@ -99,18 +111,15 @@ class Application(kcore.Context):
 		# Prepare the entire package building factor targets and writing bytecode.
 		"""
 
-		self.cxn_domain = 'system'
 		self.cxn_log = sys.stdout
-		args = self.executable.exe_invocation.args
 		env = os.environ
 
 		rebuild = int(env.get('FPI_REBUILD', '0').strip())
 		ctx = self.cxn_context = cc.Context.from_environment()
 
-		try:
-			work = files.Path.from_absolute(os.environ['PWD'])
-		except:
-			work = files.Path.from_cwd()
+		work = self.cxn_work_dir
+		w = env['PWD'] = str(work)
+		os.chdir(w)
 
 		factor_paths = [work] + [
 			files.Path.from_absolute(x) for x in env.get('FACTORPATH', '').split(':')
@@ -128,7 +137,7 @@ class Application(kcore.Context):
 		project_index = libproject.FactorSet(project_index)
 
 		# collect packages to prepare from positional parameters
-		rsegments = [libproject.factorsegment(x) for x in args[:1]]
+		rsegments = [libproject.factorsegment(x) for x in self.cxn_factors]
 
 		# Join root segment with projects.
 		roots = []
@@ -139,7 +148,7 @@ class Application(kcore.Context):
 		# Separate options into named slots.
 		local_symbols = {}
 		selection = None
-		for x in args[1:]:
+		for x in self.cxn_local_symbols:
 			if x[:1] != '-':
 				selection = local_symbols[x] = []
 			else:
@@ -154,7 +163,7 @@ class Application(kcore.Context):
 		# XXX: relocate symbols to context intialization
 		local_symbols['fault:c-interfaces'] = [local_include_factor('posix'), local_include_factor('python')]
 
-		self.cxn_log.write("[<> construct %s]\n" %(str(args[0]),))
+		self.cxn_log.write("[<> construct %s]\n" %(str(self.cxn_factors[0]),))
 
 		# Initial job.
 		root, project, fc = roots[0]
@@ -169,7 +178,11 @@ class Application(kcore.Context):
 		self.cxn_state = iter(seq)
 
 def main(inv:process.Invocation) -> process.Exit:
-	ksystem.dispatch(inv, Application())
+	inv.imports([
+		'FPI_REBUILD',
+		'FACTORPATH',
+	])
+	ksystem.dispatch(inv, Application.from_command(inv.args))
 	ksystem.control()
 
 if __name__ == '__main__':
