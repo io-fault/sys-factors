@@ -22,7 +22,7 @@ from fault.system import process
 
 def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(__file__) ** 3)):
 	include_dir = (root / project / 'include')
-	src = include_dir / 'src'
+	src = (include_dir / 'src').delimit()
 	include_fc = libproject.factorcontext(libproject.identify_filesystem_context(include_dir))
 	include_project = core.Project(
 		include_fc,
@@ -36,7 +36,7 @@ def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(
 		'source',
 		'library',
 		{},
-		[src.__class__(src, x.segment(src)) for x in src.tree()[1]],
+		src.tree()[1],
 	)
 
 	return ii
