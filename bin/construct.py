@@ -129,7 +129,7 @@ class Application(kcore.Context):
 		project_index = {}
 		for dirr in factor_paths:
 			tc = (dirr / 'project-index.txt')
-			if not tc.exists():
+			if tc.fs_type() == 'void':
 				continue
 
 			tc = tc.get_text_content().split()

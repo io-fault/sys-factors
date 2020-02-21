@@ -85,7 +85,7 @@ class Project(object):
 		"""
 
 		current = self.product.container
-		while not (current/'.environment').exists():
+		while (current/'.environment').fs_type() == 'void':
 			current = current.container
 			if str(current) == '/':
 				break
@@ -274,7 +274,7 @@ class Target(object):
 		# Factor build cache directory.
 		"""
 		p = self.project.paths.project + self.route
-		if p.is_directory():
+		if p.fs_type() == 'directory':
 			return p / self.default_cache_name
 		else:
 			return p.container / self.default_cache_name
@@ -313,7 +313,7 @@ class Target(object):
 
 		i = libproject.integrals(self.project.route, self.route)
 		out = libproject.compose_integral_path(variants, groups=groups)
-		out = (i + out).suffix('.i')
+		out = (i + out).suffix_filename('.i')
 
 		return vl, key, {
 			'integral': out,
@@ -352,7 +352,7 @@ class Target(object):
 		path = libproject.compose_integral_path(variants, groups=groups)
 		i += path
 
-		return i.suffix('.i')
+		return i.suffix_filename('.i')
 
 	def formats(self, mechanism, dependents):
 		"""
@@ -480,7 +480,7 @@ class Mechanism(object):
 				emitted.add(d)
 
 		for x in emitted:
-			if not x.exists():
+			if x.fs_type() == 'void':
 				yield ('directory', None, None, (None, x))
 
 	def adaption(self, build, domain, source, phase='transformations'):

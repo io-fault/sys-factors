@@ -58,7 +58,7 @@ def search(
 
 		for x in ws:
 			xr = r/x
-			if xr.exists():
+			if xr.fs_type() != 'void':
 				rob[x] = xr
 				removed.add(x)
 

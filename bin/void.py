@@ -15,7 +15,7 @@ def measure_source(route):
 	h = hashlib.new('sha256', b'')
 	depth = collections.Counter()
 
-	with open(str(route), 'rb') as f:
+	with route.fs_open('rb') as f:
 		continued = True
 		while continued:
 			buf = f.read(2048)

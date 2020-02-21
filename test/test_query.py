@@ -10,7 +10,7 @@ def test_executables(test):
 	with files.Path.temporary() as td:
 		b = td / 'bin'
 		x = b / 'x'
-		x.init('file')
+		x.fs_init()
 
 		p = os.environ['PATH']
 		os.environ['PATH'] = str(b)

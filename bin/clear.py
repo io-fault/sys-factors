@@ -12,10 +12,10 @@ default_removals = ('__f-int__', '__f-cache__', '__f_cache__')
 def clear_set(names, route):
 	for x in names:
 		p = (route / x)
-		if p.exists():
+		if p.fs_type() != 'void':
 			path = str(p)
 			sys.stderr.write('- %s/\n' %(str(p),))
-			#p.void()
+			#p.fs_void()
 
 def clear_tree(names, routes):
 	q = collections.deque(routes)

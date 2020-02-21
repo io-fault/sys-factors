@@ -8,10 +8,10 @@ import pickle
 from fault.system import files
 
 def load(route, _load=pickle.loads):
-	return _load(route.load())
+	return _load(route.fs_load())
 
 def store(route, data, _dump=pickle.dumps):
-	return route.store(_dump(data))
+	return route.fs_store(_dump(data))
 
 def update_named_mechanism(route:files.Path, name:str, mechanism):
 	"""
@@ -27,7 +27,7 @@ def update_named_mechanism(route:files.Path, name:str, mechanism):
 		# The dictionary to set as the mechanism's content.
 	"""
 
-	if route.exists():
+	if route.fs_type() != 'void':
 		stored = load(route)
 	else:
 		stored = {}

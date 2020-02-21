@@ -53,7 +53,7 @@ def updated(outputs, inputs, never=False, cascade=False, subfactor=True):
 
 	olm = None
 	for output in outputs:
-		if not output.exists():
+		if output.fs_type() == 'void':
 			# No such object, not updated.
 			return False
 		lm = output.get_last_modified()
@@ -64,7 +64,7 @@ def updated(outputs, inputs, never=False, cascade=False, subfactor=True):
 	# to perform the input checks.
 
 	for x in inputs:
-		if not x.exists() or x.get_last_modified() > olm:
+		if x.fs_type() == 'void' or x.get_last_modified() > olm:
 			# rebuild if any output is older than any source.
 			return False
 
@@ -348,20 +348,22 @@ class Construction(kcore.Context):
 				self.continued = True
 				self.enqueue(self.continuation)
 
+	devnull = files.Path.from_absolute(os.devnull)
+
 	def process_execute(self, instruction, f_target_path=(lambda x: str(x))):
 		factor, ins = instruction
 		typ, cmd, log, io, *tail = ins
 		target = io[1]
 
-		stdout = stdin = os.devnull
+		stdout = stdin = self.devnull
 
 		if typ == 'execute-stdio':
-			stdout = str(io[1])
-			stdin = str(io[0][0]) # Catenate for integrations?
-			iostr = ' <' + str(stdin) + ' >' + stdout
+			stdout = io[1]
+			stdin = io[0][0] # Catenate for integrations?
+			iostr = ' <' + str(stdin) + ' >' + str(stdout)
 		elif typ == 'execute-redirection':
-			stdout = str(io[1])
-			iostr = ' >' + stdout
+			stdout = io[1]
+			iostr = ' >' + str(stdout)
 		else:
 			iostr = ''
 
@@ -374,17 +376,18 @@ class Construction(kcore.Context):
 		command_string = ' '.join(printed_command) + iostr
 
 		pid = None
-		with log.open('wb') as f:
+		with log.fs_open('wb') as f:
 			f.write(b'[Command]\n')
 			f.write(' '.join(strcmd).encode('utf-8'))
 			f.write(b'\n\n[Standard Error]\n')
 
 			ki = libexec.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
-			with open(stdin, 'rb') as ci, open(stdout, 'wb') as co:
-				pid = ki.spawn(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
-				sp = kdispatch.Subprocess(libexec.reap, {
-					pid: (sysclock.now(), typ, cmd, log, factor, command_string)
-				})
+			with stdin.fs_open('rb') as ci:
+				with stdout.fs_open('wb') as co:
+					pid = ki.spawn(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
+					sp = kdispatch.Subprocess(libexec.reap, {
+						pid: (sysclock.now(), typ, cmd, log, factor, command_string)
+					})
 			xact = kcore.Transaction.create(sp)
 
 		self.log.write("[-> (%s/system/%d) %s]\n" %(fpath, pid, command_string))
@@ -437,7 +440,7 @@ class Construction(kcore.Context):
 		l += ('/start/\n\t%s\n' %(start.select('iso'),))
 		l += ('/stop/\n\t%s\n' %(sysclock.now().select('iso'),))
 
-		log.store(l.encode('utf-8'), mode='ba')
+		log.fs_store(l.encode('utf-8'), mode='ba')
 
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.
@@ -517,19 +520,19 @@ class Construction(kcore.Context):
 			if typ in ('execute', 'execute-redirection', 'execute-stdio'):
 				self.command_queue.append((factor, x))
 			elif typ == 'directory':
-				tail[0][1].init('directory')
+				tail[0][1].fs_mkdir()
 
 				self.progress[factor] += 1
 			elif typ == 'link':
 				src, dst = tail[0]
-				dst.link(src)
+				dst.fs_link_relative(src)
 
 				self.progress[factor] += 1
 			elif typ == 'call':
 				try:
 					cmd[0](*cmd[1:])
-					if logfile.exists():
-						logfile.void()
+					if logfile.fs_type() != 'void':
+						logfile.fs_void()
 				except BaseException as err:
 					self.failures += 1
 					pi_call = cmd[0]
@@ -541,8 +544,10 @@ class Construction(kcore.Context):
 
 					from traceback import format_exception
 					out = format_exception(err.__class__, err, err.__traceback__)
-					logfile.store('[Exception]\n#!/traceback\n\t', 'w')
-					logfile.store('\t'.join(out).encode('utf-8'), 'ba')
+
+					heading = b'[Exception]\n#!/traceback\n\t'
+					heading += '\t'.join(out).encode('utf-8')
+					logfile.fs_store(heading)
 
 				self.progress[factor] += 1
 			else:

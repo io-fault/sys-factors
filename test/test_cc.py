@@ -36,13 +36,13 @@ def test_updated(test):
 	test/module.updated([of], [sf], None) == False
 
 	# object older than source
-	of.init('file')
-	sf.init('file')
+	of.fs_init()
+	sf.fs_init()
 	of.set_last_modified(sf.get_last_modified().rollback(second=10))
 	test/module.updated([of], [sf], None) == False
 
-	of.void()
-	of.init('file')
+	of.fs_void()
+	of.fs_init()
 	of.set_last_modified(sf.get_last_modified().elapse(second=10))
 	test/module.updated([of], [sf], None) == True
 

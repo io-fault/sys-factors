@@ -9,7 +9,6 @@ import collections
 
 from .. import cc
 
-from fault.system import libfactor
 from fault.system import python
 
 if __name__ == '__main__':
@@ -33,11 +32,11 @@ if __name__ == '__main__':
 		files = logs.tree()[1]
 		for logfile in files:
 			sys.stdout.write('[' + str(logfile) + ']\n')
-			if not logfile.exists():
+			if logfile.fs_type() == 'void':
 				sys.stdout.write('! ERROR: File does not exist.\n')
 				continue
 
-			with logfile.open('rb') as f:
+			with logfile.fs_open('rb') as f:
 				log = f.read()
 				if log:
 					sys.stdout.buffer.write(log)

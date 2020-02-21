@@ -193,7 +193,7 @@ def context(route, intention, reference, symbols, options):
 	pylib = lib / 'python'
 
 	for x in mechdir, lib, pylib, syms:
-		x.init('directory')
+		x.fs_mkdir()
 
 	# Initialize entry point for context.
 
@@ -208,11 +208,11 @@ def context(route, intention, reference, symbols, options):
 	pypath = '\nfpath = ' + repr(pypath)
 
 	dev = (ctx / 'execute')
-	dev.init('file')
+	dev.fs_init()
 	src = ep_template % (
 		repr(__package__ + '.interface').encode('utf-8'),
 	)
-	dev.store(b'#!' + sys.executable.encode('utf-8') + pypath.encode('utf-8') + src)
+	dev.fs_store(b'#!' + sys.executable.encode('utf-8') + pypath.encode('utf-8') + src)
 	os.chmod(str(dev), 0o744)
 
 	if reference is not None:
@@ -223,7 +223,7 @@ def context(route, intention, reference, symbols, options):
 	coredata = skeleton(intention)
 	coredata['context']['options'] = options
 	corefile = mechdir / 'core'
-	corefile.store(pickle.dumps({'root': coredata}))
+	corefile.fs_store(pickle.dumps({'root': coredata}))
 
 	materialize_support_project(pylib / 'f_intention', 'intention')
 
