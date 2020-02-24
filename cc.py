@@ -56,7 +56,7 @@ def updated(outputs, inputs, never=False, cascade=False, subfactor=True):
 		if output.fs_type() == 'void':
 			# No such object, not updated.
 			return False
-		lm = output.get_last_modified()
+		lm = output.fs_status().system.st_mtime
 		olm = min(lm, olm or lm)
 
 	# Otherwise, check the inputs against outputs.
@@ -64,7 +64,7 @@ def updated(outputs, inputs, never=False, cascade=False, subfactor=True):
 	# to perform the input checks.
 
 	for x in inputs:
-		if x.fs_type() == 'void' or x.get_last_modified() > olm:
+		if x.fs_type() == 'void' or x.fs_status().system.st_mtime > olm:
 			# rebuild if any output is older than any source.
 			return False
 

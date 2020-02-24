@@ -23,7 +23,7 @@ def clear_tree(names, routes):
 	while q:
 		current = q.popleft()
 		clear_set(names, current)
-		q.extend(current.subnodes()[0])
+		q.extend(current.fs_iterfiles('directory'))
 
 def main(args):
 	clear_tree(default_removals, [files.Path.from_path(x) for x in args])
