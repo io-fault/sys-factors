@@ -17,6 +17,7 @@ from fault.kernel import system as ksystem
 
 from fault.project import library as libproject
 from fault.project import explicit
+from fault.project import polynomial
 
 from fault.system import process
 
@@ -54,32 +55,43 @@ class Application(kcore.Context):
 		work = files.Path.from_absolute(work)
 		return Class(work, [factors], symbols)
 
-	def mkconstruct(self, symbols, projects, work, root, project, fc, rebuild):
+	def mkconstruct(self, symbols, projects, work, root, project, fc, rebuild, constraint=None):
 		assert fc.enclosure == False # Resolved enclosure contents in the first pass.
-		Segment = routes.Segment.from_sequence
 
-		constraint = root.segment(project)
+		if constraint is None:
+			constraint = root.segment(project)
+
 		path = work//project//constraint
 		factor = project//constraint
 
-		wholes, composites = explicit.query(path)
-		wholes = dict(self.cxn_context.extrapolate(wholes.items()))
+		ctx = self.cxn_context
+
+		# Construction Context designated filename extensions.
+		extmap = {
+			k: (v, t, set())
+			for k, v, t in [
+				(k, v, ctx.default_type(v))
+				for k, v in ctx._languages.items()
+			]
+			if t is not None
+		}
+
+		# XXX: Resolve protocol based on identified project index.
+		protocol = polynomial.V1({'source-extension-map': extmap})
 
 		# Resolve relative references to absolute while maintaining set/sequence.
-		fc_infra = libproject.infrastructure(fc)
-		info = libproject.information(fc)
-		project = core.Project(fc, fc_infra, info)
+		infra = protocol.infrastructure(fc)
+		info = protocol.information(fc)
+		ctx_project = core.Project(fc, infra, info)
 
-		sr_composites = {
-			k: (v[0] or self.cxn_domain, v[1], {x: cc.resolve(fc_infra, symbols, x) for x in v[2]}, v[3])
-			for k, v in composites.items()
-		}
-		c_factors = [core.Target(project, k, *v) for k, v in sr_composites.items()]
-
-		w_symbols = {}
-		w_factors = [
-			core.Target(project, k, v[0], v[1], w_symbols, *v[2:], variants={'name':k.identifier})
-			for k, v in wholes.items()
+		targets = [
+			core.Target(ctx_project, segment,
+				fs[0] or self.cxn_domain,
+				fs[1], # factor-type
+				{x: cc.resolve(infra, symbols, x) for x in fs[2]},
+				fs[3],
+				variants={'name':segment.identifier})
+			for segment, fs in protocol.iterfactors(path)
 		]
 
 		return cc.Construction(
@@ -87,9 +99,9 @@ class Application(kcore.Context):
 			self.cxn_context,
 			symbols,
 			projects,
-			project,
+			ctx_project,
 			factor,
-			w_factors + c_factors,
+			targets,
 			processors = 16, # overcommit significantly
 			reconstruct = rebuild,
 		)

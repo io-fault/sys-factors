@@ -117,6 +117,17 @@ class Context(object):
 	def intention(self):
 		return self.index['context']['intention']
 
+	def default_type(self, domain, key='default-factor-type'):
+		"""
+		# Select the default factor type of the given domain.
+		# Used indirectly by project protocols to select a type
+		# for factors that only have identified a domain.
+		"""
+		if domain in self.index:
+			return self.index[domain].get(key, 'library')
+		else:
+			return None
+
 	@functools.lru_cache(8)
 	def select(self, fdomain):
 		# Scan the paths (loaded data sets) for the domain.
