@@ -60,10 +60,9 @@ class Application(kcore.Context):
 		work = files.Path.from_absolute(work)
 		return Class(ctx, work, [factors], symbols, rebuild=rebuild)
 
-	def mkconstruct(self, symbols, projects, work, root, project, fc, constraint=None):
+	def mkconstruct(self, symbols, projects, work, root, project, fc, constraint=None, rebuild=0):
 		assert fc.enclosure == False # Resolved enclosure contents in the first pass.
 
-		rebuild = self.cxn_rebuild
 		if constraint is None:
 			constraint = root.segment(project)
 
@@ -131,6 +130,7 @@ class Application(kcore.Context):
 
 		work = self.cxn_work_dir
 		ctx = self.cxn_context
+		re = self.cxn_rebuild
 
 		factor_paths = [work] + [
 			files.Path.from_absolute(x) for x in os.environ.get('FACTORPATH', '').split(':')
@@ -178,12 +178,12 @@ class Application(kcore.Context):
 
 		# Initial job.
 		root, project, fc = roots[0]
-		cxn = self.mkconstruct(local_symbols, project_index, work, root, project, fc)
+		cxn = self.mkconstruct(local_symbols, project_index, work, root, project, fc, rebuild=re)
 		self.xact_dispatch(kcore.Transaction.create(cxn))
 
 		# Chain subsequents.
 		seq = self.cxn_sequence = [
-			self.mkconstruct(local_symbols, project_index, work, root, project, fc, rebuild)
+			self.mkconstruct(local_symbols, project_index, work, root, project, fc, rebuild=re)
 			for root, project, fc in roots[1:]
 		]
 		self.cxn_state = iter(seq)
