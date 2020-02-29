@@ -33,7 +33,7 @@ def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(
 
 	ii = core.Target(
 		include_project,
-		routes.Segment(None, ('include',)),
+		libproject.factor@'include',
 		'source',
 		'library',
 		{},
@@ -128,6 +128,7 @@ class Application(kcore.Context):
 		# Prepare the entire package building factor targets and writing bytecode.
 		"""
 
+		from fault.project.core import factor
 		work = self.cxn_work_dir
 		ctx = self.cxn_context
 		re = self.cxn_rebuild
@@ -144,7 +145,7 @@ class Application(kcore.Context):
 				continue
 
 			tc = tc.get_text_content().split()
-			project_index[dirr] = dict(zip(tc[1::2], tc[0::2]))
+			project_index[dirr] = dict(zip(tc[1::2], [factor@x for x in tc[0::2]]))
 		project_index = libproject.FactorSet(project_index)
 
 		# collect packages to prepare from positional parameters

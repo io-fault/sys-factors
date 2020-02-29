@@ -82,7 +82,7 @@ def group(factors:typing.Sequence[object]):
 		container[f.pair].add(f)
 	return container
 
-def interpret_reference(index, factor, symbol, url):
+def interpret_reference(index, _factor, symbol, url):
 	"""
 	# Extract the project identifier from the &url and find a corresponding
 	# entry in the project set, &index.
@@ -91,8 +91,11 @@ def interpret_reference(index, factor, symbol, url):
 	# that should be connected in order to use the &symbol.
 	"""
 
+	from fault.project import struct
+	from fault.project.core import factor
+
 	i = ri.parse(url)
-	rfactor = i.pop('fragment', None)
+	fpath = factor@i.pop('fragment')
 	rproject_name = i['path'][-1]
 
 	i['path'][-1] = '' # Force the trailing slash in serialize()
@@ -100,20 +103,15 @@ def interpret_reference(index, factor, symbol, url):
 
 	project = None
 	path = None
-	ftype = (None, None)
 	rreqs = {}
 	sources = []
 
 	project_url = product + rproject_name
 
 	project = core.Project(*index.select(project_url))
-	factor = routes.Segment.from_sequence(rfactor.split('.'))
-	factor_dir = project.route // factor
-	from fault.project import explicit
-	ctx, fdata = explicit.struct.parse((factor_dir/'factor.txt').get_text_content())
+	ctx, fdata = struct.parse((project.route//fpath/'factor.txt').get_text_content())
 
-	t = core.Target(project, factor, fdata['domain'] or 'system', fdata['type'], rreqs, [])
-	return t
+	return core.Target(project, fpath, fdata.get('domain') or 'system', fdata['type'], rreqs, [])
 
 def requirements(index, symbols, factor):
 	"""
