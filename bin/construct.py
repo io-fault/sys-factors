@@ -43,21 +43,27 @@ def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(
 	return ii
 
 class Application(kcore.Context):
-	def __init__(self, work, factors, symbols, domain='system'):
+	def __init__(self, context, work, factors, symbols, domain='system', log=sys.stdout, rebuild=0):
+		self.cxn_context = context
 		self.cxn_work_dir = work # Product Directory
 		self.cxn_factors = factors
 		self.cxn_local_symbols = symbols
 		self.cxn_domain = domain
+		self.cxn_log = log
+		self.cxn_rebuild = rebuild
 
 	@classmethod
-	def from_command(Class, arguments):
+	def from_command(Class, environ, arguments):
+		ctx = cc.Context.from_environment(environ)
+		rebuild = int((environ.get('FPI_REBUILD') or '0').strip())
 		work, factors, *symbols = arguments
 		work = files.Path.from_absolute(work)
-		return Class(work, [factors], symbols)
+		return Class(ctx, work, [factors], symbols, rebuild=rebuild)
 
-	def mkconstruct(self, symbols, projects, work, root, project, fc, rebuild, constraint=None):
+	def mkconstruct(self, symbols, projects, work, root, project, fc, constraint=None):
 		assert fc.enclosure == False # Resolved enclosure contents in the first pass.
 
+		rebuild = self.cxn_rebuild
 		if constraint is None:
 			constraint = root.segment(project)
 
@@ -123,18 +129,11 @@ class Application(kcore.Context):
 		# Prepare the entire package building factor targets and writing bytecode.
 		"""
 
-		self.cxn_log = sys.stdout
-		env = os.environ
-
-		rebuild = int(env.get('FPI_REBUILD', '0').strip())
-		ctx = self.cxn_context = cc.Context.from_environment()
-
 		work = self.cxn_work_dir
-		w = env['PWD'] = str(work)
-		os.chdir(w)
+		ctx = self.cxn_context
 
 		factor_paths = [work] + [
-			files.Path.from_absolute(x) for x in env.get('FACTORPATH', '').split(':')
+			files.Path.from_absolute(x) for x in os.environ.get('FACTORPATH', '').split(':')
 		]
 
 		# Collect the index for each directory.
@@ -179,7 +178,7 @@ class Application(kcore.Context):
 
 		# Initial job.
 		root, project, fc = roots[0]
-		cxn = self.mkconstruct(local_symbols, project_index, work, root, project, fc, rebuild)
+		cxn = self.mkconstruct(local_symbols, project_index, work, root, project, fc)
 		self.xact_dispatch(kcore.Transaction.create(cxn))
 
 		# Chain subsequents.
@@ -192,9 +191,18 @@ class Application(kcore.Context):
 def main(inv:process.Invocation) -> process.Exit:
 	inv.imports([
 		'FPI_REBUILD',
+		'FPI_MECHANISMS',
 		'FACTORPATH',
+		'CONTEXT',
 	])
-	ksystem.dispatch(inv, Application.from_command(inv.args))
+
+	cxn = Application.from_command(inv.environ, inv.args)
+
+	os.environ['OLDPWD'] = os.environ.get('PWD')
+	os.environ['PWD'] = str(cxn.cxn_work_dir)
+	os.chdir(os.environ['PWD'])
+
+	ksystem.dispatch(inv, cxn)
 	ksystem.control()
 
 if __name__ == '__main__':

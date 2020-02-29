@@ -185,14 +185,14 @@ class Context(object):
 			yield x.identifier, data.load(x)
 
 	@classmethod
-	def from_environment(Class, envvar='FPI_MECHANISMS'):
-		mech_refs = os.environ.get(envvar, '').split(os.pathsep)
+	def from_environment(Class, environ=os.environ, envvar='FPI_MECHANISMS', ctxvar='CONTEXT'):
+		mech_refs = environ.get(envvar, '').split(os.pathsep)
 		seq = []
 		for mech in mech_refs:
 			mech = files.Path.from_absolute(mech)
 			seq.extend(list(Class.load(mech)))
 
-		ctx = files.Path.from_absolute(os.environ.get('CONTEXT'))
+		ctx = files.Path.from_absolute(environ.get(ctxvar))
 		r = Class(seq, dict(Class.load(ctx/'symbols')))
 		return r
 
