@@ -10,6 +10,7 @@ import operator
 from fault.hkp import library as libhkp
 from fault import routes
 from fault.project import library as libproject
+from fault.project import types as project_types
 from fault.system import files
 from fault.system import python
 
@@ -48,51 +49,18 @@ class Project(object):
 	"""
 
 	def __hash__(self):
-		return hash(str(self.paths.project))
-
-	@property
-	def symbol(self):
-		i = self.information
-		url = i.identifier
-		return '{1}{0}:{2}'.format(url, i.icon or '', self.route)
-
-	@property
-	def segment(self):
-		"""
-		# Return the factor path of the Project.
-		"""
-		return self.paths.project.segment(self.paths.root)
-
-	@property
-	def path(self):
-		return '.'.join(self.segment.absolute)
+		return hash(str(self.route))
 
 	@property
 	def route(self):
 		return self.paths.project
 
 	@property
-	def product(self):
+	def factor(self):
 		"""
-		# Path to the product directory containing the project.
+		# Return the factor path of the Project.
 		"""
-		return self.paths.root
-
-	@property
-	def environment(self):
-		"""
-		# Path to the environment containing the project.
-		"""
-
-		current = self.product.container
-		while (current/'.environment').fs_type() == 'void':
-			current = current.container
-			if str(current) == '/':
-				break
-		else:
-			return current
-
-		return None
+		return project_types.factor//self.route.segment(self.paths.root)
 
 	def __init__(self, paths, infrastructure, information):
 		self.paths = paths
@@ -204,11 +172,17 @@ class Target(object):
 		)
 
 	def __hash__(self):
-		return hash(self.absolute)
+		return hash((self.project.factor, self.route))
+
+	def __eq__(self, operand):
+		return (
+			self.project.factor == operand.project.factor and \
+			self.route == operand.route
+		)
 
 	@property
 	def absolute(self):
-		return (self.project.segment + self.route)
+		return (self.project.factor + self.route)
 
 	@property
 	def absolute_path_string(self):
@@ -216,9 +190,6 @@ class Target(object):
 		# The target's factor path.
 		"""
 		return '.'.join(self.absolute)
-
-	def __eq__(self, ob):
-		return self.absolute == ob.absolute
 
 	def __init__(self,
 			project:(Project),
@@ -241,7 +212,7 @@ class Target(object):
 		self.domain = domain
 		self.type = type
 		self.symbols = symbols
-		self._sources = sources
+		self._sources = list(sources)
 		self.parameters = parameters
 
 		self.key = None
@@ -273,7 +244,7 @@ class Target(object):
 		"""
 		# Factor build cache directory.
 		"""
-		p = self.project.paths.project + self.route
+		p = self.project.route // self.route
 		if p.fs_type() == 'directory':
 			return p / self.default_cache_name
 		else:
@@ -311,9 +282,7 @@ class Target(object):
 		key = self.fpi_work_key(vl)
 		wd = self.fpi_set.route(key, filename=str)
 
-		i = libproject.integrals(self.project.route, self.route)
-		out = libproject.compose_integral_path(variants, groups=groups)
-		out = (i + out).suffix_filename('.i')
+		out = self.integral(groups, variants)
 
 		return vl, key, {
 			'integral': out,
@@ -341,7 +310,7 @@ class Target(object):
 
 		return self.fpi_set.has_key(key)
 
-	def integral(self, groups, variants):
+	def integral(self, groups, variants, suffix='.i'):
 		"""
 		# Get the appropriate reduction for the Factor based on the
 		# configured &key. If no key has been configured, the returned
@@ -352,7 +321,7 @@ class Target(object):
 		path = libproject.compose_integral_path(variants, groups=groups)
 		i += path
 
-		return i.suffix_filename('.i')
+		return i.suffix_filename(suffix)
 
 	def formats(self, mechanism, dependents):
 		"""
@@ -377,7 +346,7 @@ class Target(object):
 			yield fformats.get(self.type) or fformats[None]
 
 	def groups(self, context):
-		return context.groups(self.project.environment)
+		return context.groups(None)
 
 	def link(self, variants, context, mechanism, reqs, dependents):
 		"""
@@ -595,9 +564,7 @@ class Mechanism(object):
 
 	def integrate(self, transform_mechs, build, filtered):
 		"""
-		# Construct the operations for reducing the object files created by &transform
-		# instructions into a set of targets that can satisfy
-		# the set of dependents.
+		# Construct the operations for reducing the transformations.
 		"""
 
 		f = build.factor
@@ -658,7 +625,7 @@ class Build(tuple):
 	"""
 	# Container for the set of build parameters used by the configured abstraction functions.
 	"""
-	context = property(operator.itemgetter(0))
+	context = property(operator.itemgetter(0)) # Construction Context
 	mechanism = property(operator.itemgetter(1))
 	factor = property(operator.itemgetter(2))
 	requirements = property(operator.itemgetter(3))
@@ -682,7 +649,7 @@ class Build(tuple):
 
 			v = {'name': x.name}
 			v.update(needed_variants)
-			g = ctx.groups(x.project.environment)
+			g = ctx.groups(None)
 			path = x.integral(g, v)
 			yield path, x
 

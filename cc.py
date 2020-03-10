@@ -92,10 +92,10 @@ def interpret_reference(index, _factor, symbol, url):
 	"""
 
 	from fault.project import struct
-	from fault.project.core import factor
+	from fault.project.types import factor
 
-	i = ri.parse(url)
-	fpath = factor@i.pop('fragment')
+	i = ri.parse(url[0])
+	fpath = factor@url[1]
 	rproject_name = i['path'][-1]
 
 	i['path'][-1] = '' # Force the trailing slash in serialize()
@@ -136,18 +136,13 @@ def requirements(index, symbols, factor):
 			else:
 				yield interpret_reference(index, factor, sym, r)
 
-def resolve(infrastructure, overrides, symbol):
-	if symbol in overrides:
-		return overrides[symbol]
-	return infrastructure[symbol]
-
-def initial_factor_defines(factor, factorpath):
+def initial_factor_defines(target, factorpath):
 	"""
 	# Generate a set of defines that describe the factor being created.
 	# Takes the full module path of the factor as a string.
 	"""
 	parts = factorpath.split('.')
-	project = '.'.join(factor.project.segment.absolute)
+	project = str(target.project.factor)
 
 	tail = factorpath[len(project)+1:].split('.')[1:]
 
@@ -195,7 +190,7 @@ class Construction(kcore.Context):
 		self.c_project = project
 		self.c_factors = factors
 
-		self.tracking = collections.defaultdict(list) # module -> sequence of sets of tasks
+		self.tracking = collections.defaultdict(list) # factor -> sequence of sets of tasks
 		self.progress = collections.Counter()
 
 		self.process_count = 0 # Track available subprocess slots.
@@ -275,7 +270,6 @@ class Construction(kcore.Context):
 
 		ctx = self.c_context
 		reqs = requirements.get(factor, ())
-		intention = ctx.intention
 		f_name = factor.absolute_path_string
 		common_src_params = initial_factor_defines(factor, f_name)
 		selection = ctx.select(factor.domain)
@@ -290,9 +284,8 @@ class Construction(kcore.Context):
 		variant_set = factor.link(variants, ctx, mech, reqs, dependents)
 
 		# Subfactor of c_factor (selected path)
-		subfactor = (factor.project.segment == self.c_factor)
+		subfactor = (factor.project.factor == self.c_factor)
 		xfilter = functools.partial(self._filter, subfactor=subfactor)
-		envpath = factor.project.environment
 
 		for src_params, (vl, key, locations) in variant_set:
 			v = dict(vl)
@@ -305,7 +298,7 @@ class Construction(kcore.Context):
 
 			build = core.Build((
 				ctx, mech, factor, reqs, dependents,
-				v, locations, src_params + common_src_params, envpath
+				v, locations, src_params + common_src_params, None
 			))
 			xf = list(mech.transform(build, xfilter))
 

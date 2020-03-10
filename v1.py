@@ -72,34 +72,6 @@ class Context(object):
 	def groups(self, environment) -> typing.Sequence[typing.Sequence[str]]:
 		return [['system', 'architecture'], ['name','intention']]
 
-	def extrapolate(self, factors, ftype='library'):
-		"""
-		# Rewrite factor directories into sets of specialized domain factors.
-		# Query implementations have no knowledge of specialized domains. This
-		# method interprets the files in those directories and creates a proper
-		# typed factor for the source.
-		"""
-
-		for path, files in factors:
-			for f in files[-1]:
-				# Split from left to capture name.
-				try:
-					stem, suffix = f.identifier.split('.', 1)
-				except ValueError:
-					stem = f.identifier
-					suffix = None
-					# XXX: data factor
-					continue
-
-				# Find domain.
-				try:
-					domain = self.language(suffix)
-				except:
-					# XXX: map to void domain indicating/warning about unprocessed factor?
-					continue
-
-				yield (routes.Segment(None, path + (stem,)), (domain, ftype, [f]))
-
 	def language(self, extension):
 		"""
 		# Syntax domain query selecting the language associated with a file extension.
