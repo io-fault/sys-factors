@@ -162,19 +162,10 @@ class Application(kcore.Context):
 				'source-extension-map': self.cxn_extension_map,
 			})
 
-			fc = project_types.FactorContextPaths(
-				self.cxn_product.route,
-				project.container,
-				self.cxn_product.route//project,
-			)
-
 			# Resolve relative references to absolute while maintaining set/sequence.
-			info = pjo.information
 			symbols = collections.ChainMap(local_symbols, pctx.symbols(pjo))
-			ctx_project = core.Project(fc, symbols, info)
-
 			targets = [
-				core.Target(ctx_project, fp,
+				core.Target(pjo, fp,
 					fs[0] or self.cxn_domain,
 					fs[1], # factor-type
 					{x: symbols[x] for x in fs[2]},
@@ -188,8 +179,7 @@ class Application(kcore.Context):
 				self.cxn_context,
 				local_symbols,
 				project_index,
-				ctx_project,
-				project,
+				pjo,
 				targets,
 				processors=16, # overcommit significantly
 				reconstruct=re,

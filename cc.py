@@ -170,7 +170,6 @@ class Construction(kcore.Context):
 			symbols,
 			index,
 			project,
-			factor,
 			factors,
 			reconstruct=False,
 			processors=4
@@ -183,11 +182,10 @@ class Construction(kcore.Context):
 		self.exits = 0
 		self.c_sequence = None
 
-		self.c_factor = factor
-		self.c_symbols = symbols
 		self.c_index = index
-		self.c_context = context
 		self.c_project = project
+		self.c_symbols = symbols
+		self.c_context = context
 		self.c_factors = factors
 
 		self.tracking = collections.defaultdict(list) # factor -> sequence of sets of tasks
@@ -284,7 +282,7 @@ class Construction(kcore.Context):
 		variant_set = factor.link(variants, ctx, mech, reqs, dependents)
 
 		# Subfactor of c_factor (selected path)
-		subfactor = (factor.project.factor == self.c_factor)
+		subfactor = (factor.project.factor == self.c_project.factor)
 		xfilter = functools.partial(self._filter, subfactor=subfactor)
 
 		for src_params, (vl, key, locations) in variant_set:
