@@ -135,6 +135,10 @@ class SystemFactor(object):
 	def integral(self, *ignored):
 		return self.__dict__['_integral']
 
+	@property
+	def symbols(self):
+		return {}
+
 class Target(object):
 	"""
 	# A Factor of a project; conceptually similar to "targets" in IDEs.

@@ -118,9 +118,6 @@ def requirements(index, symbols, factor):
 	# Return the set of factors that is required to build this Target, &self.
 	"""
 
-	if isinstance(factor, core.SystemFactor): # XXX: eliminate variation
-		return
-
 	for sym, refs in factor.symbols.items():
 		if sym in symbols:
 			sdef = symbols[sym]
