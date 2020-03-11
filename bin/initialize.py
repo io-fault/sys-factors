@@ -10,7 +10,7 @@ from fault.system import python
 from fault.system import process
 from fault.system import execution as libexec
 
-from .. import constructors
+from ...tools.context import constructors
 
 def factor_domain():
 	"""
