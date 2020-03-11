@@ -16,7 +16,7 @@ from fault.system import python
 
 from . import data
 
-fpi_addressing = libhkp.Hash('fnv1a_64', depth=1, length=2)
+fpi_addressing = libhkp.Hash('fnv1a_64', depth=1, length=4)
 
 def context_interface(path):
 	"""
@@ -122,8 +122,7 @@ class Target(object):
 		# Explicitly designated variants.
 	"""
 
-	default_cache_name = '__f-cache__'
-	default_integral_name = '__f-int__'
+	default_build_name = '__build__'
 
 	def __repr__(self):
 		return "<%s>" %('.'.join(self.route),)
@@ -216,11 +215,7 @@ class Target(object):
 		"""
 		# Factor build cache directory.
 		"""
-		p = self.project.route // self.route
-		if p.fs_type() == 'directory':
-			return p / self.default_cache_name
-		else:
-			return p.container / self.default_cache_name
+		return self.project.product.route / self.default_build_name / 'cache'
 
 	@property
 	def fpi_root(self) -> files.Path:
@@ -229,15 +224,17 @@ class Target(object):
 		"""
 		return self.cache_directory
 
-	@staticmethod
-	def fpi_work_key(variants):
+	def fpi_work_key(self, variants):
 		"""
 		# Calculate the key from the sorted list.
 
 		# Sort function is of minor importance, there is no warranty
 		# of consistent accessibility across platform.
 		"""
-		return ';'.join('='.join((k,v)) for k,v in variants).encode('utf-8')
+		fp = str(self.route) + ':'
+		vars = ';'.join('='.join((k,v)) for k,v in variants)
+
+		return (fp + vars).encode('utf-8')
 
 	def fpi_initialize(self, *variant_sets, **variants):
 		"""
