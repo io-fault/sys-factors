@@ -9,7 +9,7 @@ import operator
 
 from fault.hkp import library as libhkp
 from fault import routes
-from fault.project import library as libproject
+from fault.project import root
 from fault.project import types as project_types
 from fault.system import files
 from fault.system import python
@@ -34,38 +34,6 @@ def context_interface(path):
 		obj = getattr(obj, x)
 
 	return getattr(obj, final)
-
-class Project(object):
-	"""
-	# Project Information and Infrastructure storage.
-	# Provides Construction Contexts with project identity and
-	# the necessary data for resolving infrastructure symbols.
-
-	# [ Properties ]
-	# /infrastructure/
-		# The infrastructure symbols provided by the project.
-	# /information/
-		# The finite map extracted from the &source.
-	"""
-
-	def __hash__(self):
-		return hash(str(self.route))
-
-	@property
-	def route(self):
-		return self.paths.project
-
-	@property
-	def factor(self):
-		"""
-		# Return the factor path of the Project.
-		"""
-		return project_types.factor//self.route.segment(self.paths.root)
-
-	def __init__(self, paths, infrastructure, information):
-		self.paths = paths
-		self.information = information
-		self.infrastructure = infrastructure
 
 class SystemFactor(object):
 	"""
@@ -196,7 +164,7 @@ class Target(object):
 		return '.'.join(self.absolute)
 
 	def __init__(self,
-			project:(Project),
+			project:(root.Project),
 			route:(routes.Segment),
 			domain:(str),
 			type:(str),
@@ -271,7 +239,7 @@ class Target(object):
 		"""
 		return ';'.join('='.join((k,v)) for k,v in variants).encode('utf-8')
 
-	def fpi_initialize(self, groups, *variant_sets, **variants):
+	def fpi_initialize(self, *variant_sets, **variants):
 		"""
 		# Update and return the dictionary key used to access the processed factor.
 		"""
@@ -286,7 +254,7 @@ class Target(object):
 		key = self.fpi_work_key(vl)
 		wd = self.fpi_set.route(key, filename=str)
 
-		out = self.integral(groups, variants)
+		out = self.integral(variants)
 
 		return vl, key, {
 			'integral': out,
@@ -314,18 +282,14 @@ class Target(object):
 
 		return self.fpi_set.has_key(key)
 
-	def integral(self, groups, variants, suffix='.i'):
+	def integral(self, variants):
 		"""
 		# Get the appropriate reduction for the Factor based on the
 		# configured &key. If no key has been configured, the returned
 		# route will be to the inducted factor.
 		"""
 
-		i = libproject.integrals(self.project.route, self.route)
-		path = libproject.compose_integral_path(variants, groups=groups)
-		i += path
-
-		return i.suffix_filename(suffix)
+		return self.project.integral(variants, self.route)
 
 	def formats(self, mechanism, dependents):
 		"""
@@ -349,9 +313,6 @@ class Target(object):
 			# For system factors, this determines PIC/PIE/Unspecified.
 			yield fformats.get(self.type) or fformats[None]
 
-	def groups(self, context):
-		return context.groups(None)
-
 	def link(self, variants, context, mechanism, reqs, dependents):
 		"""
 		# Generate the variants, source parameters, and locations used
@@ -368,13 +329,11 @@ class Target(object):
 			# The list of Factors depending on this target.
 		"""
 
-		groups = self.groups(context)
-
 		for fmt in self.formats(mechanism, dependents):
 			vars = dict(variants)
 			vars['format'] = fmt
 
-			yield [], self.fpi_initialize(groups, vars, format=fmt)
+			yield [], self.fpi_initialize(vars, format=fmt)
 
 class Mechanism(object):
 	"""
@@ -399,10 +358,6 @@ class Mechanism(object):
 	@property
 	def symbol(self):
 		return self.descriptor['path'][0]
-
-	@property
-	def groups(self):
-		return self.descriptor['groups']
 
 	@property
 	def integrations(self):
@@ -653,8 +608,7 @@ class Build(tuple):
 
 			v = {'name': x.name}
 			v.update(needed_variants)
-			g = ctx.groups(None)
-			path = x.integral(g, v)
+			path = x.integral(v)
 			yield path, x
 
 	@property

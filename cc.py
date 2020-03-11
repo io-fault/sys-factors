@@ -13,6 +13,7 @@ from fault.system import execution as libexec
 from fault.system import files
 from fault.internet import ri
 from fault import routes
+from fault.project import types as project_types
 
 from fault.kernel import core as kcore
 from fault.kernel import dispatch as kdispatch
@@ -71,49 +72,27 @@ def updated(outputs, inputs, never=False, cascade=False, subfactor=True):
 	# object has already been updated.
 	return True
 
-def group(factors:typing.Sequence[object]):
+def interpret_reference(pcontext, _factor, symbol, url, rreqs={}, rsources=[]):
 	"""
-	# Organize &factors by their domain-type pair using (python/attribute)`pair` on
-	# the factor.
-	"""
-
-	container = collections.defaultdict(set)
-	for f in factors:
-		container[f.pair].add(f)
-	return container
-
-def interpret_reference(index, _factor, symbol, url):
-	"""
-	# Extract the project identifier from the &url and find a corresponding
-	# entry in the project set, &index.
+	# Extract the project identifier from the &url and find a corresponding project.
 
 	# The fragment portion of the URL specifies the factor within the project
 	# that should be connected in order to use the &symbol.
 	"""
 
-	from fault.project import struct
-	from fault.project.types import factor
-
 	i = ri.parse(url[0])
-	fpath = factor@url[1]
+	fpath = project_types.factor@url[1]
 	rproject_name = i['path'][-1]
 
 	i['path'][-1] = '' # Force the trailing slash in serialize()
 	product = ri.serialize(i)
 
-	project = None
-	path = None
-	rreqs = {}
-	sources = []
+	id = product + rproject_name
+	pj = pcontext.project(id) #* No project in path.
+	(fp, fs) = next(iter(pj.select(fpath))) #* Dependency has no such factor.
+	return core.Target(pj, fp, fs[0], fs[1], rreqs, rsources)
 
-	project_url = product + rproject_name
-
-	project = core.Project(*index.select(project_url))
-	ctx, fdata = struct.parse((project.route//fpath/'factor.txt').get_text_content())
-
-	return core.Target(project, fpath, fdata.get('domain') or 'system', fdata['type'], rreqs, [])
-
-def requirements(index, symbols, factor):
+def requirements(pcontext, symbols, factor):
 	"""
 	# Return the set of factors that is required to build this Target, &self.
 	"""
@@ -131,7 +110,7 @@ def requirements(index, symbols, factor):
 			if isinstance(r, core.Target):
 				yield r
 			else:
-				yield interpret_reference(index, factor, sym, r)
+				yield interpret_reference(pcontext, factor, sym, r)
 
 def initial_factor_defines(target, factorpath):
 	"""
@@ -165,7 +144,7 @@ class Construction(kcore.Context):
 			log,
 			context,
 			symbols,
-			index,
+			pcontext,
 			project,
 			factors,
 			reconstruct=False,
@@ -179,7 +158,7 @@ class Construction(kcore.Context):
 		self.exits = 0
 		self.c_sequence = None
 
-		self.c_index = index
+		self.c_pcontext = pcontext
 		self.c_project = project
 		self.c_symbols = symbols
 		self.c_context = context
@@ -210,7 +189,7 @@ class Construction(kcore.Context):
 		else:
 			self._filter = functools.partial(updated)
 
-		descent = functools.partial(requirements, self.c_index, self.c_symbols)
+		descent = functools.partial(requirements, self.c_pcontext, self.c_symbols)
 
 		# Manages the dependency order.
 		self.c_sequence = graph.sequence(descent, self.c_factors)

@@ -3,7 +3,6 @@
 """
 import os
 import sys
-import functools
 import itertools
 import collections
 
@@ -11,37 +10,16 @@ from .. import core
 from .. import options
 from .. import cc
 
+from fault.system import process
+
 from fault import routes
 from fault.system import files
 
-from fault.kernel import core as kcore
-from fault.kernel import system as ksystem
-
-from fault.project import library as libproject
-from fault.project.root import Product, Project, Context
+from fault.project.root import Product, Context
 from fault.project import types as project_types
 
-from fault.system import process
-
-def local_include_factor(project:str, root:files.Path=(files.Path.from_absolute(__file__) ** 3)):
-	# Construct a target for an include directory in the sdk context.
-	include_dir = (root / project / 'include')
-	src = (include_dir / 'src').delimit()
-	include_fc = libproject.factorcontext(libproject.identify_filesystem_context(include_dir))
-	include_project = core.Project(
-		include_fc,
-		libproject.infrastructure(include_fc),
-		libproject.information(include_fc),
-	)
-
-	return core.Target(
-		include_project,
-		project_types.factor@'include',
-		'source',
-		'library',
-		{},
-		src.tree()[1],
-	)
+from fault.kernel import core as kcore
+from fault.kernel import system as ksystem
 
 class Application(kcore.Context):
 	@property
@@ -112,26 +90,15 @@ class Application(kcore.Context):
 			if t is not None
 		}
 
+		# Project Context
+		pctx = Context()
 		factor_paths = [work] + [
 			files.Path.from_absolute(x)
 			for x in os.environ.get('FACTORPATH', '').split(':')
 		]
-
-		pctx = Context()
 		for x in factor_paths:
 			if x != files.root and x.fs_type() == 'directory':
 				pctx.connect(x)
-
-		# Collect the index for each directory.
-		project_index = {}
-		for dirr in factor_paths:
-			tc = (dirr@'.product/PROJECTS')
-			if tc.fs_type() == 'void':
-				continue
-
-			tc = tc.get_text_content().split()
-			project_index[dirr] = dict(zip(tc[0::3], [project_types.factor@x for x in tc[1::3]]))
-		project_index = libproject.FactorSet(project_index)
 
 		# Separate options into named slots.
 		local_symbols = {}
@@ -147,9 +114,6 @@ class Application(kcore.Context):
 			local_symbols[k] = options.parse(local_symbols[k])
 
 		local_symbols.update(ctx.symbols.items())
-
-		# XXX: relocate symbols to context intialization
-		local_symbols['fault:c-interfaces'] = [local_include_factor('posix'), local_include_factor('python')]
 
 		self.cxn_log.write("[<> construct %s]\n" %(str(self.cxn_projects[0]),))
 
@@ -178,7 +142,7 @@ class Application(kcore.Context):
 				self.cxn_log,
 				self.cxn_context,
 				local_symbols,
-				project_index,
+				pctx,
 				pjo,
 				targets,
 				processors=16, # overcommit significantly
