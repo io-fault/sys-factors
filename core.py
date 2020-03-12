@@ -231,7 +231,7 @@ class Target(object):
 		# Sort function is of minor importance, there is no warranty
 		# of consistent accessibility across platform.
 		"""
-		fp = str(self.route) + ':'
+		fp = "%s[%s]:" %(self.route, self.project.identifier)
 		vars = ';'.join('='.join((k,v)) for k,v in variants)
 
 		return (fp + vars).encode('utf-8')
