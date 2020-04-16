@@ -16,6 +16,8 @@ f_intention template for support modules and extensions.
 		/protocol/
 			&<http://if.fault.io/project/infrastructure>
 
+	/fault-c-interfaces/
+		- &<http://fault.io/engineering/posix#include>
 	/sdk-llvm-instrumentation/
 		- &<http://fault.io/engineering/tools.llvm#instrumentation>
 	/sdk-llvm-delineation/
@@ -46,7 +48,7 @@ f_intention template for support modules and extensions.
 		"""
 		# Executables supporting coverage data collection for a given tool.
 		"""
-		__factor_type__ = 'executables'
+
 /extensions/
 	/__init__.py/#!/pl/python
 		"""
