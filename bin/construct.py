@@ -76,7 +76,6 @@ class Application(kcore.Context):
 		"""
 
 		work = self.cxn_work_directory
-		ctx = self.cxn_context
 		re = self.cxn_rebuild
 		ctx = self.cxn_context
 
@@ -161,6 +160,15 @@ def main(inv:process.Invocation) -> process.Exit:
 	])
 
 	cxn = Application.from_command(inv.environ, inv.args)
+
+	# Add the context local support product.
+	ctxdir = files.Path.from_path(inv.environ['CONTEXT'])
+	support = ctxdir/'lib'/'python'
+	if support.fs_type() == 'directory':
+		if 'FACTORPATH' in os.environ:
+			os.environ['FACTORPATH'] += ':' + str(support)
+		else:
+			os.environ['FACTORPATH'] = str(support)
 
 	os.environ['OLDPWD'] = os.environ.get('PWD')
 	os.environ['PWD'] = str(cxn.cxn_work_directory)
