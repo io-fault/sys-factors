@@ -596,6 +596,9 @@ class Build(tuple):
 		needed_variants = ctx.variants(domain, ftype)
 		needed_variants.pop('name', None)
 
+		if domain == 'source' and self.variants['intention'] == 'delineation':
+			needed_variants['intention'] = 'debug'
+
 		reqs = self.requirements.get((domain, ftype), ())
 		srcvars = ctx.index['source']['variants']
 		for x in reqs:
