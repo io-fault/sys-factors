@@ -93,7 +93,7 @@ class Application(kcore.Context):
 		pctx = Context()
 		factor_paths = [work] + [
 			files.Path.from_absolute(x)
-			for x in os.environ.get('FACTORPATH', '').split(':')
+			for x in os.environ.get('CONNECTIONS', '').split(':')
 		]
 		for x in factor_paths:
 			if x != files.root and x.fs_type() == 'directory':
@@ -163,7 +163,7 @@ def main(inv:process.Invocation) -> process.Exit:
 
 	# Add the context local support product.
 	ctxdir = files.Path.from_path(inv.environ['CONTEXT'])
-	support = ctxdir/'lib'/'python'
+	support = ctxdir/'local'
 	if support.fs_type() == 'directory':
 		if 'FACTORPATH' in os.environ:
 			os.environ['FACTORPATH'] += ':' + str(support)

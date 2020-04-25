@@ -18,6 +18,8 @@ f_intention template for support modules and extensions.
 
 	/fault-c-interfaces/
 		- &<http://fault.io/engineering/posix#include>
+	/fault-python-interfaces/
+		- &<http://fault.io/engineering/python#include>
 	/sdk-llvm-instrumentation/
 		- &<http://fault.io/engineering/tools.llvm#instrumentation>
 	/sdk-llvm-delineation/
@@ -29,15 +31,13 @@ f_intention template for support modules and extensions.
 			&<http://if.fault.io/project/information>
 
 	/identifier/
-		`http://localhost/fault/intention`
+		`http://fault.io/engineering/context-support`
 	/name/
-		`intention`
+		`support`
 	/abstract/
-		Construction Context Support.
+		Context support project.
 	/icon/
 		- (emoji)`🛠`
-	/versioning/
-		`irrelevant`
 	/controller/
 		`fault.io`
 	/contact/

@@ -9,6 +9,7 @@ from fault.system import files
 from fault.system import python
 from fault.system import process
 from fault.system import execution as libexec
+from fault.project import root
 
 from ...tools.context import constructors
 
@@ -145,17 +146,16 @@ prefix = b"""
 import sys
 import os
 import os.path
-factors = os.environ.get('FACTORS')
-if factors and factors != fpath:
-	fpath = fpath + ':' + factors
 ctx_path = os.path.realpath(os.path.dirname(sys.argv[0]))
-ctx_lib = os.path.join(ctx_path, 'lib', 'python')
+ctx_lib = os.path.join(ctx_path, 'local')
+fp = os.environ.get('FACTORPATH', '')
+os.environ['PYTHONPATH'] = fpath
+os.environ['FACTORPATH'] = fp + ':' + ctx_lib
 os.environ['CONTEXT'] = ctx_path
 dev_bin = %s
 """ %(repr(__package__).encode('utf-8'),)
 
 ep_template = prefix + b"""
-os.environ['PYTHONPATH'] = ctx_lib + ':' + fpath if fpath else ctx_lib
 os.execv(sys.executable, [
 		sys.executable, '-m', %s,
 		'context', ctx_path,
@@ -163,9 +163,36 @@ os.execv(sys.executable, [
 )
 """
 
+project_info = {
+	'identifier': "http://fault.io/engineering/context-support",
+	'name': "f_intention",
+	'abstract': "Context support project.",
+	'controller': "fault.io",
+	'status': "volatile",
+	'icon': "- (emoji)`" + "\uD83D\uDEA7`".encode('utf-16', 'surrogatepass').decode('utf-16'),
+	'contact': "`http://fault.io/critical`"
+}
+
+pjtxt = (
+	"! CONTEXT:\n"
+	"\t/protocol/\n"
+	"\t\t&<http://if.fault.io/project/information>\n\n" + "\n".join([
+		"/%s/\n\t%s" % i for i in project_info.items()
+	]) + "\n"
+)
+
 def materialize_support_project(directory, name, fault='fault'):
 	imp = python.Import.from_fullname(__package__).container
 	tmpl_path = imp.file().container / 'templates' / 'context.txt'
+
+	pdpath = directory ** 1
+	sp_id = project_info['identifier'].encode('utf-8')
+	(pdpath@"f_intention/.protocol").fs_init(sp_id + b" factors/polynomial-1")
+	(pdpath@"f_intention/project.txt").fs_init(pjtxt.encode('utf-8', 'surrogateescape'))
+
+	pd = root.Product(pdpath)
+	pd.update()
+	pd.store()
 
 	command = [
 		"python3", "-m",
@@ -190,9 +217,9 @@ def context(route, intention, reference, symbols, options):
 	mechdir = ctx / 'mechanisms'
 	lib = ctx / 'lib'
 	syms = ctx / 'symbols'
-	pylib = lib / 'python'
+	local = ctx / 'local'
 
-	for x in mechdir, lib, pylib, syms:
+	for x in mechdir, lib, local, syms:
 		x.fs_mkdir()
 
 	# Initialize entry point for context.
@@ -225,7 +252,7 @@ def context(route, intention, reference, symbols, options):
 	corefile = mechdir / 'core'
 	corefile.fs_store(pickle.dumps({'root': coredata}))
 
-	materialize_support_project(pylib / 'f_intention', 'intention')
+	materialize_support_project(local / 'f_intention', 'intention')
 
 def main(inv:(process.Invocation)) -> (process.Exit):
 	refctx = None
