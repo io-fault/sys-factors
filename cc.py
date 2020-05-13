@@ -72,7 +72,7 @@ def updated(outputs, inputs, never=False, cascade=False, subfactor=True):
 	# object has already been updated.
 	return True
 
-def interpret_reference(pcontext, _factor, symbol, url, rreqs={}, rsources=[]):
+def interpret_reference(cache, pcontext, _factor, symbol, url, rreqs={}, rsources=[]):
 	"""
 	# Extract the project identifier from the &url and find a corresponding project.
 
@@ -90,9 +90,9 @@ def interpret_reference(pcontext, _factor, symbol, url, rreqs={}, rsources=[]):
 	id = product + rproject_name
 	pj = pcontext.project(id) #* No project in path.
 	(fp, fs) = next(iter(pj.select(fpath))) #* Dependency has no such factor.
-	return core.Target(pj, fp, fs[0], fs[1], rreqs, rsources)
+	return core.Target(cache, pj, fp, fs[0], fs[1], rreqs, rsources)
 
-def requirements(pcontext, symbols, factor):
+def requirements(cache, pcontext, symbols, factor):
 	"""
 	# Return the set of factors that is required to build this Target, &self.
 	"""
@@ -110,7 +110,7 @@ def requirements(pcontext, symbols, factor):
 			if isinstance(r, core.Target):
 				yield r
 			else:
-				yield interpret_reference(pcontext, factor, sym, r)
+				yield interpret_reference(cache, pcontext, factor, sym, r)
 
 def initial_factor_defines(target, factorpath):
 	"""
@@ -142,6 +142,7 @@ class Construction(kcore.Context):
 
 	def __init__(self,
 			log,
+			cache,
 			context,
 			symbols,
 			pcontext,
@@ -158,6 +159,7 @@ class Construction(kcore.Context):
 		self.exits = 0
 		self.c_sequence = None
 
+		self.c_cache = cache
 		self.c_pcontext = pcontext
 		self.c_project = project
 		self.c_symbols = symbols
@@ -189,7 +191,7 @@ class Construction(kcore.Context):
 		else:
 			self._filter = functools.partial(updated)
 
-		descent = functools.partial(requirements, self.c_pcontext, self.c_symbols)
+		descent = functools.partial(requirements, self.c_cache, self.c_pcontext, self.c_symbols)
 
 		# Manages the dependency order.
 		self.c_sequence = graph.sequence(descent, self.c_factors)
@@ -355,8 +357,9 @@ class Construction(kcore.Context):
 					})
 			xact = kcore.Transaction.create(sp)
 
-		self.log.write("[-> (%s/system/%d) %s]\n" %(fpath, pid, command_string))
+		self.log.write("[-> %s (%s/system/%d)]\n" %(command_string, fpath, pid))
 		self.xact_dispatch(xact)
+		return xact
 
 	def xact_exit(self, xact):
 		sp = xact.xact_context
@@ -377,7 +380,7 @@ class Construction(kcore.Context):
 			exit_code = -0xFFFF
 
 		self.exits += 1
-		self.log.write("[<- (%s/system/%d) %d %s]\n" %(factor.absolute_path_string, pid, exit_code, cmd[0]))
+		self.log.write("[<- %d %s (%s/system/%d)]\n" %(exit_code, cmd[0], factor.absolute_path_string, pid))
 		if exit_code != 0:
 			self.failures += 1
 
@@ -428,8 +431,15 @@ class Construction(kcore.Context):
 			pcount = min(self.process_limit - self.process_count, nitems)
 			for x in range(pcount):
 				cmd = self.command_queue.popleft()
-				self.process_execute(cmd)
-				self.process_count += 1
+				try:
+					self.process_execute(cmd)
+				except Exception as error:
+					# Display exception and note progress.
+					import traceback
+					traceback.print_exception(error.__class__, error, error.__traceback__)
+					self.progress[cmd[0]] += 1
+				else:
+					self.process_count += 1
 
 	def continuation(self):
 		"""

@@ -163,6 +163,7 @@ class Target(object):
 		return '.'.join(self.absolute)
 
 	def __init__(self,
+			cache:(routes.Selector),
 			project:(root.Project),
 			route:(routes.Segment),
 			domain:(str),
@@ -178,6 +179,7 @@ class Target(object):
 		# absence, and the module's (python/attribute)`__name__` field will
 		# be used to construct the &Import route given &route's absence.
 		"""
+		self.cache_directory = cache
 		self.project = project
 		self.route = route
 		self.domain = domain
@@ -209,13 +211,6 @@ class Target(object):
 		# An iterable producing the source files of the Factor.
 		"""
 		return self._sources
-
-	@property
-	def cache_directory(self) -> files.Path:
-		"""
-		# Factor build cache directory.
-		"""
-		return self.project.product.route / self.default_build_name / 'cache'
 
 	@property
 	def fpi_root(self) -> files.Path:

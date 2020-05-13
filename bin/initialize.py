@@ -142,7 +142,7 @@ def skeleton(intention):
 		}
 	}
 
-prefix = b"""
+ep_template = b"""
 import sys
 import os
 import os.path
@@ -151,14 +151,8 @@ ctx_lib = os.path.join(ctx_path, 'local')
 fp = os.environ.get('FACTORPATH', '')
 os.environ['PYTHONPATH'] = fpath
 os.environ['FACTORPATH'] = fp + ':' + ctx_lib
-os.environ['CONTEXT'] = ctx_path
-dev_bin = %s
-""" %(repr(__package__).encode('utf-8'),)
-
-ep_template = prefix + b"""
 os.execv(sys.executable, [
-		sys.executable, '-m', %s,
-		'context', ctx_path,
+		sys.executable, '-m', %s, ctx_path,
 	] + sys.argv[1:]
 )
 """
@@ -237,7 +231,7 @@ def context(route, intention, reference, symbols, options):
 	dev = (ctx / 'execute')
 	dev.fs_init()
 	src = ep_template % (
-		repr(__package__ + '.interface').encode('utf-8'),
+		repr(__package__ + '.construct').encode('utf-8'),
 	)
 	dev.fs_store(b'#!' + sys.executable.encode('utf-8') + pypath.encode('utf-8') + src)
 	os.chmod(str(dev), 0o744)

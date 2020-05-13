@@ -27,12 +27,13 @@ class Application(kcore.Context):
 		return self.cxn_product.route
 
 	def __init__(self,
-			context, product,
+			context, cache, product,
 			projects, symbols,
 			domain='system',
 			log=sys.stdout,
 			rebuild=0,
 		):
+		self.cxn_cache = cache
 		self.cxn_context = context
 		self.cxn_product = product
 		self.cxn_projects = projects
@@ -44,10 +45,13 @@ class Application(kcore.Context):
 
 	@classmethod
 	def from_command(Class, environ, arguments):
-		ctx = cc.Context.from_environment(environ)
+		ctxdir, cache, work, fpath, *symbols = arguments
+		ctxdir = files.Path.from_path(ctxdir)
+		work = files.Path.from_path(work)
+		cachedir = files.Path.from_path(cache)
+
+		ctx = cc.Context.from_directory(ctxdir)
 		rebuild = int((environ.get('FPI_REBUILD') or '0').strip())
-		work, fpath, *symbols = arguments
-		work = files.Path.from_absolute(work)
 
 		pd = Product(work)
 		pd.load() #* .product/* files
@@ -56,7 +60,7 @@ class Application(kcore.Context):
 			fpath = ''
 
 		projects = itertools.chain.from_iterable(map(pd.select, [project_types.factor@fpath]))
-		return Class(ctx, pd, list(projects), symbols, rebuild=rebuild)
+		return Class(ctx, cachedir, pd, list(projects), symbols, rebuild=rebuild)
 
 	def xact_void(self, final):
 		"""
@@ -128,7 +132,9 @@ class Application(kcore.Context):
 			# Resolve relative references to absolute while maintaining set/sequence.
 			symbols = collections.ChainMap(local_symbols, pctx.symbols(pjo))
 			targets = [
-				core.Target(pjo, fp,
+				core.Target(
+					self.cxn_cache,
+					pjo, fp,
 					fs[0] or self.cxn_domain,
 					fs[1], # factor-type
 					{x: symbols[x] for x in fs[2]},
@@ -139,6 +145,7 @@ class Application(kcore.Context):
 
 			seq.append(cc.Construction(
 				self.cxn_log,
+				self.cxn_cache,
 				self.cxn_context,
 				local_symbols,
 				pctx,
@@ -156,19 +163,9 @@ def main(inv:process.Invocation) -> process.Exit:
 		'FPI_REBUILD',
 		'FPI_MECHANISMS',
 		'FACTORPATH',
-		'CONTEXT',
 	])
 
 	cxn = Application.from_command(inv.environ, inv.args)
-
-	# Add the context local support product.
-	ctxdir = files.Path.from_path(inv.environ['CONTEXT'])
-	support = ctxdir/'local'
-	if support.fs_type() == 'directory':
-		if 'FACTORPATH' in os.environ:
-			os.environ['FACTORPATH'] += ':' + str(support)
-		else:
-			os.environ['FACTORPATH'] = str(support)
 
 	os.environ['OLDPWD'] = os.environ.get('PWD')
 	os.environ['PWD'] = str(cxn.cxn_work_directory)

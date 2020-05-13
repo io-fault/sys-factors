@@ -153,20 +153,8 @@ class Context(object):
 
 	@staticmethod
 	def load(route:files.Path):
-		for x in route.files():
+		for x in route.fs_iterfiles(type='data'):
 			yield x.identifier, data.load(x)
-
-	@classmethod
-	def from_environment(Class, environ=os.environ, envvar='FPI_MECHANISMS', ctxvar='CONTEXT'):
-		mech_refs = environ.get(envvar, '').split(os.pathsep)
-		seq = []
-		for mech in mech_refs:
-			mech = files.Path.from_absolute(mech)
-			seq.extend(list(Class.load(mech)))
-
-		ctx = files.Path.from_absolute(environ.get(ctxvar))
-		r = Class(seq, dict(Class.load(ctx/'symbols')))
-		return r
 
 	@classmethod
 	def from_directory(Class, route):
