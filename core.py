@@ -100,7 +100,7 @@ class SystemFactor(object):
 	def sources(self):
 		return self.__dict__['_sources']
 
-	def integral(self, *ignored):
+	def image(self, *ignored):
 		return self.__dict__['_integral']
 
 	@property
@@ -246,7 +246,7 @@ class Target(object):
 		key = self.fpi_work_key(vl)
 		wd = self.fpi_set.route(key, filename=str)
 
-		out = self.integral(variants)
+		out = self.image(variants)
 
 		return vl, key, {
 			'integral': out,
@@ -274,14 +274,14 @@ class Target(object):
 
 		return self.fpi_set.has_key(key)
 
-	def integral(self, variants):
+	def image(self, variants):
 		"""
 		# Get the appropriate reduction for the Factor based on the
 		# configured &key. If no key has been configured, the returned
 		# route will be to the inducted factor.
 		"""
 
-		return self.project.integral(variants, self.route)
+		return self.project.image(variants, self.route)
 
 	def formats(self, mechanism, dependents):
 		"""
@@ -598,12 +598,12 @@ class Build(tuple):
 		srcvars = ctx.index['source']['variants']
 		for x in reqs:
 			if isinstance(x, SystemFactor):
-				yield x.integral(), x
+				yield x.image(), x
 				continue
 
 			v = {'name': x.name}
 			v.update(needed_variants)
-			path = x.integral(v)
+			path = x.image(v)
 			yield path, x
 
 	@property
