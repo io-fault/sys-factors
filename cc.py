@@ -251,8 +251,12 @@ class Construction(kcore.Context):
 		selection = ctx.select(factor.domain)
 
 		if selection is None:
-			# No mechanism found.
-			self.log.write("[!# WARNING: no mechanism set for %r factors]\n"%(factor.domain))
+			self.log.write("[!# WARNING: no mechanism for %r factors (..%s)]\n"%(factor.type, f_name))
+
+			self.activity.add(factor)
+			if self.continued is False:
+				self.continued = True
+				self.enqueue(self.continuation)
 			return
 
 		variants, mech = selection

@@ -108,38 +108,6 @@ def skeleton(intention):
 		'factor': factor_domain(),
 		'source': source_domain(),
 		'resource': resource_domain(),
-
-		# Trap domain that emits failure.
-		'void': {
-			'variants': {
-				'system': 'void',
-				'architecture': 'dataprofile',
-			},
-			'formats': {
-				'library': 'void',
-				'executable': 'void',
-				'extension': 'void',
-				'partial': 'void',
-				'interfaces': 'void',
-			},
-
-			'transformations': {
-				None: {
-					'interface': constructors.__name__ + '.void',
-					'type': 'void',
-					'method': 'python',
-					'command': __package__ + '.void',
-				}
-			},
-			'integration': {
-				None: {
-					'interface': constructors.__name__ + '.void',
-					'type': 'void',
-					'method': 'python',
-					'command': __package__ + '.void',
-				}
-			}
-		}
 	}
 
 ep_template = b"""

@@ -105,25 +105,24 @@ class Context(object):
 		# Scan the paths (loaded data sets) for the domain.
 		variants = {'intention': self.intention}
 
-		if fdomain in self.index:
-			mechdata = copy.deepcopy(self.index[fdomain])
-			variants.update(mechdata.get('variants', ()))
+		if fdomain not in self.index:
+			# unsupported factor type
+			return None
 
-			if 'inherit' in mechdata:
-				# Recursively merge inherit's.
-				inner = mechdata['inherit']
-				ivariants, imech = self.select(inner)
-				data.merge(mechdata, imech.descriptor)
-				variants.update(ivariants)
-				mechdata['path'] = [fdomain] + mechdata['path']
-			else:
-				mechdata['path'] = [fdomain]
+		mechdata = copy.deepcopy(self.index[fdomain])
+		variants.update(mechdata.get('variants', ()))
 
-			mech = core.Mechanism(mechdata)
+		if 'inherit' in mechdata:
+			# Recursively merge inherit's.
+			inner = mechdata['inherit']
+			ivariants, imech = self.select(inner)
+			data.merge(mechdata, imech.descriptor)
+			variants.update(ivariants)
+			mechdata['path'] = [fdomain] + mechdata['path']
 		else:
-			# Unsupported domain.
-			mech = core.Mechanism(self.index['void'])
-			mech.descriptor['path'] = [fdomain]
+			mechdata['path'] = [fdomain]
+
+		mech = core.Mechanism(mechdata)
 
 		return variants, mech
 
