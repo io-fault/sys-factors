@@ -2,9 +2,11 @@
 
 A system executable.
 
-/__init__.py/#!/pl/python
-	__factor_domain__ = 'system'
-	__factor_type__ = 'executable'
+/factor.txt/#!text
+	/type/
+		`executable`
+	/symbols/
+		- `libc`
 /src/
 	/test.c/#!/pl/c
 		#include <fault/libc.h>
@@ -27,9 +29,11 @@ A system executable.
 A system library target. The selected mechanisms determines whether this is
 dynamic or static. For some contexts, this is may be equivalent to a &[fragment].
 
-/__init__.py/#!/pl/python
-	__factor_domain__ = 'system'
-	__factor_type__ = 'library'
+/factor.txt/#!text
+	/type/
+		`library`
+	/symbols/
+		- `libc`
 /src/
 	/test.c/#!/pl/c
 		#include "test.h"
@@ -45,13 +49,15 @@ dynamic or static. For some contexts, this is may be equivalent to a &[fragment]
 			return(0);
 		}
 
-[ fragment ]
+[ archive ]
 
-A system fragment intended for compilation into other targets.
+Object set.
 
-/__init__.py/#!/pl/python
-	__factor_domain__ = 'system'
-	__factor_type__ = 'library'
+/factor.txt/#!text
+	/type/
+		`archive`
+	/symbols/
+		- `libc`
 /src/
 	/partial.c/#!/pl/c
 		int
@@ -64,15 +70,11 @@ A system fragment intended for compilation into other targets.
 
 A system (process) extension intended to be loaded into Python.
 
-/__init__.py/#!/pl/python
-	__factor_domain__ = 'system'
-	__factor_type__ = 'extension'
-
-	# Provides the necessary flags for compiling an extension.
-	requirements = (
-		'python',
-	)
-
+/factor.txt/#!text
+	/type/
+		`extensions`
+	/symbols/
+		- `python-extension-requirements`
 /src/
 	/module.c/#!/pl/c
 		#include <fault/libc.h>
