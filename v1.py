@@ -89,16 +89,18 @@ class Context(object):
 	def intention(self):
 		return self.index['context']['intention']
 
-	def default_type(self, domain, key='default-factor-type'):
+	@property
+	def path(self):
+		return self.index['context']['path']
+
+	@functools.lru_cache(8)
+	def identify(self, ftype) -> str:
 		"""
-		# Select the default factor type of the given domain.
-		# Used indirectly by project protocols to select a type
-		# for factors that only have identified a domain.
+		# Identify the domain for the given factor type.
 		"""
-		if domain in self.index:
-			return self.index[domain].get(key, 'library')
-		else:
-			return None
+		for domain in self.path:
+			if ftype in self.select(domain)[1].descriptor['formats']:
+				return domain
 
 	@functools.lru_cache(8)
 	def select(self, fdomain):
@@ -106,7 +108,6 @@ class Context(object):
 		variants = {'intention': self.intention}
 
 		if fdomain not in self.index:
-			# unsupported factor type
 			return None
 
 		mechdata = copy.deepcopy(self.index[fdomain])

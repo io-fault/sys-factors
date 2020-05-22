@@ -83,15 +83,13 @@ class Application(kcore.Context):
 		re = self.cxn_rebuild
 		ctx = self.cxn_context
 
-		# Construction Context designated filename extensions.
-		self.cxn_extension_map = {
-			k: (v, t, set())
-			for k, v, t in [
-				(k, v, ctx.default_type(v))
-				for k, v in ctx._languages.items()
+		# Stopgap for pre-language specification factors.
+		self.cxn_extension_map = dict(
+			(y[1], (y[0], set())) for y in [
+				x.rsplit('.', 1) for x in
+				os.environ.get('FACTORTYPES', 'python-module.py:chapter.txt').split(':')
 			]
-			if t is not None
-		}
+		)
 
 		# Project Context
 		pctx = Context()
@@ -135,12 +133,12 @@ class Application(kcore.Context):
 				core.Target(
 					self.cxn_cache,
 					pjo, fp,
-					fs[0] or self.cxn_domain,
-					fs[1], # factor-type
-					{x: symbols[x] for x in fs[2]},
-					fs[3],
+					self.cxn_context.identify(ft),
+					ft, # factor-type
+					{x: symbols[x] for x in fs[0]},
+					fs[1],
 					variants={'name':fp.identifier})
-				for fp, fs in pjo.select(constraint)
+				for (fp, ft), fs in pjo.select(constraint)
 			]
 
 			seq.append(cc.Construction(

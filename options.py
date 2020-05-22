@@ -4,15 +4,15 @@
 """
 
 def add_include(root, factors, libdir, param):
-	factors['source']['library'][param] = {None}
+	factors['source']['source-tree'][param] = {None}
 	return libdir
 
 def add_library(root, factors, libdir, param):
-	factors['system']['library'][libdir].add(param)
+	factors['host']['library'][libdir].add(param)
 	return libdir
 
 def add_libdir(root, factors, libdir, param):
-	factors['system']['library'][param] = set()
+	factors['host']['library'][param] = set()
 	return param
 
 def add_source_parameter(root, factors, libdir, param):
@@ -46,9 +46,9 @@ def parse(arguments):
 
 	factors = {
 		'source': {
-			'library': {}
+			'source-tree': {}
 		},
-		'system': {
+		'host': {
 			'library': {}
 		},
 	}
@@ -65,9 +65,9 @@ def parse(arguments):
 		op = handlers[flag]
 		libdir = op(root, factors, libdir, x[2:])
 
-	for x in ('source', 'system'):
-		if not factors[x]['library']:
-			del factors[x]['library']
+	for x, y in zip(('source', 'host'), ('source-tree', 'library')):
+		if not factors[x][y]:
+			del factors[x][y]
 			if not factors[x]:
 				del factors[x]
 

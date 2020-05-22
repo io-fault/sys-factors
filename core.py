@@ -46,13 +46,13 @@ class SystemFactor(object):
 	def headers(Class, path):
 		return Class(
 			domain = 'source',
-			type = 'library',
+			type = 'source-tree',
 			name = None,
 			integral = path
 		)
 
 	@classmethod
-	def library(Class, path, name, domain='system'):
+	def library(Class, path, name, domain='host'):
 		return Class(
 			domain = domain,
 			type = 'library',
@@ -86,12 +86,12 @@ class SystemFactor(object):
 						yield SystemFactor(
 							domain = domain,
 							type = ft,
-							integral = sf_route,
+							image = sf_route,
 							name = sf_name
 						)
 
 	def __init__(self, **kw):
-		for k in ('sources', 'integral'):
+		for k in ('sources', 'image'):
 			v = kw.pop(k, None)
 			kw['_'+k] = v
 
@@ -100,8 +100,8 @@ class SystemFactor(object):
 	def sources(self):
 		return self.__dict__['_sources']
 
-	def image(self, *ignored):
-		return self.__dict__['_integral']
+	def integral(self, *ignored):
+		return self.__dict__['_image']
 
 	@property
 	def symbols(self):
@@ -125,7 +125,7 @@ class Target(object):
 	default_build_name = '__build__'
 
 	def __repr__(self):
-		return "<%s>" %('.'.join(self.route),)
+		return "<%s:%s>" %(self.type, self.route)
 
 	def __r_repr__(self):
 		return "{0.__class__.__name__}({1})".format(
@@ -192,7 +192,7 @@ class Target(object):
 		self.local_variants = variants or {}
 
 	def __str__(self, struct="({0.domain}.{0.type}) {0.name}"):
-		return struct.format(self, scheme=self.type[:3])
+		return struct.format(self, scheme=self)
 
 	@property
 	def name(self):
@@ -227,7 +227,7 @@ class Target(object):
 		# of consistent accessibility across platform.
 		"""
 		fp = "%s[%s]:" %(self.route, self.project.identifier)
-		vars = ';'.join('='.join((k,v)) for k,v in variants)
+		vars = ';'.join('='.join((k,str(v))) for k,v in variants)
 
 		return (fp + vars).encode('utf-8')
 
@@ -246,7 +246,7 @@ class Target(object):
 		key = self.fpi_work_key(vl)
 		wd = self.fpi_set.route(key, filename=str)
 
-		out = self.image(variants)
+		out = self.integral(variants)
 
 		return vl, key, {
 			'integral': out,
@@ -274,14 +274,14 @@ class Target(object):
 
 		return self.fpi_set.has_key(key)
 
-	def image(self, variants):
+	def integral(self, variants):
 		"""
 		# Get the appropriate reduction for the Factor based on the
 		# configured &key. If no key has been configured, the returned
 		# route will be to the inducted factor.
 		"""
 
-		return self.project.image(variants, self.route)
+		return self.project.integral(variants, self.route)
 
 	def formats(self, mechanism, dependents):
 		"""
@@ -303,7 +303,7 @@ class Target(object):
 				yield fformats.get(x.type, default)
 		else:
 			# For system factors, this determines PIC/PIE/Unspecified.
-			yield fformats.get(self.type) or fformats[None]
+			yield fformats.get(self.type)
 
 	def link(self, variants, context, mechanism, reqs, dependents):
 		"""
@@ -471,7 +471,7 @@ class Mechanism(object):
 			logfile = files.Path(loc['log'], src.points)
 
 			src_type = build.context.language(src.extension)
-			out_format = mechanism['formats'][f.type]
+			out_format = mechanism['formats'][f.type] # No format description for factor type?
 
 			adapter = self.adaption(build, src_type, src, phase='transformations')
 			if 'interface' in adapter:
@@ -586,24 +586,24 @@ class Build(tuple):
 	parameters = property(operator.itemgetter(7))
 	environment = property(operator.itemgetter(8))
 
-	def required(self, domain, ftype):
+	def required(self, ftype):
 		ctx = self.context
+		domain = ctx.identify(ftype)
 		needed_variants = ctx.variants(domain, ftype)
 		needed_variants.pop('name', None)
 
-		if domain == 'source' and self.variants['intention'] == 'delineation':
+		if ftype == 'source-tree' and self.variants['intention'] == 'delineation':
 			needed_variants['intention'] = 'debug'
 
 		reqs = self.requirements.get((domain, ftype), ())
-		srcvars = ctx.index['source']['variants']
 		for x in reqs:
 			if isinstance(x, SystemFactor):
-				yield x.image(), x
+				yield x.integral(), x
 				continue
 
 			v = {'name': x.name}
 			v.update(needed_variants)
-			path = x.image(v)
+			path = x.integral(v)
 			yield path, x
 
 	@property

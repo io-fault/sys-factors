@@ -13,44 +13,21 @@ from fault.project import root
 
 from ...tools.context import constructors
 
-def factor_domain():
-	"""
-	# Factor Library processing.
-	# Generally only supports libraries which are directories of whole factors and composites.
-	"""
-
-	return {
-		'target-file-extensions': {},
-
-		'formats': {
-			'library': 'directory',
-		},
-
-		'transformations': {
-			'text': {
-				'interface': constructors.__name__ + '.transparent',
-				'type': 'transparent',
-				'command': '/bin/cp',
-			},
-		}
-	}
-
 def source_domain():
 	"""
 	# Initialize (factor/domain)`source` for inclusion in a Context.
 	"""
 
-	mech = {
+	return {
 		'variants': {
 			'system': 'void',
 			'architecture': 'sources',
 		},
 
 		'formats': {
-			'executable': 'octets',
-			'library': 'octets',
-			'extension': 'octets',
-			'partial': 'octets',
+			'source-tree': 'directory',
+			'factor-index': None,
+			'image': None,
 		},
 
 		'transformations': {
@@ -61,40 +38,6 @@ def source_domain():
 			},
 		}
 	}
-
-	return mech
-
-def resource_domain():
-	"""
-	# Initialize a (factor/type)`resource` subject for inclusion in a context.
-	"""
-
-	mech = {
-		'variants': {
-			'system': 'void',
-			'architecture': 'fs',
-		},
-
-		'formats': {
-			'library': 'octets',
-		},
-
-		'transformations': {
-			None: {
-				'interface': constructors.__name__ + '.transparent',
-				'type': 'transparent',
-				'command': '/bin/cp',
-			},
-			'uri': {
-				'interface': constructors.__name__ + '.transparent',
-				'method': 'python',
-				'command': __package__ + '.stream',
-				'redirect': 'stdout',
-			}
-		}
-	}
-
-	return mech
 
 def skeleton(intention):
 	"""
@@ -105,9 +48,7 @@ def skeleton(intention):
 		'context': {
 			'intention': intention,
 		},
-		'factor': factor_domain(),
 		'source': source_domain(),
-		'resource': resource_domain(),
 	}
 
 ep_template = b"""
@@ -211,6 +152,7 @@ def context(route, intention, reference, symbols, options):
 
 	coredata = skeleton(intention)
 	coredata['context']['options'] = options
+	coredata['context']['path'] = ['source']
 	corefile = mechdir / 'core'
 	corefile.fs_store(pickle.dumps({'root': coredata}))
 
