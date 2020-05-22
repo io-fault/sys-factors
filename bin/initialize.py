@@ -67,13 +67,13 @@ os.execv(sys.executable, [
 """
 
 project_info = {
-	'identifier': "http://fault.io/engineering/context-support",
+	'identifier': "&<http://fault.io/engineering/context-support>",
 	'name': "f_intention",
 	'abstract': "Context support project.",
-	'controller': "fault.io",
+	'authority': "`fault.io`",
 	'status': "volatile",
 	'icon': "- (emoji)`" + "\uD83D\uDEA7`".encode('utf-16', 'surrogatepass').decode('utf-16'),
-	'contact': "`http://fault.io/critical`"
+	'contact': "&<http://fault.io/critical>"
 }
 
 pjtxt = (

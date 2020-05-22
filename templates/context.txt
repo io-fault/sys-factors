@@ -31,14 +31,14 @@ f_intention template for support modules and extensions.
 			&<http://if.fault.io/project/information>
 
 	/identifier/
-		`http://fault.io/engineering/context-support`
+		&<http://fault.io/engineering/factors?support=cc>
+	/icon/
+		- (emoji)`🛠`
 	/name/
 		`support`
 	/abstract/
 		Context support project.
-	/icon/
-		- (emoji)`🛠`
-	/controller/
+	/authority/
 		`fault.io`
 	/contact/
 		&<http://fault.io/critical>

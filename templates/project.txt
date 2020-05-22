@@ -73,17 +73,17 @@ Modules raise exceptions to force editing.
 
 	raise RuntimeError("initialized package was not modified")
 /project.txt/#!/text/fault
+	/icon/
+		'<emoji or URL to icon>'
 	/identifier/
 		`URL-To-Project(No versions, project "home page")`
 	/name/
 		`name-of-project`
 	/abstract/
 		Paragraphs regarding the purpose of the project.
-	/icon/
-		'<emoji or URL to icon>'
 	/versioning/
 		'continuous|semantic|inconsistent' # if unspecified, inconsistent is presumed
-	/controller/
+	/authority/
 		`domain name or mailto of project authority`
 	/contact/
 		`email or URL to an appropriate party for inquiries`
