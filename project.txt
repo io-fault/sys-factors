@@ -3,20 +3,15 @@
 		&<http://if.fault.io/project/information>
 
 /identifier/
-	`http://fault.io/engineering/factors`
+	&<http://fault.io/engineering/factors>
+/icon/
+	- (emoji)`🚨`
 /name/
 	`factors`
 /abstract/
 	Factor processing tools for materializing actionable tools.
-/icon/
-	- (emoji)`🚨`
 
-/versioning/
-	continuous
-/status/
-	experimental
-
-/controller/
+/authority/
 	`fault.io`
 /contact/
-	`http://fault.io/critical`
+	&<http://fault.io/critical>
