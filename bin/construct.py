@@ -21,6 +21,128 @@ from fault.project import types as project_types
 from fault.kernel import core as kcore
 from fault.kernel import system as ksystem
 
+class Log(object):
+	"""
+	# Abstraction for status frame logging.
+	"""
+	from fault.status import frames
+	from fault.time import sysclock
+
+	_pack = frames.stdio()[1]
+	Message = frames.types.Message
+	Parameters = frames.types.Parameters
+
+	_ticks = os.sysconf('SC_CLK_TCK')
+	def __init__(self, buffer, frequency=16, encoding='utf-8'):
+		self.encoding = encoding
+		self._buffer = buffer
+		self._send = buffer.write
+		self._flush = buffer.flush
+		self._count = 0
+		self._frequency = frequency
+
+	def flush(self):
+		self._count = 0
+		self._flush()
+
+	def transaction(self):
+		self._count += 1
+		if self._count > self._frequency:
+			self.flush()
+
+	def init(self):
+		msg = self.frames.tty_notation_1_message
+		self._send(self._pack((None, msg)).encode(self.encoding))
+		self.transaction()
+
+	def time(self):
+		return self.sysclock.elapsed().decrease(self._etime)
+
+	def start_project(self, project, intention='unspecified'):
+		self.root_channel = str(project.factor)
+		self._rtime = self.sysclock.now()
+		self._etime = self.sysclock.elapsed()
+
+		p = project.information
+		itxt = p.icon.get('emoji', '')
+		msg = self.Message.from_string_v1(
+			"transaction-started[->]: " + p.identifier + ' ' + 'factors',
+			protocol=self.frames.protocol
+		)
+		msg.msg_parameters['data'] = self.Parameters.from_pairs_v1([
+			('reference-time', self._rtime.select('iso')),
+			('time-offset', 0),
+		])
+		self._send(self._pack((self.root_channel, msg)).encode(self.encoding))
+		self.transaction()
+
+	def finish_project(self, project):
+		msg = self.Message.from_string_v1(
+			"transaction-stopped[<-]: " + project.information.identifier,
+			protocol=self.frames.protocol
+		)
+		msg.msg_parameters['data'] = self.Parameters.from_pairs_v1([
+			('time-offset', int(self.time())),
+			('system', 0.0),
+			('user', 0.0),
+		])
+
+		self._send(self._pack((str(self.root_channel), msg)).encode(self.encoding))
+		del self.root_channel
+		self.transaction()
+
+	def process_execute(self, factor, pid, synopsis, focus, command, logfile):
+		start = int(self.time())
+		channel = self.root_channel + '/' + str(factor) + '/system/' + str(pid)
+
+		msg = self.Message.from_string_v1(
+			"transaction-started[->]: " + synopsis + ' ' + focus,
+			protocol=self.frames.protocol
+		)
+		msg.msg_parameters['data'] = self.Parameters.from_pairs_v1([
+			('time-offset', start),
+			('command', list(command)),
+		])
+
+		self._send(self._pack((channel, msg)).encode(self.encoding))
+		self.transaction()
+		return start
+
+	def process_exit(self, factor, pid, synopsis, status, rusage):
+		stop = int(self.time())
+		channel = self.root_channel + '/' + str(factor) + '/system/' + str(pid)
+
+		msg = self.Message.from_string_v1(
+			"transaction-stopped[<-]: " + synopsis,
+			protocol=self.frames.protocol
+		)
+		msg.msg_parameters['data'] = self.Parameters.from_pairs_v1([
+			('time-offset', stop),
+			('status', status),
+			('system', rusage.ru_stime / self._ticks),
+			('user', rusage.ru_utime / self._ticks),
+		])
+
+		self._send(self._pack((channel, msg)).encode(self.encoding))
+		self.transaction()
+
+	def write(self, text):
+		self._send(text.encode(self.encoding))
+		self.transaction()
+
+	def warn(self, target, text):
+		msg = self.Message.from_string_v1(
+			"message-application[!#]: WARNING: " + text,
+			protocol=self.frames.protocol
+		)
+		msg.msg_parameters['data'] = self.Parameters.from_pairs_v1([
+			('time-offset', int(self.time())),
+			('factor', str(target.route)),
+		])
+
+		self._send(self._pack((self.root_channel, msg)).encode(self.encoding))
+		self.transaction()
+
 class Application(kcore.Context):
 	@property
 	def cxn_work_directory(self):
@@ -30,7 +152,7 @@ class Application(kcore.Context):
 			context, cache, product,
 			projects, symbols,
 			domain='system',
-			log=sys.stdout,
+			log=sys.stdout.buffer,
 			rebuild=0,
 		):
 		self.cxn_cache = cache
@@ -39,7 +161,7 @@ class Application(kcore.Context):
 		self.cxn_projects = projects
 		self.cxn_local_symbols = symbols
 		self.cxn_domain = domain
-		self.cxn_log = log
+		self.cxn_log = Log(log)
 		self.cxn_rebuild = rebuild
 		self.cxn_extension_map = None
 
@@ -72,6 +194,7 @@ class Application(kcore.Context):
 			self.xact_dispatch(kcore.Transaction.create(nj))
 		except StopIteration:
 			# Success unless a crash occurs.
+			self.cxn_log.flush()
 			self.executable.exe_invocation.exit(0)
 
 	def actuate(self):
@@ -79,6 +202,7 @@ class Application(kcore.Context):
 		# Prepare the entire package building factor targets and writing bytecode.
 		"""
 
+		self.cxn_log.init()
 		work = self.cxn_work_directory
 		re = self.cxn_rebuild
 		ctx = self.cxn_context
@@ -115,8 +239,6 @@ class Application(kcore.Context):
 			local_symbols[k] = options.parse(local_symbols[k])
 
 		local_symbols.update(ctx.symbols.items())
-
-		self.cxn_log.write("[<> construct %s]\n" %(str(self.cxn_projects[0]),))
 
 		seq = self.cxn_sequence = []
 		for project in self.cxn_projects:

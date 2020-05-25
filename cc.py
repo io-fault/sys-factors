@@ -153,6 +153,7 @@ class Construction(kcore.Context):
 		):
 		super().__init__()
 
+		self._rusage = {}
 		self.log = log
 		self._end_of_factors = False
 
@@ -179,9 +180,7 @@ class Construction(kcore.Context):
 		self.activity = set()
 
 	def actuate(self):
-		p = self.c_project.information
-		itxt = p.icon.get('emoji', '')
-		self.log.write("[<> %s%s %s %s]\n" %(itxt and itxt+' ', p.name, p.identifier, self.c_context.intention))
+		self.log.start_project(self.c_project)
 
 		if self.reconstruct:
 			if self.reconstruct > 1:
@@ -224,6 +223,10 @@ class Construction(kcore.Context):
 		if self._end_of_factors:
 			self.finish_termination()
 
+	def finish_termination(self):
+		self.log.finish_project(self.c_project)
+		return super().finish_termination()
+
 	def collect(self, factor, requirements, dependents=()):
 		"""
 		# Collect the parameters and work to be done for processing the &factor.
@@ -251,7 +254,7 @@ class Construction(kcore.Context):
 		selection = ctx.select(factor.domain)
 
 		if selection is None:
-			self.log.write("[!# WARNING: no mechanism for %r factors (..%s)]\n"%(factor.type, f_name))
+			self.log.warn(factor, "no mechanism for %r factors"%(factor.type,))
 
 			self.activity.add(factor)
 			if self.continued is False:
@@ -306,7 +309,7 @@ class Construction(kcore.Context):
 			else:
 				pf = ()
 
-			tracks.extend((pf, xf, fi))
+			tracks.extend((('prepare', pf), ('transform', xf), ('integrate', fi)))
 
 		if tracks:
 			self.progress[factor] = -1
@@ -320,13 +323,16 @@ class Construction(kcore.Context):
 				self.enqueue(self.continuation)
 
 	devnull = files.Path.from_absolute(os.devnull)
+	def _reapusage(self, pid, partial=functools.partial):
+		deliver = partial(self._rusage.__setitem__, pid)
+		wait = partial(libexec.waitrusage, deliver)
+		return partial(libexec.reap, sysop=wait)
 
 	def process_execute(self, instruction, f_target_path=(lambda x: str(x))):
-		factor, ins = instruction
+		irole, factor, ins = instruction
 		typ, cmd, log, io, *tail = ins
-		target = io[1]
 
-		stdout = stdin = self.devnull
+		stdout = stdin = self.devnull # Defaults
 
 		if typ == 'execute-stdio':
 			stdout = io[1]
@@ -341,40 +347,40 @@ class Construction(kcore.Context):
 		assert typ in ('execute', 'execute-redirection', 'execute-stdio')
 
 		strcmd = tuple(map(str, cmd))
-		fpath = factor.absolute_path_string
-		formatted = {str(target): f_target_path(target)}
-		printed_command = tuple(formatted.get(x, x) for x in map(str, cmd))
-		command_string = ' '.join(printed_command) + iostr
-
 		pid = None
 		with log.fs_open('wb') as f:
-			f.write(b'[Command]\n')
-			f.write(' '.join(strcmd).encode('utf-8'))
-			f.write(b'\n\n[Standard Error]\n')
-
 			ki = libexec.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
 			with stdin.fs_open('rb') as ci:
 				with stdout.fs_open('wb') as co:
 					pid = ki.spawn(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
-					sp = kdispatch.Subprocess(libexec.reap, {
-						pid: (sysclock.now(), typ, cmd, log, factor, command_string)
+					sp = kdispatch.Subprocess(self._reapusage(pid), {
+						pid: (typ, cmd, log, factor)
 					})
 			xact = kcore.Transaction.create(sp)
 
-		self.log.write("[-> %s (%s/system/%d)]\n" %(command_string, fpath, pid))
+		if irole == 'integrate':
+			focus = str(io[1])
+		elif irole == 'transform':
+			focus = str(io[0][0])
+		else:
+			focus = '<unknown instruction role>'
+		self.log.process_execute(factor.route, pid, strcmd[0], focus, strcmd, log)
+
 		self.xact_dispatch(xact)
 		return xact
 
 	def xact_exit(self, xact):
+		# Subprocess Transaction
 		sp = xact.xact_context
 		for pid, params, status in sp.sp_report():
 			self.process_exit(pid, status, None, *params)
 
 	def process_exit(self,
-			pid, delta, rusage, start, typ, cmd, log, factor, message,
+			pid, delta, rusage, typ, cmd, log, factor,
 			_color='\x1b[38;5;1m',
 			_normal='\x1b[0m'
 		):
+		rusage = self._rusage.pop(pid, None)
 		self.progress[factor] += 1
 		self.process_count -= 1
 		self.activity.add(factor)
@@ -382,39 +388,17 @@ class Construction(kcore.Context):
 		exit_code = delta.status
 		if exit_code is None:
 			# Bad exit event connected.
-			self.log.warn("process exit event had missing status code field")
+			self.log.warn(factor, "process exit event did not have status")
 
 		self.exits += 1
-		self.log.write("[<- %d %s (%s/system/%d)]\n" %(exit_code, cmd[0], factor.absolute_path_string, pid))
-		# self.log.process_exit(factor, pid, exit_code, rusage)
+		# Build synopsis.
+		exitstr = cmd[0].rsplit('/', 1)[-1] + '[' + str(exit_code) + ']'
 		if exit_code != 0:
 			self.failures += 1
+			exitstr = _color + exitstr + _normal
 
-			if message is not None:
-				duration = repr(start.measure(sysclock.now()))
-				prefix = "%s: %d -> %s in %s\n\t" %(
-					_color + factor.absolute_path_string + _normal,
-					pid,
-					_color + str(exit_code) + _normal,
-					str(duration)
-				)
-				self.log.write(prefix+message+'\n')
-
-		l = ''
-		l += ('\n[Profile]\n')
-		l += ('/factor/\n\t%s\n' %(factor,))
-
-		if log.points[-1] != 'reduction':
-			l += ('/subject/\n\t%s\n' %('/'.join(log.points),))
-		else:
-			l += ('/subject/\n\treduction\n')
-
-		l += ('/pid/\n\t%d\n' %(pid,))
-		l += ('/status/\n\t%s\n' %(str(exit_code),))
-		l += ('/start/\n\t%s\n' %(start.select('iso'),))
-		l += ('/stop/\n\t%s\n' %(sysclock.now().select('iso'),))
-
-		log.fs_store(l.encode('utf-8'), mode='ba')
+		synopsis = ' '.join([exitstr, str(log),])
+		self.log.process_exit(factor.route, pid, synopsis, exit_code, rusage)
 
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.
@@ -467,7 +451,7 @@ class Construction(kcore.Context):
 				completions.add(x)
 				continue
 
-			if self.progress[x] >= len(tracking[0]):
+			if self.progress[x] >= len(tracking[0][1]):
 				# Pop action set.
 				del tracking[0]
 				self.progress[x] = -1
@@ -495,11 +479,12 @@ class Construction(kcore.Context):
 		assert self.progress[factor] == -1
 		self.progress[factor] = 0
 
-		for x in self.tracking[factor][0]:
+		irole, commands = self.tracking[factor][0]
+		for x in commands:
 			typ, cmd, logfile, *tail = x
 
 			if typ in ('execute', 'execute-redirection', 'execute-stdio'):
-				self.command_queue.append((factor, x))
+				self.command_queue.append((irole, factor, x))
 			elif typ == 'directory':
 				tail[0][1].fs_mkdir()
 
@@ -534,7 +519,7 @@ class Construction(kcore.Context):
 			else:
 				self.log.write('unknown instruction %s\n' %(x,))
 
-		if self.progress[factor] >= len(self.tracking[factor][0]):
+		if self.progress[factor] >= len(self.tracking[factor][0][1]):
 			self.activity.add(factor)
 
 			if self.continued is False:
