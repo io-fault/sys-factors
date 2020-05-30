@@ -83,6 +83,7 @@ class Log(object):
 		)
 		msg.msg_parameters['data'] = self.Parameters.from_pairs_v1([
 			('time-offset', int(self.time())),
+			('status', 0),
 			('system', 0.0),
 			('user', 0.0),
 		])
@@ -102,6 +103,8 @@ class Log(object):
 		msg.msg_parameters['data'] = self.Parameters.from_pairs_v1([
 			('time-offset', start),
 			('command', list(command)),
+			('focus', str(focus)),
+			('log', str(logfile)),
 		])
 
 		self._send(self._pack((channel, msg)).encode(self.encoding))
