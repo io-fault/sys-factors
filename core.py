@@ -251,10 +251,10 @@ class Target(object):
 		return vl, key, {
 			'integral': out,
 			'work': wd,
-			'libraries': wd / 'lib',
-			'log': wd / 'log',
-			'output': wd / 'xfd',
-			'sources': wd / 'src',
+			'libraries': (wd / 'lib').delimit(),
+			'log': (wd / 'log').delimit(),
+			'output': (wd / 'xfd').delimit(),
+			'sources': (wd / 'src').delimit(),
 		}
 
 	@property
@@ -568,7 +568,7 @@ class Mechanism(object):
 
 		xf = context_interface(adapter['interface'])
 		seq = xf(transform_mechs, build, adapter, f.type, rr, fmt, objects, partials, libraries)
-		logfile = loc['log'] / 'Integration.log'
+		logfile = loc['log'] / 'Integration'
 
 		yield self.formulate(rr, objects, logfile, adapter, seq)
 
@@ -592,6 +592,7 @@ class Build(tuple):
 		needed_variants = ctx.variants(domain, ftype)
 		needed_variants.pop('name', None)
 
+		# XXX: Eliminate this condition; contexts should specify their depending intent.
 		if ftype == 'source-tree' and self.variants['intention'] == 'delineation':
 			needed_variants['intention'] = 'debug'
 
