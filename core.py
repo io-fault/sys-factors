@@ -109,17 +109,7 @@ class SystemFactor(object):
 
 class Target(object):
 	"""
-	# A Factor of a project; conceptually similar to "targets" in IDEs.
-	# &Factor instances are specific to the module-local Construction Context
-	# implementation.
-
-	# Initialized with the primary dependencies of most operations to avoid
-	# redundancy and in order to allow simulated factors to be managed without
-	# modifying or cleaning up &sys.modules.
-
-	# [ Properties ]
-	# /local_variants/
-		# Explicitly designated variants.
+	# The representation of a Project Factor as a compilation target.
 	"""
 
 	default_build_name = '__build__'
@@ -173,12 +163,6 @@ class Target(object):
 			parameters:(typing.Mapping)=None,
 			variants:(typing.Mapping)=None,
 		):
-		"""
-		# Either &route or &module can be &None, but not both. The system's
-		# &importlib will be used to resolve a module from the &route in its
-		# absence, and the module's (python/attribute)`__name__` field will
-		# be used to construct the &Import route given &route's absence.
-		"""
 		self.cache_directory = cache
 		self.project = project
 		self.route = route
