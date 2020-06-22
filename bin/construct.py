@@ -9,6 +9,7 @@ import collections
 from .. import core
 from .. import options
 from .. import cc
+from .. import cache
 
 from fault.system import process
 
@@ -104,7 +105,7 @@ class Log(object):
 			('time-offset', start),
 			('command', list(command)),
 			('focus', str(focus)),
-			('log', str(logfile)),
+			('log', repr(logfile)[7:-2]),
 		])
 
 		self._send(self._pack((channel, msg)).encode(self.encoding))
@@ -170,10 +171,10 @@ class Application(kcore.Context):
 
 	@classmethod
 	def from_command(Class, environ, arguments):
-		ctxdir, cache, work, fpath, *symbols = arguments
+		ctxdir, cache_path, work, fpath, *symbols = arguments
 		ctxdir = files.Path.from_path(ctxdir)
 		work = files.Path.from_path(work)
-		cachedir = files.Path.from_path(cache)
+		cdi = cache.Persistent(files.Path.from_path(cache_path))
 
 		ctx = cc.Context.from_directory(ctxdir)
 		rebuild = int((environ.get('FPI_REBUILD') or '0').strip())
@@ -185,7 +186,7 @@ class Application(kcore.Context):
 			fpath = ''
 
 		projects = itertools.chain.from_iterable(map(pd.select, [project_types.factor@fpath]))
-		return Class(ctx, cachedir, pd, list(projects), symbols, rebuild=rebuild)
+		return Class(ctx, cdi, pd, list(projects), symbols, rebuild=rebuild)
 
 	def xact_void(self, final):
 		"""
@@ -256,7 +257,6 @@ class Application(kcore.Context):
 			symbols = collections.ChainMap(local_symbols, pctx.symbols(pjo))
 			targets = [
 				core.Target(
-					self.cxn_cache,
 					pjo, fp,
 					self.cxn_context.identify(ft),
 					ft, # factor-type

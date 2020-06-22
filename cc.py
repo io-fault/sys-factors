@@ -72,7 +72,7 @@ def updated(outputs, inputs, never=False, cascade=False, subfactor=True):
 	# object has already been updated.
 	return True
 
-def interpret_reference(cc, cache, pcontext, _factor, symbol, url, rreqs={}, rsources=[]):
+def interpret_reference(cc, pcontext, _factor, symbol, url, rreqs={}, rsources=[]):
 	"""
 	# Extract the project identifier from the &url and find a corresponding project.
 
@@ -90,9 +90,9 @@ def interpret_reference(cc, cache, pcontext, _factor, symbol, url, rreqs={}, rso
 	id = product + rproject_name
 	pj = pcontext.project(id) #* No project in path.
 	((fp, ft), (fsyms, fsrcs)) = next(iter(pj.select(fpath))) #* Dependency has no such factor.
-	return core.Target(cache, pj, fp, cc.identify(ft), ft, rreqs, rsources)
+	return core.Target(pj, fp, cc.identify(ft), ft, rreqs, rsources)
 
-def requirements(cc, cache, pcontext, symbols, factor):
+def requirements(cc, pcontext, symbols, factor):
 	"""
 	# Return the set of factors that is required to build this Target, &self.
 	"""
@@ -110,7 +110,7 @@ def requirements(cc, cache, pcontext, symbols, factor):
 			if isinstance(r, core.Target):
 				yield r
 			else:
-				yield interpret_reference(cc, cache, pcontext, factor, sym, r)
+				yield interpret_reference(cc, pcontext, factor, sym, r)
 
 def initial_factor_defines(target, factorpath):
 	"""
@@ -190,7 +190,7 @@ class Construction(kcore.Context):
 		else:
 			self._filter = functools.partial(updated)
 
-		descent = functools.partial(requirements, self.c_context, self.c_cache, self.c_pcontext, self.c_symbols)
+		descent = functools.partial(requirements, self.c_context, self.c_pcontext, self.c_symbols)
 
 		# Manages the dependency order.
 		self.c_sequence = graph.sequence(descent, self.c_factors)
@@ -264,13 +264,23 @@ class Construction(kcore.Context):
 
 		variants, mech = selection
 		variants['name'] = factor.name
+		integral = factor.integral(variants)
 		variant_set = factor.link(variants, ctx, mech, reqs, dependents)
 
 		# Subfactor of c_factor (selected path)
 		subfactor = (factor.project.factor == self.c_project.factor)
 		xfilter = functools.partial(self._filter, subfactor=subfactor)
 
-		for src_params, (vl, key, locations) in variant_set:
+		for (src_params, (vl, key)) in variant_set:
+			cdr = self.c_cache.select(factor.project.factor, factor.route, key)
+			locations = {
+				'integral': integral,
+				'work': cdr,
+				'libraries': (cdr / 'lib').delimit(),
+				'log': (cdr / 'log').delimit(),
+				'output': (cdr / 'xfd').delimit(),
+				'sources': (cdr / 'src').delimit(),
+			}
 			v = dict(vl)
 
 			if not mech.integrates():

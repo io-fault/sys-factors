@@ -153,7 +153,6 @@ class Target(object):
 		return '.'.join(self.absolute)
 
 	def __init__(self,
-			cache:(routes.Selector),
 			project:(root.Project),
 			route:(routes.Segment),
 			domain:(str),
@@ -163,7 +162,6 @@ class Target(object):
 			parameters:(typing.Mapping)=None,
 			variants:(typing.Mapping)=None,
 		):
-		self.cache_directory = cache
 		self.project = project
 		self.route = route
 		self.domain = domain
@@ -196,67 +194,18 @@ class Target(object):
 		"""
 		return self._sources
 
-	@property
-	def fpi_root(self) -> files.Path:
-		"""
-		# Factor Processing Instruction root work directory for the given Factor, &self.
-		"""
-		return self.cache_directory
-
-	def fpi_work_key(self, variants):
-		"""
-		# Calculate the key from the sorted list.
-
-		# Sort function is of minor importance, there is no warranty
-		# of consistent accessibility across platform.
-		"""
-		fp = "%s[%s]:" %(self.route, self.project.identifier)
-		vars = ';'.join('='.join((k,str(v))) for k,v in variants)
-
-		return (fp + vars).encode('utf-8')
-
-	def fpi_initialize(self, *variant_sets, **variants):
-		"""
-		# Update and return the dictionary key used to access the processed factor.
-		"""
-
+	def work_key(self, *variant_sets, **variants):
+		# Combine variants.
 		vl = list(itertools.chain.from_iterable(v.items() for v in variant_sets))
 		vl.extend(self.local_variants.items())
 		vl.extend(variants.items())
+
+		# Eliminate duplicates.
 		vl = list(dict(vl).items())
 		vl.sort()
-		variants = dict(vl)
+		vars = ';'.join('='.join((k, str(v))) for k, v in vl)
 
-		key = self.fpi_work_key(vl)
-		wd = self.fpi_set.route(key, filename=str)
-
-		out = self.integral(variants)
-
-		return vl, key, {
-			'integral': out,
-			'work': wd,
-			'libraries': (wd / 'lib').delimit(),
-			'log': (wd / 'log').delimit(),
-			'output': (wd / 'xfd').delimit(),
-			'sources': (wd / 'src').delimit(),
-		}
-
-	@property
-	@functools.lru_cache(32)
-	def fpi_set(self) -> libhkp.Dictionary:
-		"""
-		# &libhkp.Dictionary containing the builds of different variants.
-		"""
-		fr = self.fpi_root
-		wd = libhkp.Dictionary.use(fr, addressing=fpi_addressing)
-		return wd
-
-	def fpi_work_exists(self, key):
-		"""
-		# Get the work directory of the Factor for the given variants.
-		"""
-
-		return self.fpi_set.has_key(key)
+		return vl, vars.encode('utf-8')
 
 	def integral(self, variants):
 		"""
@@ -306,10 +255,7 @@ class Target(object):
 		"""
 
 		for fmt in self.formats(mechanism, dependents):
-			vars = dict(variants)
-			vars['format'] = fmt
-
-			yield [], self.fpi_initialize(vars, format=fmt)
+			yield [], self.work_key(dict(variants), format=fmt)
 
 class Mechanism(object):
 	"""

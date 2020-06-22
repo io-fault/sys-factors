@@ -6,7 +6,6 @@ import functools
 import typing
 import copy
 
-from fault import routes
 from fault.system import files
 
 from . import data
