@@ -174,7 +174,11 @@ class Application(kcore.Context):
 		ctxdir, cache_path, work, fpath, *symbols = arguments
 		ctxdir = files.Path.from_path(ctxdir)
 		work = files.Path.from_path(work)
-		cdi = cache.Persistent(files.Path.from_path(cache_path))
+
+		if environ.get('FPI_CACHE', 'persistent') == 'transient':
+			cdi = cache.Transient(files.Path.from_path(cache_path))
+		else:
+			cdi = cache.Persistent(files.Path.from_path(cache_path))
 
 		ctx = cc.Context.from_directory(ctxdir)
 		rebuild = int((environ.get('FPI_REBUILD') or '0').strip())
@@ -283,6 +287,7 @@ class Application(kcore.Context):
 
 def main(inv:process.Invocation) -> process.Exit:
 	inv.imports([
+		'FPI_CACHE',
 		'FPI_REBUILD',
 		'FPI_MECHANISMS',
 		'FACTORPATH',
