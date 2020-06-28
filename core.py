@@ -7,7 +7,6 @@ import itertools
 import importlib
 import operator
 
-from fault.hkp import library as libhkp
 from fault import routes
 from fault.project import root
 from fault.project import types as project_types
@@ -15,8 +14,6 @@ from fault.system import files
 from fault.system import python
 
 from . import data
-
-fpi_addressing = libhkp.Hash('fnv1a_64', depth=1, length=4)
 
 def context_interface(path):
 	"""
