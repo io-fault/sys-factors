@@ -1,6 +1,7 @@
 """
 # Factor dependency graph checks.
 """
+from fault.system import files
 
 def test_sequence(test):
 	"""
