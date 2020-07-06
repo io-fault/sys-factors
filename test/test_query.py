@@ -2,7 +2,7 @@
 # Check environment and probe classes.
 """
 import os
-from .. import probe as module
+from .. import query as module
 
 from fault.system import files
 
@@ -29,17 +29,6 @@ def test_executables(test):
 		found, unavail = module.executables([])
 		test/unavail == set([])
 		test/found == {}
-
-def test_runtime(test):
-	src = "#include <stdio.h>\nint main(int ac, char *av[]) {printf(\"test\\n\");return(0);}"
-	test/b'test\n' == module.runtime([], 'c', src, libraries=['c'])
-
-	syntax_error = "...int i = $\n"
-	test/None == module.runtime([], 'c', syntax_error)
-
-def test_includes(test):
-	test/module.includes([], "c", ("fault/libc.h",)) == True
-	test/module.includes([], "c", ("fault/nosuchfile.h",)) == False
 
 if __name__ == '__main__':
 	from .. import libtest; import sys
