@@ -33,8 +33,7 @@ class Log(object):
 	Message = frames.types.Message
 	Parameters = frames.types.Parameters
 
-	_ticks = os.sysconf('SC_CLK_TCK')
-	def __init__(self, buffer, frequency=16, encoding='utf-8'):
+	def __init__(self, buffer, frequency=2, encoding='utf-8'):
 		self.encoding = encoding
 		self._buffer = buffer
 		self._send = buffer.write
@@ -123,8 +122,8 @@ class Log(object):
 		msg.msg_parameters['data'] = self.Parameters.from_pairs_v1([
 			('time-offset', stop),
 			('status', status),
-			('system', rusage.ru_stime / self._ticks),
-			('user', rusage.ru_utime / self._ticks),
+			('system', rusage.ru_stime),
+			('user', rusage.ru_utime),
 		])
 
 		self._send(self._pack((channel, msg)).encode(self.encoding))
