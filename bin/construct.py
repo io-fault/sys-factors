@@ -21,146 +21,11 @@ from fault.project import types as project_types
 
 from fault.kernel import core as kcore
 from fault.kernel import system as ksystem
-from fault.transcripts import frames
 
-class Log(object):
-	"""
-	# Abstraction for status frame logging.
-	"""
-	metrics = staticmethod(frames.metrics)
-	from fault.status import frames
-	from fault.time import sysclock
-
-	_pack = frames.stdio()[1]
-	Message = frames.types.Message
-	Parameters = frames.types.Parameters
-
-	def __init__(self, buffer, frequency=2, encoding='utf-8'):
-		self.encoding = encoding
-		self._buffer = buffer
-		self._send = buffer.write
-		self._flush = buffer.flush
-		self._count = 0
-		self._frequency = frequency
-
-	def flush(self):
-		self._count = 0
-		self._flush()
-
-	def transaction(self):
-		self._count += 1
-		if self._count > self._frequency:
-			self.flush()
-
-	def init(self):
-		msg = self.frames.tty_notation_1_message
-		p = self.frames.types.Parameters.from_nothing_v1()
-		self._etime = self.sysclock.elapsed()
-		p['reference-time'] = self.sysclock.now()
-		p['time-offset'] = self._etime
-		msg = self.frames.declaration(data=p)
-		self._send(self._pack((None, msg)).encode(self.encoding))
-		self.transaction()
-
-	def time(self):
-		return self.sysclock.elapsed().decrease(self._etime)
-
-	def start_project(self, project, intention='unspecified'):
-		self.root_channel = str(project.factor)
-
-		p = project.information
-		itxt = p.icon.get('emoji', '')
-		msg = self.Message.from_string_v1(
-			"transaction-started[->]: " + p.identifier + ' ' + 'factors',
-			protocol=self.frames.protocol
-		)
-		self._send(self._pack((self.root_channel, msg)).encode(self.encoding))
-		self.transaction()
-
-	def finish_project(self, project):
-		msg = self.Message.from_string_v1(
-			"transaction-stopped[<-]: " + project.information.identifier,
-			protocol=self.frames.protocol
-		)
-		msg.msg_parameters['data'] = self.Parameters.from_pairs_v1([
-			('time-offset', int(self.time())),
-		])
-
-		self._send(self._pack((str(self.root_channel), msg)).encode(self.encoding))
-		del self.root_channel
-		self.transaction()
-
-	def process_execute(self, factor, pid, synopsis, focus, command, logfile):
-		start = int(self.time())
-		channel = self.root_channel + '/' + str(factor) + '/system/' + str(pid)
-
-		msg = self.Message.from_string_v1(
-			"transaction-started[->]: " + synopsis + ' ' + focus,
-			protocol=self.frames.protocol
-		)
-		msg.msg_parameters['data'] = self.Parameters.from_pairs_v1([
-			('time-offset', start),
-			('command', list(command)),
-			('focus', str(focus)),
-			('log', repr(logfile)[7:-2]),
-		])
-
-		self._send(self._pack((channel, msg)).encode(self.encoding))
-		self.transaction()
-		return start
-
-	def _process_metrics(self, channel, time, rusage, exitcode):
-		counts = {}
-		if exitcode is None:
-			counts['skipped'] = 1
-		elif exitcode == 0:
-			counts['finished'] = 1
-		else:
-			counts['failed'] = 1
-
-		r = self.metrics(time, {'usage': rusage.ru_stime + rusage.ru_utime}, counts)
-		msg = self.Message.from_string_v1(
-			"transaction-event[--]: METRICS: system process",
-			protocol=self.frames.protocol
-		)
-		msg.msg_parameters['data'] = r
-		self._send(self._pack((channel, msg)).encode(self.encoding))
-
-	def process_exit(self, factor, pid, synopsis, status, rusage, start_time):
-		stop = int(self.time())
-		channel = self.root_channel + '/' + str(factor) + '/system/' + str(pid)
-		self._process_metrics(channel, stop - start_time, rusage, status)
-
-		msg = self.Message.from_string_v1(
-			"transaction-stopped[<-]: " + synopsis,
-			protocol=self.frames.protocol
-		)
-		msg.msg_parameters['data'] = self.Parameters.from_pairs_v1([
-			('time-offset', stop),
-			('status', status),
-			('system', rusage.ru_stime),
-			('user', rusage.ru_utime),
-		])
-
-		self._send(self._pack((channel, msg)).encode(self.encoding))
-		self.transaction()
-
-	def write(self, text):
-		self._send(text.encode(self.encoding))
-		self.transaction()
-
-	def warn(self, target, text):
-		msg = self.Message.from_string_v1(
-			"message-application[!#]: WARNING: " + text,
-			protocol=self.frames.protocol
-		)
-		msg.msg_parameters['data'] = self.Parameters.from_pairs_v1([
-			('time-offset', int(self.time())),
-			('factor', str(target.route)),
-		])
-
-		self._send(self._pack((self.root_channel, msg)).encode(self.encoding))
-		self.transaction()
+from fault.time import sysclock
+from fault.status import types as statustypes
+from fault.status import frames as statusframes
+from fault.transcripts import frames as transcripts
 
 class Application(kcore.Context):
 	@property
@@ -168,27 +33,29 @@ class Application(kcore.Context):
 		return self.cxn_product.route
 
 	def __init__(self,
+			channel,
 			context, cache, product,
 			projects, symbols,
 			domain='system',
-			log=sys.stdout.buffer,
 			rebuild=0,
 		):
+		self.cxn_channel = channel
 		self.cxn_cache = cache
 		self.cxn_context = context
 		self.cxn_product = product
 		self.cxn_projects = projects
 		self.cxn_local_symbols = symbols
 		self.cxn_domain = domain
-		self.cxn_log = Log(log)
 		self.cxn_rebuild = rebuild
 		self.cxn_extension_map = None
+		self.cxn_log = transcripts.Log.stdout()
 
 	@classmethod
 	def from_command(Class, environ, arguments):
 		ctxdir, cache_path, work, fpath, *symbols = arguments
 		ctxdir = files.Path.from_path(ctxdir)
 		work = files.Path.from_path(work)
+		channel = environ.get('FRAMECHANNEL') or 'build'
 
 		if environ.get('FPI_CACHE', 'persistent') == 'transient':
 			cdi = cache.Transient(files.Path.from_path(cache_path))
@@ -205,7 +72,7 @@ class Application(kcore.Context):
 			fpath = ''
 
 		projects = itertools.chain.from_iterable(map(pd.select, [project_types.factor@fpath]))
-		return Class(ctx, cdi, pd, list(projects), symbols, rebuild=rebuild)
+		return Class(channel, ctx, cdi, pd, list(projects), symbols, rebuild=rebuild)
 
 	def xact_void(self, final):
 		"""
@@ -225,7 +92,14 @@ class Application(kcore.Context):
 		# Prepare the entire package building factor targets and writing bytecode.
 		"""
 
-		self.cxn_log.init()
+		self._etime = sysclock.elapsed()
+		p = statustypes.Parameters.from_nothing_v1()
+		p['reference-time'] = int(sysclock.now())
+		p['time-offset'] = int(self._etime)
+		msg = statusframes.declaration(data=p)
+		self.cxn_log.emit(self.cxn_channel, msg)
+		self.cxn_log.flush()
+
 		work = self.cxn_work_directory
 		re = self.cxn_rebuild
 		ctx = self.cxn_context
@@ -286,6 +160,8 @@ class Application(kcore.Context):
 			]
 
 			seq.append(cc.Construction(
+				self.cxn_channel,
+				self._etime,
 				self.cxn_log,
 				self.cxn_cache,
 				self.cxn_context,
@@ -306,6 +182,7 @@ def main(inv:process.Invocation) -> process.Exit:
 		'FPI_REBUILD',
 		'FPI_MECHANISMS',
 		'FACTORPATH',
+		'FRAMECHANNEL',
 	])
 
 	cxn = Application.from_command(inv.environ, inv.args)

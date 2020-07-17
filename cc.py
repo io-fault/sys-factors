@@ -130,6 +130,70 @@ def initial_factor_defines(target, factorpath):
 		('FACTOR_PACKAGE', '.'.join(parts[:-1])),
 	]
 
+# Status Frames
+from fault.transcripts import frames
+from fault.status.frames import protocol as frames_protocol
+
+def open_project_transaction(time, project, intention='unspecified', channel=''):
+	p = project.information
+	itxt = p.icon.get('emoji', '')
+	msg = frames.types.Message.from_string_v1(
+		"transaction-started[->]: " + p.identifier + ' ' + 'factors',
+		protocol=frames_protocol
+	)
+	msg.msg_parameters['data'] = frames.types.Parameters.from_pairs_v1([
+		('time-offset', time),
+	])
+
+	return channel + '/' + str(project.factor), msg
+
+def close_project_transaction(time, project, channel=''):
+	msg = frames.types.Message.from_string_v1(
+		"transaction-stopped[<-]: " + project.information.identifier,
+		protocol=frames_protocol
+	)
+	msg.msg_parameters['data'] = frames.types.Parameters.from_pairs_v1([
+		('time-offset', time),
+	])
+
+	return channel + '/' + str(project.factor), msg
+
+def open_process_transaction(time, factor, pid, synopsis, focus, command, logfile, channel=''):
+	msg = frames.types.Message.from_string_v1(
+		"transaction-started[->]: " + synopsis + ' ' + focus,
+		protocol=frames.protocol
+	)
+	msg.msg_parameters['data'] = frames.types.Parameters.from_pairs_v1([
+		('time-offset', time),
+		('command', list(command)),
+		('focus', str(focus)),
+		('log', repr(logfile)[7:-2]),
+	])
+
+	return channel + '/' + str(factor) + '/system/' + str(pid), msg
+
+def close_process_transaction(time, factor, pid, synopsis, status, rusage, channel=''):
+	msg = frames.types.Message.from_string_v1(
+		"transaction-stopped[<-]: " + synopsis,
+		protocol=frames_protocol
+	)
+	msg.msg_parameters['data'] = frames.types.Parameters.from_pairs_v1([
+		('time-offset', time),
+		('status', status),
+	])
+
+	return channel + '/' + str(factor) + '/system/' + str(pid), msg
+
+def process_metrics_signal(time, exit_type, rusage):
+	counts = {exit_type: 1}
+	r = frames.metrics(time, {'usage': rusage.ru_stime + rusage.ru_utime}, counts)
+	msg = frames.types.Message.from_string_v1(
+		"transaction-event[--]: METRICS: system process",
+		protocol=frames_protocol
+	)
+	msg.msg_parameters['data'] = r
+	return msg
+
 class Construction(kcore.Context):
 	"""
 	# Construction process manager. Maintains the set of target modules to construct and
@@ -140,7 +204,20 @@ class Construction(kcore.Context):
 	# performed by the target modules being built.
 	"""
 
+	def warn(self, target, text):
+		msg = frames.types.Message.from_string_v1(
+			"message-application[!#]: WARNING: " + text,
+			protocol=frames_protocol
+		)
+		msg.msg_parameters['data'] = frames.types.Parameters.from_pairs_v1([
+			('time-offset', int(self.time())),
+			('factor', str(target.route)),
+		])
+		return self.log.emit(self._channel, msg)
+
 	def __init__(self,
+			channel,
+			time,
 			log,
 			cache,
 			context,
@@ -149,10 +226,12 @@ class Construction(kcore.Context):
 			project,
 			factors,
 			reconstruct=False,
-			processors=4
+			processors=4,
 		):
 		super().__init__()
 
+		self._channel = channel
+		self._etime = time
 		self._rusage = {}
 		self.log = log
 		self._end_of_factors = False
@@ -179,8 +258,11 @@ class Construction(kcore.Context):
 		self.continued = False
 		self.activity = set()
 
+	def time(self):
+		return sysclock.elapsed().decrease(self._etime)
+
 	def actuate(self):
-		self.log.start_project(self.c_project)
+		self.log.emit(*open_project_transaction(self.time(), self.c_project, channel=self._channel))
 
 		if self.reconstruct:
 			if self.reconstruct > 1:
@@ -224,7 +306,7 @@ class Construction(kcore.Context):
 			self.finish_termination()
 
 	def finish_termination(self):
-		self.log.finish_project(self.c_project)
+		self.log.emit(*close_project_transaction(self.time(), self.c_project, channel=self._channel))
 		return super().finish_termination()
 
 	def collect(self, factor, requirements, dependents=()):
@@ -254,7 +336,7 @@ class Construction(kcore.Context):
 		selection = ctx.select(factor.domain)
 
 		if selection is None:
-			self.log.warn(factor, "no mechanism for %r factors"%(factor.type,))
+			self.warn(factor, "no mechanism for %r factors"%(factor.type,))
 
 			self.activity.add(factor)
 			if self.continued is False:
@@ -365,7 +447,9 @@ class Construction(kcore.Context):
 
 		strcmd = tuple(map(str, cmd))
 		pid = None
-		start_time = self.log.process_execute(factor.route, pid, strcmd[0], focus, strcmd, log)
+		start_time = self.time()
+		opt = open_process_transaction(start_time, factor.route, pid, strcmd[0], focus, strcmd, log, channel=self._channel)
+		self.log.emit(*opt)
 
 		with log.fs_open('wb') as f:
 			ki = libexec.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
@@ -399,7 +483,7 @@ class Construction(kcore.Context):
 		exit_code = delta.status
 		if exit_code is None:
 			# Bad exit event connected.
-			self.log.warn(factor, "process exit event did not have status")
+			self.warn(factor, "process exit event did not have status")
 
 		self.exits += 1
 		# Build synopsis.
@@ -409,7 +493,18 @@ class Construction(kcore.Context):
 			exitstr = _color + exitstr + _normal
 
 		synopsis = ' '.join([exitstr, str(log),])
-		self.log.process_exit(factor.route, pid, synopsis, exit_code, rusage, start_time)
+		stop_time = self.time()
+
+		if exit_code is None:
+			exit_type = 'cached'
+		elif exit_code == 0:
+			exit_type = 'finished'
+		else:
+			exit_type = 'failed'
+
+		cpt = close_process_transaction(stop_time, factor.route, pid, synopsis, exit_code, rusage, channel=self._channel)
+		self.log.emit(cpt[0], process_metrics_signal(stop_time - start_time, exit_type, rusage))
+		self.log.emit(*cpt)
 
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.
