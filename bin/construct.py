@@ -21,11 +21,13 @@ from fault.project import types as project_types
 
 from fault.kernel import core as kcore
 from fault.kernel import system as ksystem
+from fault.transcripts import frames
 
 class Log(object):
 	"""
 	# Abstraction for status frame logging.
 	"""
+	metrics = staticmethod(frames.metrics)
 	from fault.status import frames
 	from fault.time import sysclock
 
@@ -52,6 +54,11 @@ class Log(object):
 
 	def init(self):
 		msg = self.frames.tty_notation_1_message
+		p = self.frames.types.Parameters.from_nothing_v1()
+		self._etime = self.sysclock.elapsed()
+		p['reference-time'] = self.sysclock.now()
+		p['time-offset'] = self._etime
+		msg = self.frames.declaration(data=p)
 		self._send(self._pack((None, msg)).encode(self.encoding))
 		self.transaction()
 
@@ -60,8 +67,6 @@ class Log(object):
 
 	def start_project(self, project, intention='unspecified'):
 		self.root_channel = str(project.factor)
-		self._rtime = self.sysclock.now()
-		self._etime = self.sysclock.elapsed()
 
 		p = project.information
 		itxt = p.icon.get('emoji', '')
@@ -69,10 +74,6 @@ class Log(object):
 			"transaction-started[->]: " + p.identifier + ' ' + 'factors',
 			protocol=self.frames.protocol
 		)
-		msg.msg_parameters['data'] = self.Parameters.from_pairs_v1([
-			('reference-time', self._rtime.select('iso')),
-			('time-offset', 0),
-		])
 		self._send(self._pack((self.root_channel, msg)).encode(self.encoding))
 		self.transaction()
 
@@ -83,9 +84,6 @@ class Log(object):
 		)
 		msg.msg_parameters['data'] = self.Parameters.from_pairs_v1([
 			('time-offset', int(self.time())),
-			('status', 0),
-			('system', 0.0),
-			('user', 0.0),
 		])
 
 		self._send(self._pack((str(self.root_channel), msg)).encode(self.encoding))
@@ -111,9 +109,27 @@ class Log(object):
 		self.transaction()
 		return start
 
-	def process_exit(self, factor, pid, synopsis, status, rusage):
+	def _process_metrics(self, channel, time, rusage, exitcode):
+		counts = {}
+		if exitcode is None:
+			counts['skipped'] = 1
+		elif exitcode == 0:
+			counts['finished'] = 1
+		else:
+			counts['failed'] = 1
+
+		r = self.metrics(time, {'usage': rusage.ru_stime + rusage.ru_utime}, counts)
+		msg = self.Message.from_string_v1(
+			"transaction-event[--]: METRICS: system process",
+			protocol=self.frames.protocol
+		)
+		msg.msg_parameters['data'] = r
+		self._send(self._pack((channel, msg)).encode(self.encoding))
+
+	def process_exit(self, factor, pid, synopsis, status, rusage, start_time):
 		stop = int(self.time())
 		channel = self.root_channel + '/' + str(factor) + '/system/' + str(pid)
+		self._process_metrics(channel, stop - start_time, rusage, status)
 
 		msg = self.Message.from_string_v1(
 			"transaction-stopped[<-]: " + synopsis,

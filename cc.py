@@ -356,25 +356,26 @@ class Construction(kcore.Context):
 
 		assert typ in ('execute', 'execute-redirection', 'execute-stdio')
 
-		strcmd = tuple(map(str, cmd))
-		pid = None
-		with log.fs_open('wb') as f:
-			ki = libexec.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
-			with stdin.fs_open('rb') as ci:
-				with stdout.fs_open('wb') as co:
-					pid = ki.spawn(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
-					sp = kdispatch.Subprocess(self._reapusage(pid), {
-						pid: (typ, cmd, log, factor)
-					})
-			xact = kcore.Transaction.create(sp)
-
 		if irole == 'integrate':
 			focus = str(io[1])
 		elif irole == 'transform':
 			focus = str(io[0][0])
 		else:
 			focus = '<unknown instruction role>'
-		self.log.process_execute(factor.route, pid, strcmd[0], focus, strcmd, log)
+
+		strcmd = tuple(map(str, cmd))
+		pid = None
+		start_time = self.log.process_execute(factor.route, pid, strcmd[0], focus, strcmd, log)
+
+		with log.fs_open('wb') as f:
+			ki = libexec.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
+			with stdin.fs_open('rb') as ci:
+				with stdout.fs_open('wb') as co:
+					pid = ki.spawn(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
+					sp = kdispatch.Subprocess(self._reapusage(pid), {
+						pid: (typ, cmd, log, factor, start_time)
+					})
+			xact = kcore.Transaction.create(sp)
 
 		self.xact_dispatch(xact)
 		return xact
@@ -386,7 +387,7 @@ class Construction(kcore.Context):
 			self.process_exit(pid, status, None, *params)
 
 	def process_exit(self,
-			pid, delta, rusage, typ, cmd, log, factor,
+			pid, delta, rusage, typ, cmd, log, factor, start_time,
 			_color='\x1b[38;5;1m',
 			_normal='\x1b[0m'
 		):
@@ -408,7 +409,7 @@ class Construction(kcore.Context):
 			exitstr = _color + exitstr + _normal
 
 		synopsis = ' '.join([exitstr, str(log),])
-		self.log.process_exit(factor.route, pid, synopsis, exit_code, rusage)
+		self.log.process_exit(factor.route, pid, synopsis, exit_code, rusage, start_time)
 
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.
