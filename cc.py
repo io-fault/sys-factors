@@ -194,6 +194,16 @@ def process_metrics_signal(time, exit_type, rusage):
 	msg.msg_parameters['data'] = r
 	return msg
 
+def cached_operation_signal(time, skipped):
+	counts = {'cached': skipped}
+	r = frames.metrics(time, {}, counts)
+	msg = frames.types.Message.from_string_v1(
+		"transaction-event[--]: METRICS: cached operation count",
+		protocol=frames_protocol
+	)
+	msg.msg_parameters['data'] = r
+	return msg
+
 class Construction(kcore.Context):
 	"""
 	# Construction process manager. Maintains the set of target modules to construct and
@@ -376,6 +386,7 @@ class Construction(kcore.Context):
 				v, locations, src_params + common_src_params, None
 			))
 			xf = list(mech.transform(build, xfilter))
+			skipped = len(build.factor.sources()) - len(xf)
 
 			# If any commands or calls are made by the transformation,
 			# rebuild the target.
@@ -400,9 +411,12 @@ class Construction(kcore.Context):
 				pf = list(mech.prepare(build))
 			else:
 				pf = ()
+				# Cached.
+				skipped += 1
 
 			tracks.extend((('prepare', pf), ('transform', xf), ('integrate', fi)))
-
+			channel = str(factor.project.route) + '/' + str(factor.route)
+			self.log.emit(channel, cached_operation_signal(0, skipped))
 		if tracks:
 			self.progress[factor] = -1
 			self.dispatch(factor)
@@ -498,7 +512,7 @@ class Construction(kcore.Context):
 		if exit_code is None:
 			exit_type = 'cached'
 		elif exit_code == 0:
-			exit_type = 'finished'
+			exit_type = 'processed'
 		else:
 			exit_type = 'failed'
 
