@@ -158,21 +158,21 @@ def close_project_transaction(time, project, channel=''):
 
 	return channel + '/' + str(project.factor), msg
 
-def open_process_transaction(time, factor, pid, synopsis, focus, command, logfile, channel=''):
+def open_process_transaction(time, factor, pid, synopsis, focus, command, logfile):
 	msg = frames.types.Message.from_string_v1(
 		"transaction-started[->]: " + synopsis + ' ' + focus,
 		protocol=frames.protocol
 	)
 	msg.msg_parameters['data'] = frames.types.Parameters.from_pairs_v1([
 		('time-offset', time),
-		('command', list(command)),
+		('factor', str(factor)),
+		('command', list(str(x) for x in command)),
 		('focus', str(focus)),
-		('log', repr(logfile)[7:-2]),
+		('log', str(logfile)),
 	])
+	return msg
 
-	return channel + '/' + str(factor) + '/system/' + str(pid), msg
-
-def close_process_transaction(time, factor, pid, synopsis, status, rusage, channel=''):
+def close_process_transaction(time, pid, synopsis, status, rusage):
 	msg = frames.types.Message.from_string_v1(
 		"transaction-stopped[<-]: " + synopsis,
 		protocol=frames_protocol
@@ -181,8 +181,7 @@ def close_process_transaction(time, factor, pid, synopsis, status, rusage, chann
 		('time-offset', time),
 		('status', status),
 	])
-
-	return channel + '/' + str(factor) + '/system/' + str(pid), msg
+	return msg
 
 def process_metrics_signal(time, exit_type, rusage):
 	counts = {exit_type: 1}
@@ -462,8 +461,6 @@ class Construction(kcore.Context):
 		strcmd = tuple(map(str, cmd))
 		pid = None
 		start_time = self.time()
-		opt = open_process_transaction(start_time, factor.route, pid, strcmd[0], focus, strcmd, log, channel=self._channel)
-		self.log.emit(*opt)
 
 		with log.fs_open('wb') as f:
 			ki = libexec.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
@@ -474,6 +471,10 @@ class Construction(kcore.Context):
 						pid: (typ, cmd, log, factor, start_time)
 					})
 			xact = kcore.Transaction.create(sp)
+
+		open_msg = open_process_transaction(start_time, factor.route, pid, strcmd[0], focus, strcmd, log)
+		channel = self._channel + '/' + str(factor.route) + '/system/' + str(pid)
+		self.log.emit(channel, open_msg)
 
 		self.xact_dispatch(xact)
 		return xact
@@ -516,9 +517,10 @@ class Construction(kcore.Context):
 		else:
 			exit_type = 'failed'
 
-		cpt = close_process_transaction(stop_time, factor.route, pid, synopsis, exit_code, rusage, channel=self._channel)
-		self.log.emit(cpt[0], process_metrics_signal(stop_time - start_time, exit_type, rusage))
-		self.log.emit(*cpt)
+		close_msg = close_process_transaction(stop_time, pid, synopsis, exit_code, rusage)
+		channel = self._channel + '/' + str(factor.route) + '/system/' + str(pid)
+		self.log.emit(channel, process_metrics_signal(stop_time - start_time, exit_type, rusage))
+		self.log.emit(channel, close_msg)
 
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.
