@@ -271,8 +271,6 @@ class Construction(kcore.Context):
 		return sysclock.elapsed().decrease(self._etime)
 
 	def actuate(self):
-		self.log.emit(*open_project_transaction(self.time(), self.c_project, channel=self._channel))
-
 		if self.reconstruct:
 			if self.reconstruct > 1:
 				self._filter = functools.partial(updated, never=True, cascade=True)
@@ -286,8 +284,8 @@ class Construction(kcore.Context):
 		# Manages the dependency order.
 		self.c_sequence = graph.sequence(descent, self.c_factors)
 
-		initial = next(self.c_sequence) # generator init
-		assert initial is None
+		initial = next(self.c_sequence)
+		assert initial is None # generator init
 
 		self.finish(())
 		self.drain_process_queue()
@@ -315,7 +313,6 @@ class Construction(kcore.Context):
 			self.finish_termination()
 
 	def finish_termination(self):
-		self.log.emit(*close_project_transaction(self.time(), self.c_project, channel=self._channel))
 		return super().finish_termination()
 
 	def collect(self, factor, requirements, dependents=()):
@@ -414,7 +411,9 @@ class Construction(kcore.Context):
 				skipped += 1
 
 			tracks.extend((('prepare', pf), ('transform', xf), ('integrate', fi)))
-			channel = str(factor.project.route) + '/' + str(factor.route)
+
+			# Communicate skip count.
+			channel = self._channel + '/' + str(factor.name)
 			self.log.emit(channel, cached_operation_signal(0, skipped))
 		if tracks:
 			self.progress[factor] = -1
@@ -473,7 +472,9 @@ class Construction(kcore.Context):
 			xact = kcore.Transaction.create(sp)
 
 		open_msg = open_process_transaction(start_time, factor.route, pid, strcmd[0], focus, strcmd, log)
-		channel = self._channel + '/' + str(factor.route) + '/system/' + str(pid)
+		channel = "{0}/{1}/{2}/{3}".format(
+			self._channel, str(factor.name), 'system', str(pid),
+		)
 		self.log.emit(channel, open_msg)
 
 		self.xact_dispatch(xact)
@@ -518,7 +519,9 @@ class Construction(kcore.Context):
 			exit_type = 'failed'
 
 		close_msg = close_process_transaction(stop_time, pid, synopsis, exit_code, rusage)
-		channel = self._channel + '/' + str(factor.route) + '/system/' + str(pid)
+		channel = "{0}/{1}/{2}/{3}".format(
+			self._channel, str(factor.name), 'system', str(pid),
+		)
 		self.log.emit(channel, process_metrics_signal(stop_time - start_time, exit_type, rusage))
 		self.log.emit(channel, close_msg)
 
