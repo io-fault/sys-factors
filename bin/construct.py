@@ -118,6 +118,8 @@ class Application(kcore.Context):
 			files.Path.from_absolute(x)
 			for x in os.environ.get('CONNECTIONS', '').split(':')
 		]
+		connections = (work/'.product'/'CONNECTIONS').fs_load().decode('utf-8').split('\n')
+		factor_paths.extend(map(files.Path.from_absolute, connections))
 		for x in factor_paths:
 			if x != files.root and x.fs_type() == 'directory':
 				pctx.connect(x)
