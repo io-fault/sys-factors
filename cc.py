@@ -90,7 +90,7 @@ def interpret_reference(cc, pcontext, _factor, symbol, url, rreqs={}, rsources=[
 	id = product + rproject_name
 	pj = pcontext.project(id) #* No project in path.
 	((fp, ft), (fsyms, fsrcs)) = next(iter(pj.select(fpath))) #* Dependency has no such factor.
-	return core.Target(pj, fp, cc.identify(ft), ft, rreqs, rsources)
+	return core.Target(pj, fp, cc.identify(ft), ft, rreqs, rsources, intention=cc.required)
 
 def requirements(cc, pcontext, symbols, factor):
 	"""
@@ -312,8 +312,10 @@ class Construction(kcore.Context):
 		if self._end_of_factors:
 			self.finish_termination()
 
-	def finish_termination(self):
-		return super().finish_termination()
+	if 0:
+		# End of project processing.
+		def finish_termination(self):
+			return super().finish_termination()
 
 	def collect(self, factor, requirements, dependents=()):
 		"""
@@ -352,8 +354,8 @@ class Construction(kcore.Context):
 
 		variants, mech = selection
 		variants['name'] = factor.name
-		integral = factor.integral(variants)
 		variant_set = factor.link(variants, ctx, mech, reqs, dependents)
+		integral = factor.image(variants, overrides=ctx.overrides)
 
 		# Subfactor of c_factor (selected path)
 		subfactor = (factor.project.factor == self.c_project.factor)

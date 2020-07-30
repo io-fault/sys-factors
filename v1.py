@@ -85,7 +85,24 @@ class Context(object):
 		return self.index['context']['name']
 
 	@property
+	def required(self):
+		"""
+		# The intention used to resolve dependencies.
+		"""
+		return self.index['context'].get('requirement')
+
+	@property
+	def overrides(self):
+		"""
+		# Variant overrides for &.core.Target.image.
+		"""
+		return self.index['context'].get('override-variants')
+
+	@property
 	def intention(self):
+		"""
+		# The intention of target images.
+		"""
 		return self.index['context']['intention']
 
 	@property

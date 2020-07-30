@@ -97,8 +97,9 @@ class SystemFactor(object):
 	def sources(self):
 		return self.__dict__['_sources']
 
-	def integral(self, *ignored):
+	def image(self):
 		return self.__dict__['_image']
+	integral = image
 
 	@property
 	def symbols(self):
@@ -158,6 +159,7 @@ class Target(object):
 			sources:(typing.Sequence[routes.Selector]),
 			parameters:(typing.Mapping)=None,
 			variants:(typing.Mapping)=None,
+			intention=None,
 		):
 		self.project = project
 		self.route = route
@@ -166,6 +168,7 @@ class Target(object):
 		self.symbols = symbols
 		self._sources = list(sources)
 		self.parameters = parameters
+		self.intention = intention
 
 		self.key = None
 		self.local_variants = variants or {}
@@ -204,14 +207,24 @@ class Target(object):
 
 		return vl, vars.encode('utf-8')
 
-	def integral(self, variants):
+	def image(self, variants, overrides=None):
 		"""
 		# Get the appropriate reduction for the Factor based on the
 		# configured &key. If no key has been configured, the returned
 		# route will be to the inducted factor.
 		"""
 
-		return self.project.integral(variants, self.route)
+		if overrides is not None:
+			variants.update(overrides)
+
+		if self.intention is not None:
+			# Variant (image) intention override for requirements.
+			# For Contexts like delineation, the requirements need
+			# a real image. Notably, for source factors such as C headers.
+			variants['intention'] = self.intention
+
+		return self.project.image(variants, self.route)
+	integral = image
 
 	def formats(self, mechanism, dependents):
 		"""

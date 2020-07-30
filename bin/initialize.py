@@ -39,14 +39,20 @@ def source_domain():
 		}
 	}
 
-def skeleton(intention):
+def skeleton(intention, requirement=None, variants={}):
 	"""
 	# Initialize a construction context for host targets.
 	"""
 
 	return {
 		'context': {
+			# The target intent.
 			'intention': intention,
+			# The requirement intent.
+			'requirement': requirement,
+
+			# The override variants.
+			'overrides': variants,
 		},
 		'source': source_domain(),
 	}
@@ -153,9 +159,16 @@ def context(route, intention, reference, symbols, options):
 	coredata = skeleton(intention)
 	coredata['context']['options'] = options
 	coredata['context']['path'] = ['source']
+
+	if intention == 'delineation':
+		coredata['context']['requirement'] = 'debug'
+		coredata['context']['override-variants'] = {
+			'system': 'void',
+			'architecture': 'data',
+		}
+
 	corefile = mechdir / 'core'
 	corefile.fs_store(pickle.dumps({'root': coredata}))
-
 	materialize_support_project(local / 'f_intention', 'intention')
 
 def main(inv:(process.Invocation)) -> (process.Exit):
