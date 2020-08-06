@@ -530,22 +530,16 @@ class Build(tuple):
 		ctx = self.context
 		domain = ctx.identify(ftype)
 		needed_variants = ctx.variants(domain, ftype)
-		needed_variants.pop('name', None)
-
-		# XXX: Eliminate this condition; contexts should specify their depending intent.
-		if ftype == 'source-tree' and self.variants['intention'] == 'delineation':
-			needed_variants['intention'] = 'debug'
 
 		reqs = self.requirements.get((domain, ftype), ())
 		for x in reqs:
 			if isinstance(x, SystemFactor):
-				yield x.integral(), x
-				continue
-
-			v = {'name': x.name}
-			v.update(needed_variants)
-			path = x.integral(v)
-			yield path, x
+				yield x.image(), x
+			else:
+				v = dict(needed_variants)
+				v['name'] = x.name
+				path = x.image(v)
+				yield path, x
 
 	@property
 	def system(self):
