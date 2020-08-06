@@ -48,6 +48,7 @@ class Context(object):
 		self.sequence = sequence or ()
 		self.symbols = symbols
 		self._languages = {}
+		self._cache = {}
 
 		self.index = dict()
 		for mid, slots in self.sequence:
@@ -118,15 +119,14 @@ class Context(object):
 			if ftype in self.select(domain)[1].descriptor['formats']:
 				return domain
 
-	@functools.lru_cache(8)
-	def select(self, fdomain):
+	def _build(self, domain):
 		# Scan the paths (loaded data sets) for the domain.
 		variants = {'intention': self.intention}
 
-		if fdomain not in self.index:
+		if domain not in self.index:
 			return None
 
-		mechdata = copy.deepcopy(self.index[fdomain])
+		mechdata = copy.deepcopy(self.index[domain])
 		variants.update(mechdata.get('variants', ()))
 
 		if 'inherit' in mechdata:
@@ -135,13 +135,22 @@ class Context(object):
 			ivariants, imech = self.select(inner)
 			data.merge(mechdata, imech.descriptor)
 			variants.update(ivariants)
-			mechdata['path'] = [fdomain] + mechdata['path']
+			mechdata['path'] = [domain] + mechdata['path']
 		else:
-			mechdata['path'] = [fdomain]
+			mechdata['path'] = [domain]
 
 		mech = core.Mechanism(mechdata)
-
 		return variants, mech
+
+	def select(self, domain):
+		if domain not in self._cache:
+			self._cache[domain] = self._build(domain)
+
+		entry = self._cache[domain]
+		if entry is None:
+			return None
+		variants, mech = entry
+		return (dict(variants), mech)
 
 	@functools.lru_cache(16)
 	def field(self, path, prefix):
