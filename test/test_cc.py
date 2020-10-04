@@ -5,7 +5,7 @@ from fault.system import files
 from .. import cc as module
 
 def test_updated(test):
-	tr = test.exits.enter_context(files.Path.temporary())
+	tr = test.exits.enter_context(files.Path.fs_tmpdir())
 
 	of = tr / 'obj'
 	sf = tr / 'src'

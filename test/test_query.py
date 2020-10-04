@@ -7,7 +7,7 @@ from .. import query as module
 from fault.system import files
 
 def test_executables(test):
-	with files.Path.temporary() as td:
+	with files.Path.fs_tmpdir() as td:
 		b = td / 'bin'
 		x = b / 'x'
 		x.fs_init()
