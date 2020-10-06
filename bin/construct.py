@@ -23,7 +23,7 @@ from fault.kernel import system as ksystem
 from fault.time import sysclock
 from fault.status import types as statustypes
 from fault.status import frames as statusframes
-from fault.transcripts import frames as transcripts
+from fault.transcript import frames as transcripts
 
 class Application(kcore.Context):
 	@property

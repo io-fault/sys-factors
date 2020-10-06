@@ -130,7 +130,7 @@ def initial_factor_defines(target, factorpath):
 	]
 
 # Status Frames
-from fault.transcripts import frames
+from fault.transcript import frames
 from fault.status.frames import protocol as frames_protocol
 
 def open_project_transaction(time, project, intention='unspecified', channel=''):
