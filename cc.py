@@ -8,7 +8,6 @@ import collections
 import contextlib
 import typing
 
-from fault import routes
 from fault.time import sysclock
 from fault.system import execution as libexec
 from fault.system import files

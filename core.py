@@ -7,7 +7,6 @@ import itertools
 import importlib
 import operator
 
-from fault import routes
 from fault.project import root
 from fault.project import types as project_types
 from fault.system import files
@@ -152,11 +151,11 @@ class Target(object):
 
 	def __init__(self,
 			project:(root.Project),
-			route:(routes.Segment),
+			route:(root.types.FactorPath),
 			domain:(str),
 			type:(str),
 			symbols:(typing.Sequence[str]),
-			sources:(typing.Sequence[routes.Selector]),
+			sources:(typing.Sequence[files.Path]),
 			parameters:(typing.Mapping)=None,
 			variants:(typing.Mapping)=None,
 			intention=None,

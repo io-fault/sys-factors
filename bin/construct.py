@@ -12,8 +12,6 @@ from .. import cc
 from .. import cache
 
 from fault.system import process
-
-from fault import routes
 from fault.system import files
 
 from fault.project.root import Product, Context
