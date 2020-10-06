@@ -40,7 +40,7 @@ handlers = {
 def parse(arguments):
 	"""
 	# Parse the given arguments into a dictionary suitable for serialization into
-	# a &..cc.Context parameters directory and use by &..cc.Parameters.
+	# a &.cc.Context parameters directory and use by &.cc.Parameters.
 	"""
 	libdir = None
 
