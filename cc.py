@@ -468,7 +468,7 @@ class Construction(kcore.Context):
 				with stdout.fs_open('wb') as co:
 					pid = ki.spawn(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
 					sp = kdispatch.Subprocess(self._reapusage(pid), {
-						pid: (typ, cmd, log, factor, start_time)
+						pid: (typ, cmd, log, factor, start_time, io)
 					})
 			xact = kcore.Transaction.create(sp)
 
@@ -488,7 +488,7 @@ class Construction(kcore.Context):
 			self.process_exit(pid, status, None, *params)
 
 	def process_exit(self,
-			pid, delta, rusage, typ, cmd, log, factor, start_time,
+			pid, delta, rusage, typ, cmd, log, factor, start_time, io,
 			_color='\x1b[38;5;1m',
 			_normal='\x1b[0m'
 		):
@@ -505,7 +505,10 @@ class Construction(kcore.Context):
 		self.exits += 1
 		# Build synopsis.
 		exitstr = cmd[0].rsplit('/', 1)[-1] + '[' + str(exit_code) + ']'
-		if exit_code != 0:
+		if exit_code == 0:
+			if io[1].fs_type() == 'directory':
+				io[1].fs_modified()
+		else:
 			self.failures += 1
 			exitstr = _color + exitstr + _normal
 
