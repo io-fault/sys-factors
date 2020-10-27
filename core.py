@@ -96,7 +96,7 @@ class SystemFactor(object):
 	def sources(self):
 		return self.__dict__['_sources']
 
-	def image(self):
+	def image(self, variants=None):
 		return self.__dict__['_image']
 	integral = image
 
