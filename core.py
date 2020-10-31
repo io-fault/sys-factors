@@ -65,6 +65,10 @@ class SystemFactor(object):
 		# XXX: invariant
 		return ()
 
+	@property
+	def method(self):
+		return getattr(self, '_method', None)
+
 	@classmethod
 	def collect(Class, tree):
 		"""
@@ -159,6 +163,7 @@ class Target(object):
 			parameters:(typing.Mapping)=None,
 			variants:(typing.Mapping)=None,
 			intention=None,
+			method=None,
 		):
 		self.project = project
 		self.route = route
@@ -168,6 +173,7 @@ class Target(object):
 		self._sources = list(sources)
 		self.parameters = parameters
 		self.intention = intention
+		self.method = method
 
 		self.key = None
 		self.local_variants = variants or {}

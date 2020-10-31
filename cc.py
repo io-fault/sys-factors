@@ -71,16 +71,17 @@ def updated(outputs, inputs, never=False, cascade=False, subfactor=True):
 	# object has already been updated.
 	return True
 
-def interpret_reference(cc, pcontext, _factor, symbol, url, rreqs={}, rsources=[]):
+def interpret_reference(cc, pcontext, _factor, symbol, reference, rreqs={}, rsources=[]):
 	"""
 	# Extract the project identifier from the &url and find a corresponding project.
 
 	# The fragment portion of the URL specifies the factor within the project
 	# that should be connected in order to use the &symbol.
 	"""
+	method, project_url, factor_path = reference
 
-	i = ri.parse(url[0])
-	fpath = project_types.factor@url[1]
+	i = ri.parse(project_url)
+	fpath = project_types.factor@factor_path
 	rproject_name = i['path'][-1]
 
 	i['path'][-1] = '' # Force the trailing slash in serialize()
@@ -89,7 +90,7 @@ def interpret_reference(cc, pcontext, _factor, symbol, url, rreqs={}, rsources=[
 	id = product + rproject_name
 	pj = pcontext.project(id) #* No project in path.
 	((fp, ft), (fsyms, fsrcs)) = next(iter(pj.select(fpath))) #* Dependency has no such factor.
-	return core.Target(pj, fp, cc.identify(ft), ft, rreqs, rsources, intention=cc.required)
+	return core.Target(pj, fp, cc.identify(ft), ft, rreqs, rsources, intention=cc.required, method=method)
 
 def requirements(cc, pcontext, symbols, factor):
 	"""
