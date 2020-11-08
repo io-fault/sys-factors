@@ -79,6 +79,9 @@ def interpret_reference(cc, pcontext, _factor, symbol, reference, rreqs={}, rsou
 	# that should be connected in order to use the &symbol.
 	"""
 	method, project_url, factor_path = reference
+	if method == 'type':
+		# Usually, virtual.
+		return
 
 	i = ri.parse(project_url)
 	fpath = project_types.factor@factor_path
@@ -90,7 +93,7 @@ def interpret_reference(cc, pcontext, _factor, symbol, reference, rreqs={}, rsou
 	id = product + rproject_name
 	pj = pcontext.project(id) #* No project in path.
 	((fp, ft), (fsyms, fsrcs)) = next(iter(pj.select(fpath))) #* Dependency has no such factor.
-	return core.Target(pj, fp, cc.identify(ft), ft, rreqs, rsources, intention=cc.required, method=method)
+	yield core.Target(pj, fp, cc.identify(ft), ft, rreqs, rsources, intention=cc.required, method=method)
 
 def requirements(cc, pcontext, symbols, factor):
 	"""
@@ -110,7 +113,7 @@ def requirements(cc, pcontext, symbols, factor):
 			if isinstance(r, core.Target):
 				yield r
 			else:
-				yield interpret_reference(cc, pcontext, factor, sym, r)
+				yield from interpret_reference(cc, pcontext, factor, sym, r)
 
 def initial_factor_defines(target, factorpath):
 	"""
