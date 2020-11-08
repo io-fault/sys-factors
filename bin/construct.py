@@ -102,14 +102,6 @@ class Application(kcore.Context):
 		re = self.cxn_rebuild
 		ctx = self.cxn_context
 
-		# Stopgap for pre-language specification factors.
-		self.cxn_extension_map = dict(
-			(y[1], (y[0], set())) for y in [
-				x.rsplit('.', 1) for x in
-				os.environ.get('FACTORTYPES', 'python-module.py:chapter.txt').split(':')
-			]
-		)
-
 		# Project Context
 		pctx = Context()
 		factor_paths = [work] + [
@@ -121,6 +113,9 @@ class Application(kcore.Context):
 		for x in factor_paths:
 			if x != files.root and x.fs_type() == 'directory':
 				pctx.connect(x)
+
+		pctx.load() # Project Index
+		pctx.configure() # Protocol Configuration Inheritance.
 
 		# Separate options into named slots.
 		local_symbols = {}
@@ -142,9 +137,6 @@ class Application(kcore.Context):
 			constraint = project_types.factor
 			pj_id = self.cxn_product.identifier_by_factor(project)[0]
 			pjo = pctx.project(pj_id)
-			pjo.protocol.parameters.update({
-				'source-extension-map': self.cxn_extension_map,
-			})
 
 			# Resolve relative references to absolute while maintaining set/sequence.
 			symbols = collections.ChainMap(local_symbols, pctx.symbols(pjo))
@@ -154,7 +146,7 @@ class Application(kcore.Context):
 					self.cxn_context.identify(ft),
 					ft, # factor-type
 					{x: symbols[x] for x in fs[0]},
-					fs[1],
+					fs[1], # sources
 					variants={'name':fp.identifier})
 				for (fp, ft), fs in pjo.select(constraint)
 			]
