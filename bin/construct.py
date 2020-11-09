@@ -104,17 +104,9 @@ class Application(kcore.Context):
 
 		# Project Context
 		pctx = Context()
-		factor_paths = [work] + [
-			files.Path.from_absolute(x)
-			for x in os.environ.get('CONNECTIONS', '').split(':')
-		]
-		connections = (work/'.product'/'CONNECTIONS').fs_load().decode('utf-8').split('\n')
-		factor_paths.extend(map(files.Path.from_absolute, connections))
-		for x in factor_paths:
-			if x != files.root and x.fs_type() == 'directory':
-				pctx.connect(x)
-
-		pctx.load() # Project Index
+		rctx = Context.from_product_connections(pctx.connect(work))
+		rctx.load() # Connection Project Index
+		pctx.load() # Build Project Index
 		pctx.configure() # Protocol Configuration Inheritance.
 
 		# Separate options into named slots.
@@ -159,6 +151,7 @@ class Application(kcore.Context):
 				self.cxn_context,
 				local_symbols,
 				pctx,
+				[pctx, rctx],
 				pjo,
 				targets,
 				processors=16, # overcommit significantly

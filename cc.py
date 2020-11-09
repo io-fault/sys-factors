@@ -71,7 +71,7 @@ def updated(outputs, inputs, never=False, cascade=False, subfactor=True):
 	# object has already been updated.
 	return True
 
-def interpret_reference(cc, pcontext, _factor, symbol, reference, rreqs={}, rsources=[]):
+def interpret_reference(cc, ctxpath, _factor, symbol, reference, rreqs={}, rsources=[]):
 	"""
 	# Extract the project identifier from the &url and find a corresponding project.
 
@@ -91,11 +91,20 @@ def interpret_reference(cc, pcontext, _factor, symbol, reference, rreqs={}, rsou
 	product = ri.serialize(i)
 
 	id = product + rproject_name
-	pj = pcontext.project(id) #* No project in path.
+	for ctx in ctxpath:
+		try:
+			pj = ctx.project(id) #* No project in path.
+		except LookupError:
+			pass
+		else:
+			break
+	else:
+		raise Exception("could not find %s project in contexts" %(id,))
+
 	((fp, ft), (fsyms, fsrcs)) = next(iter(pj.select(fpath))) #* Dependency has no such factor.
 	yield core.Target(pj, fp, cc.identify(ft), ft, rreqs, rsources, intention=cc.required, method=method)
 
-def requirements(cc, pcontext, symbols, factor):
+def requirements(cc, ctxpath, symbols, factor):
 	"""
 	# Return the set of factors that is required to build this Target, &self.
 	"""
@@ -113,7 +122,7 @@ def requirements(cc, pcontext, symbols, factor):
 			if isinstance(r, core.Target):
 				yield r
 			else:
-				yield from interpret_reference(cc, pcontext, factor, sym, r)
+				yield from interpret_reference(cc, ctxpath, factor, sym, r)
 
 def initial_factor_defines(target, factorpath):
 	"""
@@ -235,6 +244,7 @@ class Construction(kcore.Context):
 			context,
 			symbols,
 			pcontext,
+			ctxpath,
 			project,
 			factors,
 			reconstruct=False,
@@ -255,6 +265,7 @@ class Construction(kcore.Context):
 
 		self.c_cache = cache
 		self.c_pcontext = pcontext
+		self.c_ctxpath = ctxpath
 		self.c_project = project
 		self.c_symbols = symbols
 		self.c_context = context
@@ -282,7 +293,7 @@ class Construction(kcore.Context):
 		else:
 			self._filter = functools.partial(updated)
 
-		descent = functools.partial(requirements, self.c_context, self.c_pcontext, self.c_symbols)
+		descent = functools.partial(requirements, self.c_context, self.c_ctxpath, self.c_symbols)
 
 		# Manages the dependency order.
 		self.c_sequence = graph.sequence(descent, self.c_factors)
