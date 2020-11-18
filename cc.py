@@ -104,7 +104,10 @@ def interpret_reference(cc, ctxpath, _factor, symbol, reference, rreqs={}, rsour
 		fp = record[0][0]
 		if fp.identifier == fpath.identifier:
 			((fp, ft), (fsyms, fsrcs)) = record
-			yield core.Target(pj, fp, cc.identify(ft), ft, rreqs, rsources, intention=cc.required, method=method)
+			yield core.Target(
+				pj, fp, cc.identify(ft), ft, rreqs, rsources,
+				intention=cc.required,
+				method=reference.method)
 
 def requirements(cc, ctxpath, symbols, factor):
 	"""
