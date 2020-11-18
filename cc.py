@@ -78,13 +78,12 @@ def interpret_reference(cc, ctxpath, _factor, symbol, reference, rreqs={}, rsour
 	# The fragment portion of the URL specifies the factor within the project
 	# that should be connected in order to use the &symbol.
 	"""
-	method, project_url, factor_path = reference
-	if method == 'type':
+	if reference.method == 'type':
 		# Usually, virtual.
 		return
 
-	i = ri.parse(project_url)
-	fpath = project_types.factor@factor_path
+	i = ri.parse(reference.project)
+	fpath = reference.factor
 	rproject_name = i['path'][-1]
 
 	i['path'][-1] = '' # Force the trailing slash in serialize()
@@ -101,8 +100,11 @@ def interpret_reference(cc, ctxpath, _factor, symbol, reference, rreqs={}, rsour
 	else:
 		raise Exception("could not find %s project in contexts" %(id,))
 
-	((fp, ft), (fsyms, fsrcs)) = next(iter(pj.select(fpath))) #* Dependency has no such factor.
-	yield core.Target(pj, fp, cc.identify(ft), ft, rreqs, rsources, intention=cc.required, method=method)
+	for record in pj.select(fpath.container):
+		fp = record[0][0]
+		if fp.identifier == fpath.identifier:
+			((fp, ft), (fsyms, fsrcs)) = record
+			yield core.Target(pj, fp, cc.identify(ft), ft, rreqs, rsources, intention=cc.required, method=method)
 
 def requirements(cc, ctxpath, symbols, factor):
 	"""
