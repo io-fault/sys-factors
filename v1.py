@@ -119,6 +119,9 @@ class Context(object):
 			if ftype in self.select(domain)[1].descriptor['formats']:
 				return domain
 
+		# No domain holds that factor type.
+		return None
+
 	def _build(self, domain):
 		# Scan the paths (loaded data sets) for the domain.
 		variants = {'intention': self.intention}
