@@ -418,11 +418,10 @@ class Construction(kcore.Context):
 
 			# Collect the exact mechanisms used for reference by integration.
 			xfmechs = {}
-			for src in build.factor.sources():
-				langname = ctx.language(src.extension)
-				xfmech = build.mechanism.adaption(build, langname, src, phase='transformations')
-				if langname not in xfmechs:
-					xfmechs[langname] = xfmech
+			for srcfmt, src in build.factor.sources():
+				xfmech = build.mechanism.adaption(build, srcfmt.isolation, src, phase='transformations')
+				if srcfmt.isolation not in xfmechs:
+					xfmechs[srcfmt.isolation] = xfmech
 
 			fi = list(mech.integrate(xfmechs, build, f))
 			if xf or fi:

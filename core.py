@@ -1,6 +1,7 @@
 """
 # Core classes and data structures for building projects with Construction Contexts.
 """
+import sys
 import typing
 import functools
 import itertools
@@ -336,7 +337,7 @@ class Mechanism(object):
 		ld = loc['log']
 		emitted = set((od, ld))
 
-		for src in f.sources():
+		for srcfmt, src in f.sources():
 			outfile = files.Path(od, src.points)
 			logfile = files.Path(ld, src.points)
 
@@ -403,7 +404,7 @@ class Mechanism(object):
 		ignores = mechanism.get('ignore-extensions', ())
 
 		commands = []
-		for src in f.sources():
+		for srcfmt, src in f.sources():
 			fnx = src.extension
 			if intention != 'fragments' and fnx in ignores or src.identifier.startswith('.'):
 				# Ignore header files and dot-files for non-delineation contexts.
@@ -415,18 +416,17 @@ class Mechanism(object):
 
 			logfile = files.Path(loc['log'], src.points)
 
-			src_type = build.context.language(src.extension)
 			out_format = mechanism['formats'][f.type] # No format description for factor type?
 
-			adapter = self.adaption(build, src_type, src, phase='transformations')
+			adapter = self.adaption(build, srcfmt.isolation, src, phase='transformations')
 			if 'interface' in adapter:
 				xf = context_interface(adapter['interface'])
 			else:
-				sys.stdout.write('[!# ERROR: no interface for transformation %r %s]\n' % (src_type, str(src)))
+				sys.stdout.write('[!# ERROR: no interface for transformation %r %s]\n' % (srcfmt.isolation, str(src)))
 				continue
 
 			# Compilation to out_format for integration.
-			seq = list(xf(build, adapter, out_format, obj, src_type, (src,)))
+			seq = list(xf(build, adapter, out_format, obj, srcfmt.isolation, (src,)))
 
 			yield self.formulate(obj, (src,), logfile, adapter, seq)
 
@@ -467,8 +467,8 @@ class Mechanism(object):
 		loc = build.locations
 		mechanism = build.mechanism.descriptor
 
-		fmt = build.variants.get('format')
-		if fmt is None:
+		imgfmt = build.variants.get('format')
+		if imgfmt is None:
 			return
 		if 'integrations' not in mechanism:# or f.reflective: XXX
 			# warn/note?
@@ -481,7 +481,7 @@ class Mechanism(object):
 		# Discover the known sources in order to identify which objects should be selected.
 		objdir = loc['output']
 		sources = set([
-			x.points for x in f.sources()
+			x.points for srcfmt, x in f.sources()
 			if x.extension not in mechp.get('ignore-extensions', ())
 		])
 		objects = [
@@ -512,7 +512,7 @@ class Mechanism(object):
 			libraries = ()
 
 		xf = context_interface(adapter['interface'])
-		seq = xf(transform_mechs, build, adapter, f.type, rr, fmt, objects, partials, libraries)
+		seq = xf(transform_mechs, build, adapter, f.type, rr, imgfmt, objects, partials, libraries)
 		logfile = loc['log'] / 'Integration'
 
 		yield self.formulate(rr, objects, logfile, adapter, seq)
