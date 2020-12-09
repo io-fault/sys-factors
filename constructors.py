@@ -80,3 +80,42 @@ def delineation(build, adapter, o_type, output, i_type, inputs, verbose=True):
 	srcparams = ((k, v or '') for k, v in build.parameters)
 	l.extend(itertools.chain.from_iterable(srcparams))
 	return l
+
+Projection = {
+	'type': 'transparent',
+	'interface': __name__ + '.transparent',
+	'command': "/bin/ln",
+}
+
+# Single file duplication.
+Duplication = {
+	'type': 'clone',
+	'interface': __name__ + '.transparent',
+	'command': "/bin/cp",
+}
+
+# Tree duplication.
+Clone = {
+	'type': 'clone',
+	'interface': __name__ + '.clone',
+	'command': "/bin/cp",
+}
+
+def Catenation(type:str, command:str="/bin/cat"):
+	"""
+	# Template for integration commands that have a cat interface.
+	"""
+	return {
+		'type': type,
+		'interface': concatenation,
+		'name': 'cat',
+		'command': command,
+	}
+
+def Inherit(target:str):
+	"""
+	# Inheritance constructor.
+	"""
+	return {
+		'inherit': target
+	}
