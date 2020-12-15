@@ -78,7 +78,7 @@ def interpret_reference(cc, ctxpath, _factor, symbol, reference, rreqs={}, rsour
 	# The fragment portion of the URL specifies the factor within the project
 	# that should be connected in order to use the &symbol.
 	"""
-	if reference.method == 'type':
+	if reference.method in {'type', 'control/execution', 'control'}:
 		# Usually, virtual.
 		return
 
