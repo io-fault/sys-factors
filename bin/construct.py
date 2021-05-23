@@ -135,8 +135,8 @@ class Application(kcore.Context):
 			targets = [
 				core.Target(
 					pjo, fp,
-					self.cxn_context.identify(str(ft)),
-					str(ft), # factor-type
+					self.cxn_context.identify(ft),
+					ft, # factor-type
 					{x: symbols[x] for x in fs[0]},
 					fs[1], # sources
 					variants={'name':fp.identifier})
@@ -170,7 +170,7 @@ def main(inv:process.Invocation) -> process.Exit:
 		'FRAMECHANNEL',
 	])
 
-	cxn = Application.from_command(inv.environ, inv.args)
+	cxn = Application.from_command(inv.environ, inv.argv)
 
 	os.environ['OLDPWD'] = os.environ.get('PWD')
 	os.environ['PWD'] = str(cxn.cxn_work_directory)
