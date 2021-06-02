@@ -11,7 +11,7 @@ from fault.system import process
 from fault.system import execution as libexec
 from fault.project import root
 
-from sdk.tools.context import constructors
+from .. import constructors
 
 def source_domain():
 	"""
@@ -103,23 +103,8 @@ def materialize_support_project(directory, name, fault='fault'):
 	pd.update()
 	pd.store()
 
-	command = [
-		"python3", "-m",
-		fault+'.text.bin.ifst',
-		str(directory), str(tmpl_path), name,
-	]
-
-	pid, status, data = libexec.effect(libexec.KInvocation(sys.executable, command))
-	if status != 0:
-		sys.stderr.write("! ERROR: adapter tool instantiation failed\n")
-		sys.stderr.write("\t/command\n\t\t" + " ".join(command) + "\n")
-		sys.stderr.write("\t/status\n\t\t" + str(status) + "\n")
-
-		sys.stderr.write("\t/message\n")
-		sys.stderr.buffer.writelines(b"\t\t" + x + b"\n" for x in data.split(b"\n"))
-		raise SystemExit(1)
-
-	return status
+	from fault.text.bin import ifst
+	return ifst.instantiate(directory, tmpl_path, name)
 
 def context(route, intention, reference, symbols, options):
 	ctx = route
