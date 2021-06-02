@@ -403,6 +403,9 @@ class Construction(kcore.Context):
 				ctx, mech, factor, reqs, dependents,
 				v, locations, src_params + common_src_params, None
 			))
+			if not build.operable:
+				continue
+
 			xf = list(mech.transform(build, xfilter))
 			skipped = len(build.factor.sources()) - len(xf)
 

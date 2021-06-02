@@ -549,3 +549,12 @@ class Build(tuple):
 	@property
 	def system(self):
 		return self.variants.get('system', 'void')
+
+	@property
+	def operable(self):
+		"""
+		# Whether the build should be considered operable.
+		"""
+		for x in self.factor.sources():
+			return True
+		return False
