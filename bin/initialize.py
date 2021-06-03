@@ -67,7 +67,7 @@ fp = os.environ.get('FACTORPATH', '')
 os.environ['PYTHONPATH'] = fpath
 os.environ['FACTORPATH'] = fp + ':' + ctx_lib
 os.execv(sys.executable, [
-		sys.executable, '-m', %s, ctx_path,
+		sys.executable, '-m', %s,
 	] + sys.argv[1:]
 )
 """
