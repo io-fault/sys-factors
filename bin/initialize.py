@@ -106,7 +106,7 @@ def materialize_support_project(directory, name, fault='fault'):
 	from fault.text.bin import ifst
 	return ifst.instantiate(directory, tmpl_path, name)
 
-def context(route, intention, reference, symbols, options):
+def context(route, intention, symbols, options):
 	ctx = route
 	mechdir = ctx / 'mechanisms'
 	lib = ctx / 'lib'
@@ -128,19 +128,6 @@ def context(route, intention, reference, symbols, options):
 
 	pypath = '\nfpath = ' + repr(pypath)
 
-	dev = (ctx / 'execute')
-	dev.fs_init()
-	src = ep_template % (
-		repr(__package__ + '.construct').encode('utf-8'),
-	)
-	dev.fs_store(b'#!' + sys.executable.encode('utf-8') + pypath.encode('utf-8') + src)
-	os.chmod(str(dev), 0o744)
-
-	if reference is not None:
-		support = str(reference)
-	else:
-		support = ''
-
 	coredata = skeleton(intention)
 	coredata['context']['options'] = options
 	coredata['context']['path'] = ['source']
@@ -161,11 +148,8 @@ def main(inv:(process.Invocation)) -> (process.Exit):
 	intention, target, *args = inv.args
 	syms = {}
 
-	if 'CONTEXT' in os.environ:
-		refctx = files.Path.from_absolute(os.environ['CONTEXT'])
-
 	target = files.Path.from_path(target)
-	context(target, intention, refctx, syms, set(args))
+	context(target, intention, syms, set(args))
 
 	return inv.exit(0)
 
