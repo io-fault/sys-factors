@@ -16,7 +16,7 @@ def transparent(build, adapter, o_type, output, i_type, inputs, verbose=True):
 	"""
 
 	input, = inputs # Rely on exception from unpacking; expecting one input.
-	return [None, '-f', input, output]
+	return [None, '-sfh', input, output]
 
 def void(build, adapter, o_type, output, i_type, inputs, verbose=True):
 	"""
