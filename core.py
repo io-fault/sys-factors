@@ -8,10 +8,9 @@ import itertools
 import importlib
 import operator
 
-from fault.project import root
-from fault.project import types as project_types
 from fault.system import files
 from fault.system import python
+from fault.project import system as lsf
 
 from . import data
 
@@ -155,8 +154,8 @@ class Target(object):
 		return '.'.join(self.absolute)
 
 	def __init__(self,
-			project:(root.Project),
-			route:(root.types.FactorPath),
+			project:(lsf.Project),
+			route:(lsf.types.FactorPath),
 			domain:(str),
 			type:(str),
 			symbols:(typing.Sequence[str]),

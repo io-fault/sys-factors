@@ -9,7 +9,7 @@ from fault.system import files
 from fault.system import python
 from fault.system import process
 from fault.system import execution as libexec
-from fault.project import root
+from fault.project import system as lsf
 
 from .. import constructors
 
@@ -99,7 +99,7 @@ def materialize_support_project(directory, name, fault='fault'):
 	(pdpath@"f_intention/.protocol").fs_init(sp_id + b" factors/polynomial-1")
 	(pdpath@"f_intention/project.txt").fs_init(pjtxt.encode('utf-8', 'surrogateescape'))
 
-	pd = root.Product(pdpath)
+	pd = lsf.Product(pdpath)
 	pd.update()
 	pd.store()
 

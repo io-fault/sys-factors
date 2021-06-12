@@ -13,9 +13,7 @@ from .. import cache
 
 from fault.system import process
 from fault.system import files
-
-from fault.project.root import Product, Context
-from fault.project import types as project_types
+from fault.project import system as lsf
 
 from fault.kernel import core as kcore
 from fault.kernel import system as ksystem
@@ -63,13 +61,13 @@ class Application(kcore.Context):
 		ctx = cc.Context.from_directory(ctxdir)
 		rebuild = int((environ.get('FPI_REBUILD') or '0').strip())
 
-		pd = Product(work)
+		pd = lsf.Product(work)
 		pd.load() #* .product/* files
 
 		if fpath == '*':
 			fpath = ''
 
-		projects = itertools.chain.from_iterable(map(pd.select, [project_types.factor@fpath]))
+		projects = itertools.chain.from_iterable(map(pd.select, [lsf.types.factor@fpath]))
 		return Class(channel, ctx, cdi, pd, list(projects), symbols, rebuild=rebuild)
 
 	def xact_void(self, final):
@@ -103,8 +101,8 @@ class Application(kcore.Context):
 		ctx = self.cxn_context
 
 		# Project Context
-		pctx = Context()
-		rctx = Context.from_product_connections(pctx.connect(work))
+		pctx = lsf.Context()
+		rctx = lsf.Context.from_product_connections(pctx.connect(work))
 		rctx.load() # Connection Project Index
 		pctx.load() # Build Project Index
 		pctx.configure() # Protocol Configuration Inheritance.
@@ -126,7 +124,7 @@ class Application(kcore.Context):
 
 		seq = self.cxn_sequence = []
 		for project in self.cxn_projects:
-			constraint = project_types.factor
+			constraint = lsf.types.factor
 			pj_id = self.cxn_product.identifier_by_factor(project)[0]
 			pjo = pctx.project(pj_id)
 
