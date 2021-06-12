@@ -6,6 +6,7 @@ import sys
 import os
 import importlib
 import collections
+import itertools
 
 from .. import cc
 
@@ -29,7 +30,7 @@ if __name__ == '__main__':
 	for src_params, (vl, key, locations) in vset:
 		logs = locations['log']
 
-		files = logs.tree()[1]
+		files = itertools.chain.from_iterable(x[1] for x in logs.fs_index())
 		for logfile in files:
 			sys.stdout.write('[' + str(logfile) + ']\n')
 			if logfile.fs_type() == 'void':
