@@ -76,7 +76,7 @@ def delineation(build, adapter, o_type, output, i_type, inputs, verbose=True):
 	"""
 	input, = inputs
 	prefix = adapter.get('options', [])
-	l = ['delineate'] + prefix + [output, input]
+	l = ['delineate'] + adapter['tool'] + prefix + [output, input]
 	srcparams = ((k, v or '') for k, v in build.parameters)
 	l.extend(itertools.chain.from_iterable(srcparams))
 	return l
