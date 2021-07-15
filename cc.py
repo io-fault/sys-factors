@@ -78,8 +78,8 @@ def interpret_reference(cc, ctxpath, _factor, symbol, reference, rreqs={}, rsour
 	# The fragment portion of the URL specifies the factor within the project
 	# that should be connected in order to use the &symbol.
 	"""
-	if reference.method in {'type', 'control/execution', 'control'}:
-		# Usually, virtual.
+	if reference.method in {'type', 'control'}:
+		# Virtual factors.
 		return
 
 	i = ri.parse(reference.project)
@@ -106,47 +106,25 @@ def interpret_reference(cc, ctxpath, _factor, symbol, reference, rreqs={}, rsour
 			((fp, ft), (fsyms, fsrcs)) = record
 			fts = str(ft)
 			yield core.Target(
-				pj, fp, cc.identify(fts), fts, rreqs, rsources,
+				pj, fp, fts, rreqs, rsources,
 				intention=cc.required,
 				method=reference.method)
 
 def requirements(cc, ctxpath, symbols, factor):
 	"""
-	# Return the set of factors that is required to build this Target, &self.
+	# Return the set of factors that is required to build this Target, &factor.
 	"""
 
 	for sym, refs in factor.symbols.items():
 		if sym in symbols:
-			sdef = symbols[sym]
-			if isinstance(sdef, list):
-				yield from sdef
-			else:
-				yield from core.SystemFactor.collect(symbols[sym])
+			yield from symbols[sym]
 			continue
 
 		for r in refs:
-			if isinstance(r, core.Target):
+			if isinstance(r, (core.Target, core.SystemFactor)):
 				yield r
 			else:
 				yield from interpret_reference(cc, ctxpath, factor, sym, r)
-
-def initial_factor_defines(target, factorpath):
-	"""
-	# Generate a set of defines that describe the factor being created.
-	# Takes the full module path of the factor as a string.
-	"""
-	parts = factorpath.split('.')
-	project = str(target.project.factor)
-
-	tail = factorpath[len(project)+1:].split('.')[1:]
-
-	return [
-		('FACTOR_SUBPATH', '.'.join(tail)),
-		('FACTOR_PROJECT', project),
-		('FACTOR_QNAME', factorpath),
-		('FACTOR_BASENAME', parts[-1]),
-		('FACTOR_PACKAGE', '.'.join(parts[:-1])),
-	]
 
 # Status Frames
 from fault.transcript import frames
@@ -223,12 +201,8 @@ def cached_operation_signal(time, skipped):
 
 class Construction(kcore.Context):
 	"""
-	# Construction process manager. Maintains the set of target modules to construct and
+	# Construction process manager. Maintains the set of targets to construct and
 	# dispatches the work to be performed for completion in the appropriate order.
-
-	# [ Engineering ]
-	# Primarily, this class traverses the directed graph constructed by imports
-	# performed by the target modules being built.
 	"""
 
 	def warn(self, target, text):
@@ -332,6 +306,30 @@ class Construction(kcore.Context):
 		if self._end_of_factors:
 			self.finish_termination()
 
+	def _prepare_work_directory(self, locations, sources):
+		"""
+		# Generate processing instructions initializing directories in the work directory.
+		"""
+
+		ftr = locations['image']
+		units = locations['output']
+		logs = locations['log']
+
+		yield ('directory', None, None, (None, ftr.container))
+
+		emitted = set((units, logs))
+
+		# Mirror source directory tree.
+		# Scan the whole set; don't presume all sources share a common directory.
+		for srcfmt, src in sources:
+			unit = files.Path(units, src.points[:-1])
+			log = files.Path(logs, src.points[:-1])
+			emitted.update((unit, log))
+
+		for x in emitted:
+			if x.fs_type() == 'void':
+				yield ('directory', None, None, (None, x))
+
 	if 0:
 		# End of project processing.
 		def finish_termination(self):
@@ -359,9 +357,7 @@ class Construction(kcore.Context):
 
 		ctx = self.c_context
 		reqs = requirements.get(factor, ())
-		f_name = factor.absolute_path_string
-		common_src_params = initial_factor_defines(factor, f_name)
-		selection = ctx.select(factor.domain)
+		selection = ctx.select(factor.type)
 
 		if selection is None:
 			self.warn(factor, "no mechanism for %r factors"%(factor.type,))
@@ -374,22 +370,22 @@ class Construction(kcore.Context):
 
 		variants, mech = selection
 		variants['name'] = factor.name
-		variant_set = factor.link(variants, ctx, mech, reqs, dependents)
-		integral = factor.image(variants, overrides=ctx.overrides)
+		image = factor.image(variants, overrides=ctx.overrides)
 
 		# Subfactor of c_factor (selected path)
 		subfactor = (factor.project.factor == self.c_project.factor)
 		xfilter = functools.partial(self._filter, subfactor=subfactor)
 
-		for (src_params, (vl, key)) in variant_set:
+		for i in mech.variants([ctx.intention]):
+			variants['intention'] = i
+			vl, key = factor.work_key(variants)
+
 			cdr = self.c_cache.select(factor.project.factor, factor.route, key)
 			locations = {
-				'integral': integral,
+				'image': image,
 				'work': cdr,
-				'libraries': (cdr / 'lib').delimit(),
 				'log': (cdr / 'log').delimit(),
-				'output': (cdr / 'xfd').delimit(),
-				'sources': (cdr / 'src').delimit(),
+				'output': (cdr / 'units').delimit(),
 			}
 			v = dict(vl)
 
@@ -397,16 +393,17 @@ class Construction(kcore.Context):
 				# For mechanisms that do not specify reductions,
 				# the transformed set is the factor.
 				# XXX: Incomplete; check if specific output is absent.
-				locations['output'] = locations['integral']
+				locations['output'] = locations['image']
 
-			build = core.Build((
-				ctx, mech, factor, reqs, dependents,
-				v, locations, src_params + common_src_params, None
+			build = core.Integrand((
+				self.c_pcontext, mech,
+				factor, reqs, dependents,
+				v, locations
 			))
 			if not build.operable:
 				continue
 
-			xf = list(mech.transform(build, xfilter))
+			xf = list(mech.translate(build, xfilter))
 			skipped = len(build.factor.sources()) - len(xf)
 
 			# If any commands or calls are made by the transformation,
@@ -419,26 +416,22 @@ class Construction(kcore.Context):
 				# Otherwise, update if out dated.
 				f = xfilter
 
-			# Collect the exact mechanisms used for reference by integration.
-			xfmechs = {}
-			for srcfmt, src in build.factor.sources():
-				xfmech = build.mechanism.adaption(build, srcfmt.isolation, src, phase='transformations')
-				if srcfmt.isolation not in xfmechs:
-					xfmechs[srcfmt.isolation] = xfmech
-
-			fi = list(mech.integrate(xfmechs, build, f))
+			fi = list(mech.render(build, f))
 			if xf or fi:
-				pf = list(mech.prepare(build))
+				pf = list(self._prepare_work_directory(
+					locations, build.factor.sources()
+				))
 			else:
 				pf = ()
 				# Cached.
 				skipped += 1
 
-			tracks.extend((('prepare', pf), ('transform', xf), ('integrate', fi)))
+			tracks.extend((('prepare', pf), ('translate', xf), ('render', fi)))
 
 			# Communicate skip count.
 			channel = self._channel + '/' + str(factor.name)
 			self.log.emit(channel, cached_operation_signal(0, skipped))
+
 		if tracks:
 			self.progress[factor] = -1
 			self.dispatch(factor)
@@ -464,7 +457,7 @@ class Construction(kcore.Context):
 
 		if typ == 'execute-stdio':
 			stdout = io[1]
-			stdin = io[0][0] # Catenate for integrations?
+			stdin = io[0][0]
 			iostr = ' <' + str(stdin) + ' >' + str(stdout)
 		elif typ == 'execute-redirection':
 			stdout = io[1]
@@ -495,7 +488,11 @@ class Construction(kcore.Context):
 					})
 			xact = kcore.Transaction.create(sp)
 
-		open_msg = open_process_transaction(start_time, factor.route, pid, strcmd[0], focus, strcmd, log)
+		# Emit status frames.
+		open_msg = open_process_transaction(
+			start_time, factor.route, pid,
+			strcmd[0], focus, strcmd, log
+		)
 		channel = "{0}/{1}/{2}/{3}".format(
 			self._channel, str(factor.name), 'system', str(pid),
 		)
@@ -638,8 +635,7 @@ class Construction(kcore.Context):
 			if typ in ('execute', 'execute-redirection', 'execute-stdio'):
 				self.command_queue.append((irole, factor, x))
 			elif typ == 'directory':
-				tail[0][1].fs_mkdir()
-
+				tail[0][1].fs_alloc().fs_mkdir()
 				self.progress[factor] += 1
 			elif typ == 'link':
 				src, dst = tail[0]

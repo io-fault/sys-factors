@@ -11,34 +11,6 @@ from fault.system import process
 from fault.system import execution as libexec
 from fault.project import system as lsf
 
-from .. import constructors
-
-def source_domain():
-	"""
-	# Initialize (factor/domain)`source` for inclusion in a Context.
-	"""
-
-	return {
-		'variants': {
-			'system': 'void',
-			'architecture': 'sources',
-		},
-
-		'formats': {
-			'source-tree': 'directory',
-			'factor-index': None,
-			'image': None,
-		},
-
-		'transformations': {
-			None: {
-				'interface': constructors.__name__ + '.transparent',
-				'type': 'transparent',
-				'command': '/bin/cp',
-			},
-		}
-	}
-
 def skeleton(intention, requirement=None, variants={}):
 	"""
 	# Initialize a construction context for host targets.
@@ -54,7 +26,6 @@ def skeleton(intention, requirement=None, variants={}):
 			# The override variants.
 			'overrides': variants,
 		},
-		'source': source_domain(),
 	}
 
 ep_template = b"""
@@ -96,8 +67,10 @@ def materialize_support_project(directory, name, fault='fault'):
 
 	pdpath = directory ** 1
 	sp_id = project_info['identifier'].encode('utf-8')
-	(pdpath@"f_intention/.protocol").fs_init(sp_id + b" factors/polynomial-1")
-	(pdpath@"f_intention/project.txt").fs_init(pjtxt.encode('utf-8', 'surrogateescape'))
+
+	pjd = (pdpath@"f_intention").fs_alloc().fs_mkdir()
+	(pjd@".protocol").fs_store(sp_id + b" factors/polynomial-1")
+	(pjd@"project.txt").fs_store(pjtxt.encode('utf-8', 'surrogateescape'))
 
 	pd = lsf.Product(pdpath)
 	pd.update()

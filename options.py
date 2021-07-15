@@ -2,39 +2,30 @@
 # Options parser implementation for compilation options common to compiler collections and link editors.
 # Used by command line tools to construct Context reference parameters local to the command.
 """
+from fault.project import types
+from fault.system import files
+from . import core
 
-def add_include(root, factors, libdir, param):
-	factors['source']['source-tree'][param] = {None}
-	return libdir
+sourcetree = types.Reference.from_ri('type', 'http://if.fault.io/factors/lambda.sources')
+systemexec = types.Reference.from_ri('type', 'http://if.fault.io/factors/system.executable')
+systemlibrary = types.Reference.from_ri('reference', 'http://if.fault.io/factors/system.library')
+systemdirectory = types.Reference.from_ri('reference', 'http://if.fault.io/factors/system.directory')
+sourceparameter = types.Reference.from_ri('set', 'http://if.fault.io/factors/lambda.control')
 
-def add_library(root, factors, libdir, param):
-	factors['host']['library'][libdir].add(param)
-	return libdir
+def split_define_parameter(s):
+	idx = s.find('=')
+	if idx == -1:
+		return [(s, '')]
 
-def add_libdir(root, factors, libdir, param):
-	factors['host']['library'][param] = set()
-	return param
-
-def add_source_parameter(root, factors, libdir, param):
-	k, v = param.split('=')
-	root['parameters'][k] = v
-	return libdir
-
-def add_source_parameter_void(root, factors, libdir, param):
-	root['parameters'][param] = None
-	return libdir
-
-def note_executable(root, factors, libdir, param):
-	root['executable'] = param
-	return libdir
+	return [(s[:idx], s[idx+1:])]
 
 handlers = {
-	'-X': note_executable,
-	'-I': add_include,
-	'-l': add_library,
-	'-L': add_libdir,
-	'-D': add_source_parameter,
-	'-U': add_source_parameter_void,
+	'-X': (systemexec, files.Path.from_path),
+	'-I': (sourcetree, files.Path.from_path),
+	'-l': (systemlibrary, files.root.__matmul__),
+	'-L': (systemdirectory, files.Path.from_path),
+	'-D': (sourceparameter, split_define_parameter),
+	'-U': (sourceparameter, (lambda x: [(str(x), None)])),
 }
 
 def parse(arguments):
@@ -42,36 +33,6 @@ def parse(arguments):
 	# Parse the given arguments into a dictionary suitable for serialization into
 	# a &.cc.Context parameters directory and use by &.cc.Parameters.
 	"""
-	libdir = None
-
-	factors = {
-		'source': {
-			'source-tree': {}
-		},
-		'host': {
-			'library': {}
-		},
-	}
-
-	root = {
-		# System factors used by mechanisms to support transformation and integration.
-		'factors': factors,
-		# Source parameters used by transformations.
-		'parameters': {},
-	}
-
 	for x in arguments:
-		flag = x[:2]
-		op = handlers[flag]
-		libdir = op(root, factors, libdir, x[2:])
-
-	for x, y in zip(('source', 'host'), ('source-tree', 'library')):
-		if not factors[x][y]:
-			del factors[x][y]
-			if not factors[x]:
-				del factors[x]
-
-	if not root['parameters']:
-		del root['parameters']
-
-	return factors
+		typ, shape = handlers[x[:2]]
+		yield core.SystemFactor(str(typ), shape(x[2:]))

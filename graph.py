@@ -57,7 +57,7 @@ def sequence(descent, nodes, defaultdict=collections.defaultdict, tuple=tuple):
 	for x, y in tree.items():
 		cs = reqs[x] = defaultdict(set)
 		for f in y:
-			cs[f.pair].add(f)
+			cs[f.type].add(f)
 
 	yield None
 

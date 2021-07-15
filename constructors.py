@@ -10,7 +10,7 @@ def disabled(*args, **kw):
 	"""
 	return ()
 
-def transparent(build, adapter, o_type, output, i_type, inputs, verbose=True):
+def transparent(build, adapter, output, srcformat, inputs, verbose=True):
 	"""
 	# Create links from the input to the output; used for zero transformations.
 	"""
@@ -18,21 +18,35 @@ def transparent(build, adapter, o_type, output, i_type, inputs, verbose=True):
 	input, = inputs # Rely on exception from unpacking; expecting one input.
 	return [None, '-sfh', input, output]
 
-def void(build, adapter, o_type, output, i_type, inputs, verbose=True):
+def copy(build, adapter, output, srcformat, inputs, verbose=True):
+	"""
+	# Create links from the input to the output; used for zero transformations.
+	"""
+
+	input, = inputs # Rely on exception from unpacking; expecting one input.
+	return [None, '-f', input, output]
+
+def clone(build, adapter, output, srcformat, inputs):
+	"""
+	# Duplicate the filesystem directory or file.
+	"""
+	return ['cp', '-R', '-f', str(inputs[0] ** 1) + '/', output]
+
+def void(build, adapter, output, inputs, verbose=True):
 	"""
 	# Command constructor executing &.bin.void with the intent of emitting
 	# an error designating that the factor could not be processed.
 	"""
 	return [None, output] + list(inputs)
 
-def standard_io(build, adapter, o_type, output, i_type, inputs, verbose=True):
+def standard_io(build, adapter, output, inputs, verbose=True):
 	"""
 	# Interface returning a command with no arguments.
 	# Used by transformation mechanisms that operate using standard I/O.
 	"""
 	return [None]
 
-def standard_out(build, adapter, o_type, output, i_type, inputs, verbose=True, root=False):
+def standard_out(build, adapter, output, inputs, verbose=True, root=False):
 	"""
 	# Takes the set of files as the initial parameters and emits
 	# the processed result to standard output.
@@ -40,8 +54,7 @@ def standard_out(build, adapter, o_type, output, i_type, inputs, verbose=True, r
 
 	return [None] + list(inputs)
 
-def concatenation(build, adapter, o_type, output, i_type, inputs,
-		partials, libraries,
+def concatenation(build, adapter, output, inputs,
 		verbose=True,
 		filepath=str,
 	):
@@ -53,13 +66,7 @@ def concatenation(build, adapter, o_type, output, i_type, inputs,
 	"""
 	return ['cat'] + list(inputs)
 
-def clone(context, build, adapter, o_type, output, i_type, inputs, partials, libraries):
-	"""
-	# Duplicate the filesystem directory or file.
-	"""
-	return ['cp', '-R', '-f', str(inputs[0] ** 1) + '/', output]
-
-def empty(context, mechanism, factor, output, inputs,
+def empty(build, factor, output, inputs,
 		language=None,
 		format=None,
 		verbose=True,
@@ -70,7 +77,7 @@ def empty(context, mechanism, factor, output, inputs,
 	"""
 	return ['empty']
 
-def delineation(build, adapter, o_type, output, i_type, inputs, verbose=True):
+def delineation(build, adapter, output, inputs, verbose=True):
 	"""
 	# Standard delineation form.
 	"""
@@ -116,6 +123,4 @@ def Inherit(target:str):
 	"""
 	# Inheritance constructor.
 	"""
-	return {
-		'inherit': target
-	}
+	return {'inherit': target}

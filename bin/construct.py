@@ -32,7 +32,6 @@ class Application(kcore.Context):
 			channel,
 			context, cache, product,
 			projects, symbols,
-			domain='system',
 			rebuild=0,
 		):
 		self.cxn_channel = channel
@@ -41,7 +40,6 @@ class Application(kcore.Context):
 		self.cxn_product = product
 		self.cxn_projects = projects
 		self.cxn_local_symbols = symbols
-		self.cxn_domain = domain
 		self.cxn_rebuild = rebuild
 		self.cxn_extension_map = None
 		self.cxn_log = transcripts.Log.stdout()
@@ -103,8 +101,8 @@ class Application(kcore.Context):
 		# Project Context
 		pctx = lsf.Context()
 		rctx = lsf.Context.from_product_connections(pctx.connect(work))
-		rctx.load() # Connection Project Index
-		pctx.load() # Build Project Index
+		rctx.load() # Connection Project Index (requirements)
+		pctx.load() # Build Project Index (targets)
 		pctx.configure() # Protocol Configuration Inheritance.
 
 		# Separate options into named slots.
@@ -118,27 +116,24 @@ class Application(kcore.Context):
 
 		# Parse options for each slot.
 		for k in list(local_symbols):
-			local_symbols[k] = options.parse(local_symbols[k])
-
-		local_symbols.update(ctx.symbols.items())
+			local_symbols[k] = list(options.parse(local_symbols[k]))
 
 		seq = self.cxn_sequence = []
-		for project in self.cxn_projects:
+		for project_factor in self.cxn_projects:
 			constraint = lsf.types.factor
-			pj_id = self.cxn_product.identifier_by_factor(project)[0]
-			pjo = pctx.project(pj_id)
+			pj_id = self.cxn_product.identifier_by_factor(project_factor)[0]
+			project = pctx.project(pj_id)
 
 			# Resolve relative references to absolute while maintaining set/sequence.
-			symbols = collections.ChainMap(local_symbols, pctx.symbols(pjo))
+			symbols = collections.ChainMap(local_symbols, pctx.symbols(project))
 			targets = [
 				core.Target(
-					pjo, fp,
-					self.cxn_context.identify(ft),
+					project, fp,
 					ft, # factor-type
-					{x: symbols[x] for x in fs[0]},
+					{x: symbols[x] for x in fs[0]}, # requirements
 					fs[1], # sources
 					variants={'name':fp.identifier})
-				for (fp, ft), fs in pjo.select(constraint)
+				for (fp, ft), fs in project.select(constraint)
 			]
 
 			seq.append(cc.Construction(
@@ -150,7 +145,7 @@ class Application(kcore.Context):
 				local_symbols,
 				pctx,
 				[pctx, rctx],
-				pjo,
+				project,
 				targets,
 				processors=16, # overcommit significantly
 				reconstruct=re,
