@@ -8,11 +8,11 @@ import collections
 import contextlib
 import typing
 
+from fault.context import tools
 from fault.time import sysclock
 from fault.system import execution as libexec
 from fault.system import files
 from fault.internet import ri
-from fault.project import types as project_types
 
 from fault.kernel import core as kcore
 from fault.kernel import dispatch as kdispatch
@@ -22,6 +22,21 @@ from . import core
 from . import v1
 
 Context=v1.Context
+
+@tools.cachedcalls(8)
+def work_key_cache(prefix, variants):
+	key = prefix
+	# Using slashes as separators as they should not
+	# be present in the values for filesystem safety.
+	key += '/i=' + variants.intention
+	key += '/s=' + variants.system
+	key += '/a=' + variants.architecture
+	key += '/f=' + variants.form
+	return key
+
+def work(variants, name, /, encoding='utf-8'):
+	key = work_key_cache('fpi-work', variants) + '/N=' + name
+	return key.encode(encoding)
 
 def rebuild(outputs, inputs, subfactor=True, cascade=False):
 	"""
@@ -107,7 +122,6 @@ def interpret_reference(cc, ctxpath, _factor, symbol, reference, rreqs={}, rsour
 			fts = str(ft)
 			yield core.Target(
 				pj, fp, fts, rreqs, rsources,
-				intention=cc.required,
 				method=reference.method)
 
 def requirements(cc, ctxpath, symbols, factor):
@@ -220,6 +234,7 @@ class Construction(kcore.Context):
 			channel,
 			time,
 			log,
+			intentions,
 			cache,
 			context,
 			symbols,
@@ -243,6 +258,7 @@ class Construction(kcore.Context):
 		self.exits = 0
 		self.c_sequence = None
 
+		self.c_intentions = intentions
 		self.c_cache = cache
 		self.c_pcontext = pcontext
 		self.c_ctxpath = ctxpath
@@ -311,7 +327,7 @@ class Construction(kcore.Context):
 		# Generate processing instructions initializing directories in the work directory.
 		"""
 
-		ftr = locations['image']
+		ftr = locations['factor-image']
 		units = locations['output']
 		logs = locations['log']
 
@@ -369,42 +385,32 @@ class Construction(kcore.Context):
 			return
 
 		variants, mech = selection
-		variants['name'] = factor.name
-		image = factor.image(variants, overrides=ctx.overrides)
 
 		# Subfactor of c_factor (selected path)
 		subfactor = (factor.project.factor == self.c_project.factor)
 		xfilter = functools.partial(self._filter, subfactor=subfactor)
 
-		for i in mech.variants([ctx.intention]):
-			variants['intention'] = i
-			vl, key = factor.work_key(variants)
-
+		for ci, variants in mech.variants(self.c_intentions):
+			image = factor.image(variants)
+			key = work(variants, factor.name)
 			cdr = self.c_cache.select(factor.project.factor, factor.route, key)
 			locations = {
-				'image': image,
+				'factor-image': image,
 				'work': cdr,
 				'log': (cdr / 'log').delimit(),
 				'output': (cdr / 'units').delimit(),
 			}
-			v = dict(vl)
 
-			if not mech.integrates():
-				# For mechanisms that do not specify reductions,
-				# the transformed set is the factor.
-				# XXX: Incomplete; check if specific output is absent.
-				locations['output'] = locations['image']
-
-			build = core.Integrand((
+			fint = core.Integrand((
 				self.c_pcontext, mech,
 				factor, reqs, dependents,
-				v, locations
+				variants, locations
 			))
-			if not build.operable:
+			if not fint.operable:
 				continue
 
-			xf = list(mech.translate(build, xfilter))
-			skipped = len(build.factor.sources()) - len(xf)
+			xf = list(mech.translate(fint, xfilter))
+			skipped = len(fint.factor.sources()) - len(xf)
 
 			# If any commands or calls are made by the transformation,
 			# rebuild the target.
@@ -416,10 +422,10 @@ class Construction(kcore.Context):
 				# Otherwise, update if out dated.
 				f = xfilter
 
-			fi = list(mech.render(build, f))
+			fi = list(mech.render(fint, f))
 			if xf or fi:
 				pf = list(self._prepare_work_directory(
-					locations, build.factor.sources()
+					locations, fint.factor.sources()
 				))
 			else:
 				pf = ()

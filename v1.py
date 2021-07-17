@@ -7,6 +7,7 @@ import typing
 import copy
 import importlib
 
+from fault.context import tools
 from fault.system import files
 from fault.system import python
 from fault.project import system as lsf
@@ -51,9 +52,10 @@ class Mechanism(object):
 		self.descriptor = descriptor
 		self.cache = {}
 
-	def variants(self, intentions):
+	def variants(self, intentions, /, _vc=tools.cachedcalls(8)(lsf.types.Variants)):
+		v = self.descriptor['variants']
 		for i in intentions:
-			yield i
+			yield None, _vc(v['system'], v['architecture'], i, '')
 
 	def integrates(self):
 		ints = self.descriptor.get('integrations')
@@ -173,7 +175,7 @@ class Mechanism(object):
 		objects = [objdir.__class__(objdir, x) for x in sources]
 
 		# XXX: does not account for partials
-		if filtered((loc['image'],), objects):
+		if filtered((loc['factor-image'],), objects):
 			return
 
 		adapter = self.adaption(build, f.type, objects, phase='integrations')
@@ -185,10 +187,10 @@ class Mechanism(object):
 			objects = [objdir / root]
 
 		xf = context_interface(adapter['interface'])
-		seq = xf(build, adapter, loc['image'], objects)
+		seq = xf(build, adapter, loc['factor-image'], objects)
 		logfile = loc['log'] / 'Integration'
 
-		yield self.formulate(loc['image'], objects, logfile, adapter, seq)
+		yield self.formulate(loc['factor-image'], objects, logfile, adapter, seq)
 
 class Context(object):
 	"""

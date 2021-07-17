@@ -11,6 +11,7 @@ from .. import options
 from .. import cc
 from .. import cache
 
+from fault.context import tools
 from fault.system import process
 from fault.system import files
 from fault.project import system as lsf
@@ -29,12 +30,13 @@ class Application(kcore.Context):
 		return self.cxn_product.route
 
 	def __init__(self,
-			channel,
-			context, cache, product,
-			projects, symbols,
+			channel, context, cache,
+			intentions, product, projects,
+			symbols,
 			rebuild=0,
 		):
 		self.cxn_channel = channel
+		self.cxn_intentions = intentions
 		self.cxn_cache = cache
 		self.cxn_context = context
 		self.cxn_product = product
@@ -46,14 +48,17 @@ class Application(kcore.Context):
 
 	@classmethod
 	def from_command(Class, environ, arguments):
-		ctxdir, cache_path, work, fpath, *symbols = arguments
+		ctxdir, cache_type, cache_path, intentstr, work, fpath, *symbols = arguments
 		ctxdir = files.Path.from_path(ctxdir)
 		work = files.Path.from_path(work)
 		channel = environ.get('FRAMECHANNEL') or 'build'
 
-		if environ.get('FPI_CACHE', 'persistent') == 'transient':
+		intentions = list(tools.unique(intentstr.split(':'), None))
+
+		if cache_type == 'transient':
 			cdi = cache.Transient(files.Path.from_path(cache_path))
 		else:
+			assert cache_type == 'persistent'
 			cdi = cache.Persistent(files.Path.from_path(cache_path))
 
 		ctx = cc.Context.from_directory(ctxdir)
@@ -66,7 +71,11 @@ class Application(kcore.Context):
 			fpath = ''
 
 		projects = itertools.chain.from_iterable(map(pd.select, [lsf.types.factor@fpath]))
-		return Class(channel, ctx, cdi, pd, list(projects), symbols, rebuild=rebuild)
+		return Class(
+			channel, ctx, cdi,
+			intentions, pd, list(projects),
+			symbols, rebuild=rebuild
+		)
 
 	def xact_void(self, final):
 		"""
@@ -140,6 +149,7 @@ class Application(kcore.Context):
 				self.cxn_channel,
 				self._etime,
 				self.cxn_log,
+				self.cxn_intentions,
 				self.cxn_cache,
 				self.cxn_context,
 				local_symbols,

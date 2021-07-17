@@ -49,10 +49,10 @@ class SystemFactor(object):
 	def sources(self):
 		return self.data
 
-	def image(self, variants=None):
+	def image(self, variants):
 		return self.data
 
-	def get(self, field, variants):
+	def get(self, field):
 		typset = self.fields[field]
 		if str(self.type) not in typset:
 			raise ValueError("field is not available under factor type")
@@ -83,10 +83,6 @@ class Target(object):
 		'context-id': ('_context_id',),
 
 		'corpus': ('_corpus_id',),
-
-		'factor-image': ('image',),
-		'factor-work': ('_work',),
-
 		'source-paths': ('_source_paths',),
 		'sources': ('_source_list',),
 	}
@@ -117,7 +113,7 @@ class Target(object):
 				for x in fs[1]:
 					return x[1].context
 
-	def get(self, field, variants):
+	def get(self, field):
 		# Get the (local) field requested by &select.
 		obj = self
 		for attr in self.fields[field]:
@@ -173,7 +169,6 @@ class Target(object):
 			sources:(typing.Sequence[files.Path]),
 			parameters:(typing.Mapping)=None,
 			variants:(typing.Mapping)=None,
-			intention=None,
 			method=None,
 		):
 		self.project = project
@@ -182,7 +177,6 @@ class Target(object):
 		self.symbols = symbols
 		self._sources = list(sources)
 		self.parameters = parameters
-		self.intention = intention
 		self.method = method
 
 		self.key = None
@@ -205,20 +199,7 @@ class Target(object):
 		"""
 		return self._sources
 
-	def work_key(self, *variant_sets, **variants):
-		# Combine variants.
-		vl = list(itertools.chain.from_iterable(v.items() for v in variant_sets))
-		vl.extend(self.local_variants.items())
-		vl.extend(variants.items())
-
-		# Eliminate duplicates.
-		vl = list(dict(vl).items())
-		vl.sort()
-		vars = ';'.join('='.join((k, str(v))) for k, v in vl)
-
-		return vl, vars.encode('utf-8')
-
-	def image(self, variants, overrides=None):
+	def image(self, variants):
 		"""
 		# Get the appropriate reduction for the Factor based on the
 		# configured &key. If no key has been configured, the returned
@@ -239,17 +220,6 @@ class Integrand(tuple):
 	variants = property(operator.itemgetter(5))
 	locations = property(operator.itemgetter(6))
 
-	def required(self, ftype):
-		reqs = self.requirements.get(ftype, ())
-		for x in reqs:
-			if isinstance(x, SystemFactor):
-				yield x.image(), x
-			else:
-				v = dict(self.variants)
-				v['name'] = x.name
-				path = x.image(v)
-				yield path, x
-
 	@property
 	def operable(self):
 		"""
@@ -261,15 +231,15 @@ class Integrand(tuple):
 
 	@property
 	def intention(self) -> str:
-		return self.variants['intention']
+		return self.variants.intention
 
 	@property
 	def system(self) -> str:
-		return self.variants['system']
+		return self.variants.system
 
 	@property
 	def architecture(self) -> str:
-		return self.variants['architecture']
+		return self.variants.architecture
 
 	@property
 	def format(self) -> str:
@@ -277,7 +247,7 @@ class Integrand(tuple):
 
 	@property
 	def image(self):
-		return self.locations['image']
+		return self.locations['factor-image']
 
 	@staticmethod
 	@tools.cachedcalls(8)
@@ -296,7 +266,18 @@ class Integrand(tuple):
 			yield self.factor.get(field, self.variants)
 			return
 
-		ref = self._qrefs(field)
+		# Presume requirement query at this point.
+		try:
+			ref = self._qrefs(field)
+		except Exception:
+			return
+
 		typref = '/'.join((ref.project, str(ref.factor)))
-		for r in self.requirements.get(typref, ()):
-			yield r.get(ref.isolation, self.variants)
+
+		if ref.isolation in {'factor-image', 'image'}:
+			# Special case image as it requires variants.
+			for r in self.requirements.get(typref, ()):
+				yield r.image(self.variants)
+		else:
+			for r in self.requirements.get(typref, ()):
+				yield r.get(ref.isolation)
