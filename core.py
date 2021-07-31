@@ -152,7 +152,7 @@ class Target(object):
 
 	@property
 	def absolute(self):
-		return (self.project.factor + self.route)
+		return (self.project.factor // self.route)
 
 	@property
 	def absolute_path_string(self):
@@ -212,13 +212,12 @@ class Integrand(tuple):
 	# Container for the set of build parameters used by the configured abstraction functions.
 	"""
 
-	context = property(operator.itemgetter(0))
-	mechanism = property(operator.itemgetter(1))
-	factor = property(operator.itemgetter(2))
-	requirements = property(operator.itemgetter(3))
-	dependents = property(operator.itemgetter(4))
-	variants = property(operator.itemgetter(5))
-	locations = property(operator.itemgetter(6))
+	mechanism = property(operator.itemgetter(0))
+	factor = property(operator.itemgetter(1))
+	requirements = property(operator.itemgetter(2))
+	dependents = property(operator.itemgetter(3))
+	variants = property(operator.itemgetter(4))
+	locations = property(operator.itemgetter(5))
 
 	@property
 	def operable(self):
@@ -228,6 +227,10 @@ class Integrand(tuple):
 		for x in self.factor.sources():
 			return True
 		return False
+
+	@property
+	def itype(self):
+		return self.factor.type
 
 	@property
 	def intention(self) -> str:
@@ -251,8 +254,25 @@ class Integrand(tuple):
 
 	@staticmethod
 	@tools.cachedcalls(8)
-	def _qrefs(ri):
-		return lsf.types.Reference.from_ri('internal', ri)
+	def _qrefs(rfactor, ri):
+		tr = lsf.types.Reference.from_ri('type', ri)
+
+		if tr.factor:
+			ref = tr.isolate(None)
+		else:
+			ref = tr.__class__(
+				rfactor.project,
+				lsf.types.factor@tr.project,
+				tr.method, None
+			)
+
+		return (ref, tr.isolation)
+
+	def required(self, variants):
+		if self.requirements:
+			for reqset in self.requirements.values():
+				for ri in reqset:
+					yield ri.image(variants)
 
 	def select(self, field):
 		"""
@@ -263,21 +283,24 @@ class Integrand(tuple):
 			return
 
 		if field in self.factor.fields:
-			yield self.factor.get(field, self.variants)
+			yield self.factor.get(field)
 			return
 
 		# Presume requirement query at this point.
 		try:
-			ref = self._qrefs(field)
+			ref, rfield = self._qrefs(self.factor.type, field)
 		except Exception:
 			return
 
-		typref = '/'.join((ref.project, str(ref.factor)))
-
-		if ref.isolation in {'factor-image', 'image'}:
-			# Special case image as it requires variants.
-			for r in self.requirements.get(typref, ()):
-				yield r.image(self.variants)
-		else:
-			for r in self.requirements.get(typref, ()):
-				yield r.get(ref.isolation)
+		if self.requirements:
+			if rfield in {'factor-image', 'factor-image-name'}:
+				# Special case image as it requires variants.
+				if rfield.endswith('-name'):
+					for r in self.requirements.get(ref, ()):
+						yield r.image(self.variants).identifier
+				else:
+					for r in self.requirements.get(ref, ()):
+						yield r.image(self.variants)
+			else:
+				for r in self.requirements.get(ref, ()):
+					yield r.get(rfield)

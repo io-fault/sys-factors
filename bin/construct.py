@@ -30,11 +30,13 @@ class Application(kcore.Context):
 		return self.cxn_product.route
 
 	def __init__(self,
+			executor,
 			channel, context, cache,
 			intentions, product, projects,
 			symbols,
 			rebuild=0,
 		):
+		self.cxn_executor = executor
 		self.cxn_channel = channel
 		self.cxn_intentions = intentions
 		self.cxn_cache = cache
@@ -53,15 +55,16 @@ class Application(kcore.Context):
 		work = files.Path.from_path(work)
 		channel = environ.get('FRAMECHANNEL') or 'build'
 
+		executor = environ.get('FPI_EXECUTOR', None)
 		intentions = list(tools.unique(intentstr.split(':'), None))
 
 		if cache_type == 'transient':
 			cdi = cache.Transient(files.Path.from_path(cache_path))
 		else:
 			assert cache_type == 'persistent'
-			cdi = cache.Persistent(files.Path.from_path(cache_path))
+			cdi = cache.Persistent(files.Path.from_path(cache_path)/fpath)
 
-		ctx = cc.Context.from_directory(ctxdir)
+		ctx = cc.Context.from_directory(ctxdir).load().configure()
 		rebuild = int((environ.get('FPI_REBUILD') or '0').strip())
 
 		pd = lsf.Product(work)
@@ -72,6 +75,7 @@ class Application(kcore.Context):
 
 		projects = itertools.chain.from_iterable(map(pd.select, [lsf.types.factor@fpath]))
 		return Class(
+			executor,
 			channel, ctx, cdi,
 			intentions, pd, list(projects),
 			symbols, rebuild=rebuild
@@ -138,7 +142,7 @@ class Application(kcore.Context):
 			targets = [
 				core.Target(
 					project, fp,
-					ft, # factor-type
+					ft, # integration-type
 					{x: symbols[x] for x in fs[0]}, # requirements
 					fs[1], # sources
 					variants={'name':fp.identifier})
@@ -146,6 +150,7 @@ class Application(kcore.Context):
 			]
 
 			seq.append(cc.Construction(
+				self.cxn_executor,
 				self.cxn_channel,
 				self._etime,
 				self.cxn_log,
@@ -166,6 +171,7 @@ class Application(kcore.Context):
 
 def main(inv:process.Invocation) -> process.Exit:
 	inv.imports([
+		'FPI_EXECUTOR',
 		'FPI_CACHE',
 		'FPI_REBUILD',
 		'FPI_MECHANISMS',

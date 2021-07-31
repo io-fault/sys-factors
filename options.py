@@ -35,4 +35,4 @@ def parse(arguments):
 	"""
 	for x in arguments:
 		typ, shape = handlers[x[:2]]
-		yield core.SystemFactor(str(typ), shape(x[2:]))
+		yield core.SystemFactor(typ, shape(x[2:]))

@@ -19,9 +19,69 @@ from fault.kernel import dispatch as kdispatch
 
 from . import graph
 from . import core
-from . import v1
+from . import v2
 
-Context=v1.Context
+Context=v2.Context
+devnull = files.Path.from_absolute(os.devnull)
+
+def local_query(integrand, local, query):
+	if query in local:
+		r = local[query]
+		if isinstance(r, list):
+			return r
+		return [r]
+	return list(map(str, integrand.select(query)))
+
+def prepare(command, args, log, output, input, executor=None):
+	"""
+	# Given a command and its constructed arguments, interpret the
+	# standard I/O fields in &args, formulate a &libexec.KInvocation
+	# instance for execution, and prepare stdio &files.Path
+	# assignments.
+
+	# [ Parameters ]
+	# /command/
+		# The command prefix to be used with &args.
+	# /args/
+		# The argument vector produced by the construction context.
+	# /log/
+		# The &files.Path identifying the default location for standard error.
+	# /output/
+		# The &files.Path identifying the file that will be created by the command.
+	# /input/
+		# The &files.Path identifying the source file being translated or the sole unit.
+	"""
+	opid = next(args)
+	stdin_spec = next(args)
+	stdout_spec = next(args)
+
+	if stdin_spec == '-':
+		stdin = devnull
+	else:
+		if stdin_spec == 'input':
+			stdin = input
+		else:
+			raise Exception("unrecognized standard input specifier: " + input)
+
+	if stdout_spec == '-':
+		stdout = devnull
+	else:
+		if stdout_spec == 'output':
+			stdout = output
+		else:
+			raise Exception("unrecognized standard output specifier: " + output)
+
+	xargs = list(command[2])
+	xargs.extend(args)
+	env = dict(os.environ)
+	env.update(command[0])
+
+	ki = libexec.KInvocation(executor or command[1], xargs, environ=env)
+	return (opid, output, stdin, stdout, log, ki)
+
+@tools.cachedcalls(12)
+def _ftype(itype):
+	return itype.project + '/' + str(itype.factor ** 1)
 
 @tools.cachedcalls(8)
 def work_key_cache(prefix, variants):
@@ -79,9 +139,20 @@ def updated(outputs, inputs, never=False, cascade=False, subfactor=True):
 	# to perform the input checks.
 
 	for x in inputs:
-		if x.fs_type() == 'void' or x.fs_status().system.st_mtime > olm:
-			# rebuild if any output is older than any source.
-			return False
+		try:
+			stat = x.fs_status()
+		except FileNotFoundError:
+			# This appears undesirable, but the case is that &updated is used
+			# in situation where the &inputs are supposed to exist. If they
+			# do not, it is likely that integration was performed incorrectly.
+			# Or, requirements without images are being referenced, which is
+			# why this behavior is desired. Notably, lambda.sources factors
+			# never have images.
+			pass
+		else:
+			if stat.system.st_mtime > olm:
+				# rebuild if any output is older than any source.
+				return False
 
 	# object has already been updated.
 	return True
@@ -119,9 +190,8 @@ def interpret_reference(cc, ctxpath, _factor, symbol, reference, rreqs={}, rsour
 		fp = record[0][0]
 		if fp.identifier == fpath.identifier:
 			((fp, ft), (fsyms, fsrcs)) = record
-			fts = str(ft)
 			yield core.Target(
-				pj, fp, fts, rreqs, rsources,
+				pj, fp, ft, rreqs, rsources,
 				method=reference.method)
 
 def requirements(cc, ctxpath, symbols, factor):
@@ -231,6 +301,7 @@ class Construction(kcore.Context):
 		return self.log.emit(self._channel, msg)
 
 	def __init__(self,
+			executor,
 			channel,
 			time,
 			log,
@@ -250,6 +321,7 @@ class Construction(kcore.Context):
 		self._channel = channel
 		self._etime = time
 		self._rusage = {}
+		self._mcache = {}
 		self.log = log
 		self._end_of_factors = False
 
@@ -259,6 +331,7 @@ class Construction(kcore.Context):
 		self.c_sequence = None
 
 		self.c_intentions = intentions
+		self.c_executor = executor
 		self.c_cache = cache
 		self.c_pcontext = pcontext
 		self.c_ctxpath = ctxpath
@@ -302,6 +375,13 @@ class Construction(kcore.Context):
 
 		return super().actuate()
 
+	def select(self, ftype):
+		if ftype in self._mcache:
+			return self._mcache[ftype]
+
+		mech = self._mcache[ftype] = v2.Mechanism(self.c_context, ftype)
+		return mech
+
 	def finish(self, factors):
 		"""
 		# Called when a set of factors have been completed.
@@ -312,8 +392,15 @@ class Construction(kcore.Context):
 				del self.tracking[x]
 
 			work, reqs, deps = self.c_sequence.send(factors) # raises StopIteration
-			for x in work:
-				self.collect(x, reqs, deps.get(x, ()))
+			for target in work:
+				if isinstance(target, core.SystemFactor):
+					self.tracking[target] = []
+					self.finish([target])
+				else:
+					ftype = _ftype(target.type)
+					fr = reqs.get(target, ())
+					fd = deps.get(target, ())
+					self.collect(self.select(ftype), target, fr, fd)
 		except StopIteration:
 			self._end_of_factors = True
 			self.xact_exit_if_empty()
@@ -328,15 +415,15 @@ class Construction(kcore.Context):
 		"""
 
 		ftr = locations['factor-image']
-		units = locations['output']
-		logs = locations['log']
+		units = locations['unit-directory']
+		logs = locations['log-directory']
 
-		yield ('directory', None, None, (None, ftr.container))
+		workdir = ftr.container
+		workdir.fs_mkdir()
 
 		emitted = set((units, logs))
 
-		# Mirror source directory tree.
-		# Scan the whole set; don't presume all sources share a common directory.
+		# Mirror source directory trees to allow trivial unit/log initialization.
 		for srcfmt, src in sources:
 			unit = files.Path(units, src.points[:-1])
 			log = files.Path(logs, src.points[:-1])
@@ -344,18 +431,21 @@ class Construction(kcore.Context):
 
 		for x in emitted:
 			if x.fs_type() == 'void':
-				yield ('directory', None, None, (None, x))
+				x.fs_alloc().fs_mkdir()
 
 	if 0:
 		# End of project processing.
 		def finish_termination(self):
 			return super().finish_termination()
 
-	def collect(self, factor, requirements, dependents=()):
+	def collect(self, mechanism, factor, requirements, dependents=()):
 		"""
 		# Collect the parameters and work to be done for processing the &factor.
 
 		# [ Parameters ]
+		# /mechanism/
+			# The abstraction to the Construction Context providing
+			# translation and rendering command constructors for the variant set.
 		# /factor/
 			# The &core.Target being built.
 		# /requirements/
@@ -366,76 +456,88 @@ class Construction(kcore.Context):
 		"""
 		tracks = self.tracking[factor]
 
-		if isinstance(factor, core.SystemFactor):
-			# SystemFactors require no processing.
-			self.finish([factor])
-			return
-
-		ctx = self.c_context
-		reqs = requirements.get(factor, ())
-		selection = ctx.select(factor.type)
-
-		if selection is None:
-			self.warn(factor, "no mechanism for %r factors"%(factor.type,))
-
-			self.activity.add(factor)
-			if self.continued is False:
-				self.continued = True
-				self.enqueue(self.continuation)
-			return
-
-		variants, mech = selection
-
 		# Subfactor of c_factor (selected path)
 		subfactor = (factor.project.factor == self.c_project.factor)
 		xfilter = functools.partial(self._filter, subfactor=subfactor)
 
-		for ci, variants in mech.variants(self.c_intentions):
+		# Execution override for supporting command tracing and usage constraints.
+		exe = self.c_executor
+		skipped = 0
+		nsources = len(factor.sources())
+
+		for section, variants in mechanism.variants(self.c_intentions):
+			u_prefix, u_suffix = mechanism.unit_name_delta(section, variants, factor.type)
+
 			image = factor.image(variants)
 			key = work(variants, factor.name)
 			cdr = self.c_cache.select(factor.project.factor, factor.route, key)
 			locations = {
 				'factor-image': image,
-				'work': cdr,
-				'log': (cdr / 'log').delimit(),
-				'output': (cdr / 'units').delimit(),
+				'work-directory': cdr,
+				'log-directory': (cdr / 'log').delimit(),
+				'unit-directory': (cdr / 'units').delimit(),
 			}
 
 			fint = core.Integrand((
-				self.c_pcontext, mech,
-				factor, reqs, dependents,
+				mechanism, factor,
+				requirements, dependents,
 				variants, locations
 			))
 			if not fint.operable:
 				continue
 
-			xf = list(mech.translate(fint, xfilter))
-			skipped = len(fint.factor.sources()) - len(xf)
+			self._prepare_work_directory(locations, factor.sources())
+			logs = locations['log-directory']
+			units = locations['unit-directory']
 
-			# If any commands or calls are made by the transformation,
-			# rebuild the target.
-			for x in xf:
-				if x[0] not in ('directory', 'link'):
-					f = rebuild
-					break
+			translations = []
+			unitseq = []
+			for fmt, src in factor.sources():
+				unit_name = u_prefix + src.identifier + u_suffix
+				tlout = files.Path(units, src.points[:-1] + (unit_name,))
+				unitseq.append(str(tlout))
+
+				if xfilter((tlout,), (src,)):
+					continue
+
+				tllog = files.Path(logs, src.points)
+				cmd, tlc = mechanism.translate(section, variants, factor.type, fmt)
+				local = {
+					'source': str(src),
+					'unit': str(tlout),
+					'language': fmt.format.language,
+					'dialect': fmt.format.dialect,
+				}
+				q = tools.partial(local_query, fint, local)
+
+				args = tlc(q)
+				translations.append(prepare(cmd, args, tllog, tlout, src, executor=exe))
+
+			tracks.append(('translate', translations))
+
+			if translations or not xfilter((image,), fint.required(variants)):
+				# Build is triggered unconditionally if any translations are performed
+				# or if the target image is older than any requirement image.
+
+				cmd, ric = mechanism.render(section, variants, factor.type)
+				local = {
+					'units': unitseq,
+				}
+				if len(unitseq) == 1:
+					local['unit'] = unitseq[0]
+
+				q = tools.partial(local_query, fint, local)
+				render = ric(q)
+				rlog = files.Path(logs, ('Integration',))
+				ops = [prepare(cmd, render, rlog, image, src, executor=exe)]
 			else:
-				# Otherwise, update if out dated.
-				f = xfilter
+				ops = []
 
-			fi = list(mech.render(fint, f))
-			if xf or fi:
-				pf = list(self._prepare_work_directory(
-					locations, fint.factor.sources()
-				))
-			else:
-				pf = ()
-				# Cached.
-				skipped += 1
-
-			tracks.extend((('prepare', pf), ('translate', xf), ('render', fi)))
+			tracks.append(('render', ops))
 
 			# Communicate skip count.
 			channel = self._channel + '/' + str(factor.name)
+			skipped += nsources - len(translations)
 			self.log.emit(channel, cached_operation_signal(0, skipped))
 
 		if tracks:
@@ -449,55 +551,35 @@ class Construction(kcore.Context):
 				self.continued = True
 				self.enqueue(self.continuation)
 
-	devnull = files.Path.from_absolute(os.devnull)
 	def _reapusage(self, pid, partial=functools.partial):
 		deliver = partial(self._rusage.__setitem__, pid)
 		wait = partial(libexec.waitrusage, deliver)
 		return partial(libexec.reap, sysop=wait)
 
 	def process_execute(self, instruction, f_target_path=(lambda x: str(x))):
-		irole, factor, ins = instruction
-		typ, cmd, log, io, *tail = ins
+		phase, factor, ins = instruction
+		opid, tfile, cin, cout, cerr, ki = ins
 
-		stdout = stdin = self.devnull # Defaults
-
-		if typ == 'execute-stdio':
-			stdout = io[1]
-			stdin = io[0][0]
-			iostr = ' <' + str(stdin) + ' >' + str(stdout)
-		elif typ == 'execute-redirection':
-			stdout = io[1]
-			iostr = ' >' + str(stdout)
-		else:
-			iostr = ''
-
-		assert typ in ('execute', 'execute-redirection', 'execute-stdio')
-
-		if irole == 'integrate':
-			focus = str(io[1])
-		elif irole == 'transform':
-			focus = str(io[0][0])
-		else:
-			focus = '<unknown instruction role>'
-
-		strcmd = tuple(map(str, cmd))
 		pid = None
 		start_time = self.time()
 
-		with log.fs_open('wb') as f:
-			ki = libexec.KInvocation(str(cmd[0]), strcmd, environ=dict(os.environ))
-			with stdin.fs_open('rb') as ci:
-				with stdout.fs_open('wb') as co:
-					pid = ki.spawn(fdmap=((ci.fileno(), 0), (co.fileno(), 1), (f.fileno(), 2)))
+		with cin.fs_open('rb') as ci:
+			with cerr.fs_open('wb') as cl:
+				with cout.fs_open('wb') as co:
+					pid = ki.spawn(fdmap=(
+						(ci.fileno(), 0),
+						(co.fileno(), 1),
+						(cl.fileno(), 2),
+					))
 					sp = kdispatch.Subprocess(self._reapusage(pid), {
-						pid: (typ, cmd, log, factor, start_time, io)
+						pid: (start_time, factor, cerr, opid, tfile)
 					})
 			xact = kcore.Transaction.create(sp)
 
 		# Emit status frames.
 		open_msg = open_process_transaction(
 			start_time, factor.route, pid,
-			strcmd[0], focus, strcmd, log
+			opid, phase, (opid,), cerr
 		)
 		channel = "{0}/{1}/{2}/{3}".format(
 			self._channel, str(factor.name), 'system', str(pid),
@@ -513,10 +595,8 @@ class Construction(kcore.Context):
 		for pid, params, status in sp.sp_report():
 			self.process_exit(pid, status, None, *params)
 
-	def process_exit(self,
-			pid, delta, rusage, typ, cmd, log, factor, start_time, io,
-			_color='\x1b[38;5;1m',
-			_normal='\x1b[0m'
+	def process_exit(self, pid, delta, rusage,
+			start_time, factor, log, cmd, tfile,
 		):
 		rusage = self._rusage.pop(pid, None)
 		self.progress[factor] += 1
@@ -530,13 +610,13 @@ class Construction(kcore.Context):
 
 		self.exits += 1
 		# Build synopsis.
-		exitstr = cmd[0].rsplit('/', 1)[-1] + '[' + str(exit_code) + ']'
+		exitstr = cmd + '[' + str(exit_code) + ']'
 		if exit_code == 0:
-			if io[1].fs_type() == 'directory':
-				io[1].fs_modified()
+			if tfile.fs_type() == 'directory':
+				# Force modification of directories for (persistent) cache checks.
+				tfile.fs_modified()
 		else:
 			self.failures += 1
-			exitstr = _color + exitstr + _normal
 
 		synopsis = ' '.join([exitstr, str(log),])
 		stop_time = self.time()
@@ -634,44 +714,9 @@ class Construction(kcore.Context):
 		assert self.progress[factor] == -1
 		self.progress[factor] = 0
 
-		irole, commands = self.tracking[factor][0]
+		phase, commands = self.tracking[factor][0]
 		for x in commands:
-			typ, cmd, logfile, *tail = x
-
-			if typ in ('execute', 'execute-redirection', 'execute-stdio'):
-				self.command_queue.append((irole, factor, x))
-			elif typ == 'directory':
-				tail[0][1].fs_alloc().fs_mkdir()
-				self.progress[factor] += 1
-			elif typ == 'link':
-				src, dst = tail[0]
-				dst.fs_link_relative(src)
-
-				self.progress[factor] += 1
-			elif typ == 'call':
-				try:
-					cmd[0](*cmd[1:])
-					if logfile.fs_type() != 'void':
-						logfile.fs_void()
-				except BaseException as err:
-					self.failures += 1
-					pi_call = cmd[0]
-					pi_call_id = '.'.join((pi_call.__module__, pi_call.__name__))
-					error = '%s call (%s) raised ' % (factor.absolute_path_string, pi_call_id,)
-					error += err.__class__.__name__ + ': '
-					error += str(err) + '\n'
-					sys.stderr.write(error)
-
-					from traceback import format_exception
-					out = format_exception(err.__class__, err, err.__traceback__)
-
-					heading = b'[Exception]\n#!/traceback\n\t'
-					heading += '\t'.join(out).encode('utf-8')
-					logfile.fs_store(heading)
-
-				self.progress[factor] += 1
-			else:
-				self.log.write('unknown instruction %s\n' %(x,))
+			self.command_queue.append((phase, factor, x))
 
 		if self.progress[factor] >= len(self.tracking[factor][0][1]):
 			self.activity.add(factor)

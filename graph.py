@@ -5,12 +5,12 @@
 """
 import collections
 
-def traverse(descent, working, tree, inverse, node):
+def traverse(directory, working, tree, inverse, node):
 	"""
 	# Invert the directed graph of dependencies from the node.
 	"""
 
-	deps = set(descent(node))
+	deps = set(directory(node))
 
 	if not deps:
 		# No dependencies, add to working set and return.
@@ -27,11 +27,11 @@ def traverse(descent, working, tree, inverse, node):
 		# Note the factor as depending on &x and build
 		# its tree.
 		inverse[x].add(node)
-		traverse(descent, working, tree, inverse, x)
+		traverse(directory, working, tree, inverse, x)
 
-def sequence(descent, nodes, defaultdict=collections.defaultdict, tuple=tuple):
+def sequence(directory, nodes, defaultdict=collections.defaultdict, tuple=tuple):
 	"""
-	# Generator maintaining the state of the sequencing of a traversed depedency
+	# Generator maintaining the state of the sequencing of a traversed dependency
 	# graph. This generator emits factors as they are ready to be processed and receives
 	# factors that have completed processing.
 
@@ -50,7 +50,7 @@ def sequence(descent, nodes, defaultdict=collections.defaultdict, tuple=tuple):
 	working = set()
 
 	for node in nodes:
-		traverse(descent, working, tree, inverse, node)
+		traverse(directory, working, tree, inverse, node)
 
 	new = working
 	# Copy tree.
