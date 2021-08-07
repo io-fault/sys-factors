@@ -81,7 +81,7 @@ class Context(object):
 
 	def __init__(self, route:files.Path, intention:str):
 		self.route = route
-		# Requirement intention of exception contexts.
+		# Requirement intention for metadata contexts.
 		self.intention = intention
 		self.projects = lsf.Context()
 
@@ -95,10 +95,13 @@ class Context(object):
 			'r-intention': intention
 		})
 
+	def _intentions(self, factor):
+		# Read the full set of system-architecture pairs from a variants factor.
+		return self._cat(self._lv(factor), '[intentions]')
+
 	def _variants(self, factor):
 		# Read the full set of system-architecture pairs from a variants factor.
 		v = self._lv(factor)
-
 		for system in self._cat(v, '[systems]'):
 			for arch in self._cat(v, '[' + system + ']'):
 				yield (system, arch)
@@ -130,14 +133,19 @@ class Context(object):
 		fvp = list()
 
 		# Identify the set of variants.
-		for i in intentions:
-			for section in self._semantics(i)[semantics]:
-				vfactor = (section @ 'variants')
-				spec = [
-					(section, lsf.types.Variants(x[0], x[1], i, ''))
-					for x in self._variants(vfactor)
-				]
-				fvp.extend(spec)
+		for section in self._idefault[semantics]:
+			vfactor = (section @ 'variants')
+			try:
+				vi = set(self._intentions(vfactor))
+			except KeyError:
+				vi = intentions
+
+			spec = [
+				(section, lsf.types.Variants(x[0], x[1], i, ''))
+				for i, x in itertools.product(intentions, self._variants(vfactor))
+				if i in vi
+			]
+			fvp.extend(spec)
 
 		return fvp
 
@@ -239,21 +247,6 @@ class Context(object):
 
 		return self._ls(exeref), Adapt
 
-	def _semantics(self, intention):
-		"""
-		# Retrieve the projections and variants for the given intentions.
-		"""
-		path = lsf.types.factor@intention
-
-		if path in self._exc_intentions:
-			if path in self._icache:
-				return self._icache[path]
-			else:
-				self._icache[path] = self._map_factor_semantics(path)
-				return self._icache[path]
-		else:
-			return self._idefault
-
 	def load(self):
 		"""
 		# Load the product indicies.
@@ -265,17 +258,8 @@ class Context(object):
 
 	def configure(self, context=(lsf.types.factor@'vectors')):
 		"""
-		# Load the default factor semantics and identify exceptions.
+		# Load the default factor semantics.
 		"""
-
-		# Acquire the full set of root contexts.
-		ctx = set()
-		for x in self.projects.product_sequence:
-			ctx.update(x.contexts | x.roots)
-
-		# images is the presumed default.
-		ctx.discard(context)
-		self._exc_intentions = ctx
 		self._idefault = self._map_factor_semantics(context)
 		return self
 
