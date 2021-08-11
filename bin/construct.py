@@ -32,13 +32,15 @@ class Application(kcore.Context):
 	def __init__(self,
 			executor,
 			channel, context, cache,
-			intentions, product, projects,
+			intentions, form,
+			product, projects,
 			symbols,
 			rebuild=0,
 		):
 		self.cxn_executor = executor
 		self.cxn_channel = channel
 		self.cxn_intentions = intentions
+		self.cxn_form = form
 		self.cxn_cache = cache
 		self.cxn_context = context
 		self.cxn_product = product
@@ -56,6 +58,13 @@ class Application(kcore.Context):
 		channel = environ.get('FRAMECHANNEL') or 'build'
 
 		executor = environ.get('FPI_EXECUTOR', None)
+
+		i = intentstr.find('/')
+		if i > -1:
+			form = intentstr[:i]
+			intentstr = intentstr[i+1:]
+		else:
+			form = ''
 		intentions = list(tools.unique(intentstr.split(':'), None))
 
 		if cache_type == 'transient':
@@ -77,7 +86,8 @@ class Application(kcore.Context):
 		return Class(
 			executor,
 			channel, ctx, cdi,
-			intentions, pd, list(projects),
+			intentions, form,
+			pd, list(projects),
 			symbols, rebuild=rebuild
 		)
 
@@ -155,6 +165,7 @@ class Application(kcore.Context):
 				self._etime,
 				self.cxn_log,
 				self.cxn_intentions,
+				self.cxn_form,
 				self.cxn_cache,
 				self.cxn_context,
 				local_symbols,

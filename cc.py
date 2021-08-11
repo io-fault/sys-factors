@@ -306,6 +306,7 @@ class Construction(kcore.Context):
 			time,
 			log,
 			intentions,
+			form,
 			cache,
 			context,
 			symbols,
@@ -331,6 +332,7 @@ class Construction(kcore.Context):
 		self.c_sequence = None
 
 		self.c_intentions = intentions
+		self.c_form = form
 		self.c_executor = executor
 		self.c_cache = cache
 		self.c_pcontext = pcontext
@@ -465,7 +467,7 @@ class Construction(kcore.Context):
 		skipped = 0
 		nsources = len(factor.sources())
 
-		for section, variants in mechanism.variants(self.c_intentions):
+		for section, variants in mechanism.variants(self.c_intentions, form=self.c_form):
 			u_prefix, u_suffix = mechanism.unit_name_delta(section, variants, factor.type)
 
 			image = factor.image(variants)

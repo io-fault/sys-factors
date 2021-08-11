@@ -14,6 +14,23 @@ from fault.project import system as lsf
 from . import core
 from . import vc
 
+def _variant_constants(variants):
+	return {
+		'fv-intention': variants.intention,
+		'fv-system': variants.system,
+		'fv-architecture': variants.architecture,
+		'fv-form': variants.form
+	}
+
+def _variant_conclusions(variants):
+	return {
+		'fv-i' + variants.intention,
+		'fv-system-' + variants.system,
+		'fv-architecture-' + variants.architecture,
+		'fv-intention-' + variants.intention,
+		'fv-form-' + (variants.form or 'void'),
+	}
+
 class Mechanism(object):
 	"""
 	# A section of a construction context that can formulate adapters for factor processing.
@@ -36,12 +53,12 @@ class Mechanism(object):
 		self._cache[k] = c
 		return c
 
-	def variants(self, intentions):
+	def variants(self, intentions, form=''):
 		"""
 		# Generate the full combinations of sections and variants
 		# for the given intentions.
 		"""
-		return self.context.cc_variants(self.semantics, intentions)
+		return self.context.cc_variants(self.semantics, intentions, form=form)
 
 	def unit_name_delta(self, section, variants, itype):
 		"""
@@ -91,42 +108,43 @@ class Context(object):
 		self._vcache = {}
 
 		# Initialization Context for loading projections and variants.
-		self._vinit = vc.Context(set(), {
-			'r-intention': intention
-		})
+		self._vinit = vc.Context(set(), {})
 
 	def _intentions(self, factor):
-		# Read the full set of system-architecture pairs from a variants factor.
-		return self._cat(self._lv(factor), '[intentions]')
+		return self._cat(self._vinit, self._lv(factor), '[intentions]')
+
+	def _forms(self, factor):
+		return self._cat(self._vinit, self._lv(factor), '[forms]')
 
 	def _variants(self, factor):
 		# Read the full set of system-architecture pairs from a variants factor.
 		v = self._lv(factor)
-		for system in self._cat(v, '[systems]'):
-			for arch in self._cat(v, '[' + system + ']'):
+		for system in self._cat(self._vinit, v, '[systems]'):
+			for arch in self._cat(self._vinit, v, '[' + system + ']'):
 				yield (system, arch)
 
 	def cc_unit_name_delta(self, section, variants, itype):
 		# Unit name adjustments.
+		initctx = vc.Context(_variant_conclusions(variants), _variant_constants(variants))
 		exe, adapter, idx = self._read_merged(
-			self._vinit,
+			initctx,
 			section, variants,
 			'Render', itype, None
 		)
 
 		try:
-			unit_prefix = list(self._cat(idx, "[unit-prefix]"))[0]
+			unit_prefix = list(self._cat(initctx, idx, "[unit-prefix]"))[0]
 		except KeyError:
 			unit_prefix = ""
 
 		try:
-			unit_suffix = list(self._cat(idx, "[unit-suffix]"))[0]
+			unit_suffix = list(self._cat(initctx, idx, "[unit-suffix]"))[0]
 		except KeyError:
 			unit_suffix = ""
 
 		return unit_prefix, unit_suffix
 
-	def cc_variants(self, semantics, intentions):
+	def cc_variants(self, semantics, intentions, form=''):
 		"""
 		# Identify the variant combinations to use for the given &semantics and &intentions.
 		"""
@@ -136,14 +154,17 @@ class Context(object):
 		for section in self._idefault[semantics]:
 			vfactor = (section @ 'variants')
 			try:
-				vi = set(self._intentions(vfactor))
+				vf = set(self._forms(vfactor))
 			except KeyError:
-				vi = intentions
+				# Unconditional
+				vf = set([form])
+
+			if form not in vf:
+				continue
 
 			spec = [
-				(section, lsf.types.Variants(x[0], x[1], i, ''))
+				(section, lsf.types.Variants(x[0], x[1], i, form))
 				for i, x in itertools.product(intentions, self._variants(vfactor))
-				if i in vi
 			]
 			fvp.extend(spec)
 
@@ -156,10 +177,7 @@ class Context(object):
 
 		kw['null'] = '/dev/null'
 		kw['factor-integration-type'] = str(itype.factor)
-		kw['fv-intention'] = variants.intention
-		kw['fv-system'] = variants.system
-		kw['fv-architecture'] = variants.architecture
-		kw['fv-form'] = variants.form
+		kw.update(_variant_constants(variants))
 
 		from fault.system import identity
 		kw['host-system'], kw['host-architecture'] = identity.root_execution_context()
@@ -177,15 +195,7 @@ class Context(object):
 		return l | {
 			'it-' + itype.factor.identifier,
 			'cc-' + str(section),
-			'fv-i' + variants.intention,
-
-			# Generally unused as conclusions,
-			# but acceptable in cases where it's known consistent.
-			'fv-system-' + variants.system,
-			'fv-architecture-' + variants.architecture,
-			'fv-intention-' + variants.intention,
-			'fv-form-' + (variants.form or 'void'),
-		}
+		} | _variant_conclusions(variants)
 
 	def _compose(self, vctx, section, composition, itype, name, fallback):
 		idx = {}
@@ -286,12 +296,12 @@ class Context(object):
 		# Vector Reference Query method used during initialization.
 		return ()
 
-	def _cat(self, index, name, fallback=None):
+	def _cat(self, ctx, index, name, fallback=None):
 		# Catenate the vectors selected in index using _vinit.
 		if name in index:
-			return self._vinit.chain(self._iq, index, name)
+			return ctx.chain(self._iq, index, name)
 		else:
-			return self._vinit.chain(self._iq, index, fallback)
+			return ctx.chain(self._iq, index, fallback)
 
 	def _v(self, factor):
 		if factor not in self._vcache:
@@ -318,7 +328,7 @@ class Context(object):
 
 		# Map semantics identifier to the adapter projects in cc.
 		for project in pvector.keys():
-			v = self._cat(pvector, project)
+			v = self._cat(self._vinit, pvector, project)
 			for i in v:
 				idx[i].append(context @ project)
 
