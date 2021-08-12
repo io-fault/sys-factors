@@ -110,9 +110,6 @@ class Context(object):
 		# Initialization Context for loading projections and variants.
 		self._vinit = vc.Context(set(), {})
 
-	def _intentions(self, factor):
-		return self._cat(self._vinit, self._lv(factor), '[intentions]')
-
 	def _forms(self, factor):
 		return self._cat(self._vinit, self._lv(factor), '[forms]')
 
