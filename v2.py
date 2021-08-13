@@ -89,6 +89,20 @@ class Context(object):
 	# Vectors Composition based Mechanism set.
 	"""
 
+	@staticmethod
+	def _ref(section, name):
+		if name[:2] == '..':
+			# Context relative.
+			ref = section.container @ name[2:]
+		elif name[:1] == '.':
+			# Project relative.
+			ref = section @ name[1:]
+		else:
+			# Unqualified, absolute.
+			ref = lsf.factor @ name
+
+		return ref
+
 	@classmethod
 	def from_directory(Class, route:files.Path, intention:str='optimal'):
 		"""
@@ -111,11 +125,11 @@ class Context(object):
 		self._vinit = vc.Context(set(), {})
 
 	def _forms(self, factor):
-		return self._cat(self._vinit, self._lv(factor), '[forms]')
+		return self._cat(self._vinit, self._load_vector(factor), '[forms]')
 
 	def _variants(self, factor):
 		# Read the full set of system-architecture pairs from a variants factor.
-		v = self._lv(factor)
+		v = self._load_vector(factor)
 		for system in self._cat(self._vinit, v, '[systems]'):
 			for arch in self._cat(self._vinit, v, '[' + system + ']'):
 				yield (system, arch)
@@ -197,9 +211,9 @@ class Context(object):
 	def _compose(self, vctx, section, composition, itype, name, fallback):
 		idx = {}
 		for c in composition:
-			idx.update(self._lv(section @ c).items())
+			idx.update(self._load_vector(section @ c).items())
 
-		idx.update(self._lv(section @ itype.factor.identifier).items())
+		idx.update(self._load_vector(section @ itype.factor.identifier).items())
 
 		# Catenate the vectors selected in index using _vinit.
 		if name in idx:
@@ -235,7 +249,7 @@ class Context(object):
 
 		idx = {}
 		for x in composition:
-			vects = (section @ x)
+			vects = self._ref(section, x)
 			idx.update(self._v(vects))
 
 		return exeref, adapter, idx
@@ -252,7 +266,7 @@ class Context(object):
 		def Adapt(query, Format=list(vr), Chain=itertools.chain.from_iterable):
 			return Chain(x(query) for x in Format)
 
-		return self._ls(exeref), Adapt
+		return self._load_system(self._ref(section, exeref)), Adapt
 
 	def load(self):
 		"""
@@ -279,12 +293,12 @@ class Context(object):
 				first, = srcs #* Cell
 				return first
 
-	def _lv(self, factor):
+	def _load_vector(self, factor):
 		# Load vector.
 		typ, src = self._read_cell(factor)
 		return vc.parse(src.fs_load().decode('utf-8'))
 
-	def _ls(self, factor):
+	def _load_system(self, factor):
 		# Load system command.
 		typ, src = self._read_cell(factor)
 		return execution.parse_sx_plan(src.fs_load().decode('utf-8'))
@@ -301,8 +315,9 @@ class Context(object):
 			return ctx.chain(self._iq, index, fallback)
 
 	def _v(self, factor):
+		# Cached load vector.
 		if factor not in self._vcache:
-			self._vcache[factor] = self._lv(factor)
+			self._vcache[factor] = self._load_vector(factor)
 
 		return self._vcache[factor]
 
