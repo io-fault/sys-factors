@@ -18,7 +18,8 @@ class SystemFactor(object):
 
 	fields = {
 		'source-paths': {'http://if.fault.io/factors/lambda.sources'},
-		'image': {
+		'factor-image': {
+			'http://if.fault.io/factors/system.library-name',
 			'http://if.fault.io/factors/system.library',
 			'http://if.fault.io/factors/system.directory',
 		},

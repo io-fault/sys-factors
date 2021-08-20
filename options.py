@@ -8,8 +8,8 @@ from . import core
 
 sourcetree = types.Reference.from_ri('type', 'http://if.fault.io/factors/lambda.sources')
 systemexec = types.Reference.from_ri('type', 'http://if.fault.io/factors/system.executable')
-systemlibrary = types.Reference.from_ri('reference', 'http://if.fault.io/factors/system.library')
-systemdirectory = types.Reference.from_ri('reference', 'http://if.fault.io/factors/system.directory')
+systemlibrary = types.Reference.from_ri('type', 'http://if.fault.io/factors/system.library-name')
+systemdirectory = types.Reference.from_ri('type', 'http://if.fault.io/factors/system.directory')
 sourceparameter = types.Reference.from_ri('set', 'http://if.fault.io/factors/lambda.control')
 
 def split_define_parameter(s):
@@ -22,7 +22,7 @@ def split_define_parameter(s):
 handlers = {
 	'-X': (systemexec, files.Path.from_path),
 	'-I': (sourcetree, files.Path.from_path),
-	'-l': (systemlibrary, files.root.__matmul__),
+	'-l': (systemlibrary, str),
 	'-L': (systemdirectory, files.Path.from_path),
 	'-D': (sourceparameter, split_define_parameter),
 	'-U': (sourceparameter, (lambda x: [(str(x), None)])),

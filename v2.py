@@ -1,5 +1,5 @@
 """
-# Construction Context implementation using vector compositions.
+# Construction Context implementation using vector formulations.
 """
 import sys
 import functools
