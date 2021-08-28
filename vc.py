@@ -154,21 +154,24 @@ class Context(object):
 			# Trap. Match count must be zero for inclusion;
 			# Also, zero count must be returned for subsequent traps.
 			return (matches == 0), 0
-		elif cset.issubset(self.conclusions):
-			# Regular Match
+		elif not cset.isdisjoint(self.conclusions):
+			# Regular, fast path, Match
+			# Presumes &self.conclusions disallows leading '!'.
 			return True, len(cset)
 		else:
-			# Exception matches.
+			# Check each field; logical or.
 			for c in cset:
 				negative = (c[:1] == '!')
 				if negative:
-					if c[1:] in self.conclusions:
-						return False, 0
-				elif c not in self.conclusions:
-					return False, 0
+					match = not (c[1:] in self.conclusions)
+				else:
+					match = (c in self.conclusions)
+
+				if match:
+					return True, len(cset)
 			else:
-				# All conclusions passed.
-				return True, len(cset)
+				# No conclusions matched.
+				return False, 0
 
 		return False, 0
 
@@ -413,7 +416,7 @@ def instruction(lineno, line):
 	constr, vector = line.split(':', 1)
 
 	# line.split(':')
-	conclusions = frozenset(constr.strip().split('/'))
+	conclusions = frozenset(constr.strip().split('|'))
 
 	# Keep fields separated from quotations so isolated
 	# processing can be performed without weaving about.
