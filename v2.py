@@ -10,9 +10,9 @@ import collections
 from fault.system import files
 from fault.system import execution
 from fault.project import system as lsf
+from fault.vector import formulation as vf
 
 from . import core
-from . import vc
 
 def _variant_constants(variants):
 	return {
@@ -122,7 +122,7 @@ class Context(object):
 		self._vcache = {}
 
 		# Initialization Context for loading projections and variants.
-		self._vinit = vc.Context(set(), {})
+		self._vinit = vf.Context(set(), {})
 
 	def _forms(self, factor):
 		return self._cat(self._vinit, self._load_vector(factor), '[forms]')
@@ -136,7 +136,7 @@ class Context(object):
 
 	def cc_unit_name_delta(self, section, variants, itype):
 		# Unit name adjustments.
-		initctx = vc.Context(_variant_conclusions(variants), _variant_constants(variants))
+		initctx = vf.Context(_variant_conclusions(variants), _variant_constants(variants))
 		exe, adapter, idx = self._read_merged(
 			initctx,
 			section, variants,
@@ -165,12 +165,12 @@ class Context(object):
 		for section in self._idefault[semantics]:
 			vfactor = (section @ 'variants')
 			try:
-				vf = set(self._forms(vfactor))
+				v = set(self._forms(vfactor))
 			except KeyError:
 				# Unconditional
-				vf = set([form])
+				v = set([form])
 
-			if form not in vf:
+			if form not in v:
 				continue
 
 			spec = [
@@ -255,7 +255,7 @@ class Context(object):
 		return exeref, adapter, idx
 
 	def cc_compose(self, phase, section, variants, itype, xtype):
-		vctx = vc.Context(
+		vctx = vf.Context(
 			self._conclusions(section, variants, itype, xtype),
 			self._constants(section, variants, itype, xtype)
 		)
@@ -296,7 +296,7 @@ class Context(object):
 	def _load_vector(self, factor):
 		# Load vector.
 		typ, src = self._read_cell(factor)
-		return vc.parse(src.fs_load().decode('utf-8'))
+		return vf.parse(src.fs_load().decode('utf-8'))
 
 	def _load_system(self, factor):
 		# Load system command.
