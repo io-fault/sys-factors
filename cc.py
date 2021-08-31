@@ -19,9 +19,9 @@ from fault.kernel import dispatch as kdispatch
 
 from . import graph
 from . import core
-from . import v2
+from . import vectorcontext
 
-Context=v2.Context
+open_fs_context = vectorcontext.Context.from_directory
 devnull = files.Path.from_absolute(os.devnull)
 
 def local_query(integrand, local, query):
@@ -381,7 +381,7 @@ class Construction(kcore.Context):
 		if ftype in self._mcache:
 			return self._mcache[ftype]
 
-		mech = self._mcache[ftype] = v2.Mechanism(self.c_context, ftype)
+		mech = self._mcache[ftype] = vectorcontext.Mechanism(self.c_context, ftype)
 		return mech
 
 	def finish(self, factors):

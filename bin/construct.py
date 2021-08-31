@@ -73,7 +73,7 @@ class Application(kcore.Context):
 			assert cache_type == 'persistent'
 			cdi = cache.Persistent(files.Path.from_path(cache_path)/fpath)
 
-		ctx = cc.Context.from_directory(ctxdir).load().configure()
+		ctx = cc.open_fs_context(ctxdir).load().configure()
 		rebuild = int((environ.get('FPI_REBUILD') or '0').strip())
 
 		pd = lsf.Product(work)
