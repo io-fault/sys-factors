@@ -76,8 +76,9 @@ def prepare(command, args, log, output, input, executor=None):
 	env = dict(os.environ)
 	env.update(command[0])
 
-	ki = libexec.KInvocation(executor or command[1], xargs, environ=env)
-	return (opid, output, stdin, stdout, log, ki)
+	xpath = executor or command[1]
+	ki = libexec.KInvocation(xpath, xargs, environ=env)
+	return (opid, output, stdin, stdout, log, (command[0], xpath, xargs), ki)
 
 @tools.cachedcalls(12)
 def _ftype(itype):
@@ -239,6 +240,7 @@ def close_project_transaction(time, project, channel=''):
 	return channel + '/' + str(project.factor), msg
 
 def open_process_transaction(time, factor, pid, synopsis, focus, command, logfile):
+	env, xpath, xargs = command
 	msg = frames.types.Message.from_string_v1(
 		"transaction-started[->]: " + synopsis + ' ' + focus,
 		protocol=frames.protocol
@@ -246,9 +248,13 @@ def open_process_transaction(time, factor, pid, synopsis, focus, command, logfil
 	msg.msg_parameters['data'] = frames.types.Parameters.from_pairs_v1([
 		('time-offset', time),
 		('factor', str(factor)),
-		('command', list(str(x) for x in command)),
+		('command', [xpath]),
 		('focus', str(focus)),
 		('log', str(logfile)),
+	])
+	msg.msg_parameters['data'].specify([
+		('value', 'string', 'executable', xpath),
+		('v-sequence', 'string', 'argv', xargs),
 	])
 	return msg
 
@@ -560,7 +566,7 @@ class Construction(kcore.Context):
 
 	def process_execute(self, instruction, f_target_path=(lambda x: str(x))):
 		phase, factor, ins = instruction
-		opid, tfile, cin, cout, cerr, ki = ins
+		opid, tfile, cin, cout, cerr, cmd, ki = ins
 
 		pid = None
 		start_time = self.time()
@@ -581,7 +587,7 @@ class Construction(kcore.Context):
 		# Emit status frames.
 		open_msg = open_process_transaction(
 			start_time, factor.route, pid,
-			opid, phase, (opid,), cerr
+			opid, phase, cmd, cerr
 		)
 		channel = "{0}/{1}/{2}/{3}".format(
 			self._channel, str(factor.name), 'system', str(pid),
