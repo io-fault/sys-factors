@@ -20,9 +20,7 @@ from fault.kernel import core as kcore
 from fault.kernel import system as ksystem
 
 from fault.time import sysclock
-from fault.status import types as statustypes
-from fault.status import frames as statusframes
-from fault.transcript import frames as transcripts
+from fault.transcript import io as transcripts
 
 class Application(kcore.Context):
 	@property
@@ -31,14 +29,13 @@ class Application(kcore.Context):
 
 	def __init__(self,
 			executor,
-			channel, context, cache,
+			context, cache,
 			intentions, form,
 			product, projects,
 			symbols,
 			rebuild=0,
 		):
 		self.cxn_executor = executor
-		self.cxn_channel = channel
 		self.cxn_intentions = intentions
 		self.cxn_form = form
 		self.cxn_cache = cache
@@ -55,7 +52,6 @@ class Application(kcore.Context):
 		ctxdir, cache_type, cache_path, intentstr, work, fpath, *symbols = arguments
 		ctxdir = files.Path.from_path(ctxdir)
 		work = files.Path.from_path(work)
-		channel = environ.get('FRAMECHANNEL') or 'build'
 
 		executor = environ.get('FPI_EXECUTOR', None)
 
@@ -84,8 +80,7 @@ class Application(kcore.Context):
 
 		projects = itertools.chain.from_iterable(map(pd.select, [lsf.types.factor@fpath]))
 		return Class(
-			executor,
-			channel, ctx, cdi,
+			executor, ctx, cdi,
 			intentions, form,
 			pd, list(projects),
 			symbols, rebuild=rebuild
@@ -110,11 +105,7 @@ class Application(kcore.Context):
 		"""
 
 		self._etime = sysclock.elapsed()
-		p = statustypes.Parameters.from_nothing_v1()
-		p['reference-time'] = int(sysclock.now())
-		p['time-offset'] = int(self._etime)
-		msg = statusframes.declaration(data=p)
-		self.cxn_log.emit(self.cxn_channel, msg)
+		self.cxn_log.declare()
 		self.cxn_log.flush()
 
 		work = self.cxn_work_directory
@@ -161,7 +152,6 @@ class Application(kcore.Context):
 
 			seq.append(cc.Construction(
 				self.cxn_executor,
-				self.cxn_channel,
 				self._etime,
 				self.cxn_log,
 				self.cxn_intentions,
@@ -173,7 +163,7 @@ class Application(kcore.Context):
 				[pctx, rctx],
 				project,
 				targets,
-				processors=16, # overcommit significantly
+				processors=8, # overcommit significantly
 				reconstruct=re,
 			))
 

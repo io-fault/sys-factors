@@ -17,6 +17,8 @@ from fault.internet import ri
 from fault.kernel import core as kcore
 from fault.kernel import dispatch as kdispatch
 
+from fault.transcript import metrics
+
 from . import graph
 from . import core
 from . import vectorcontext
@@ -88,7 +90,7 @@ def _ftype(itype):
 def work_key_cache(prefix, variants):
 	key = prefix
 	# Using slashes as separators as they should not
-	# be present in the values for filesystem safety.
+	# present in the values for filesystem safety.
 	key += '/i=' + variants.intention
 	key += '/s=' + variants.system
 	key += '/a=' + variants.architecture
@@ -211,104 +213,14 @@ def requirements(cc, ctxpath, symbols, factor):
 			else:
 				yield from interpret_reference(cc, ctxpath, factor, sym, r)
 
-# Status Frames
-from fault.transcript import frames
-from fault.status.frames import protocol as frames_protocol
-
-def open_project_transaction(time, project, intention='unspecified', channel=''):
-	p = project.information
-	itxt = p.icon.get('emoji', '')
-	msg = frames.types.Message.from_string_v1(
-		"transaction-started[->]: " + p.identifier + ' ' + 'factors',
-		protocol=frames_protocol
-	)
-	msg.msg_parameters['data'] = frames.types.Parameters.from_pairs_v1([
-		('time-offset', time),
-	])
-
-	return channel + '/' + str(project.factor), msg
-
-def close_project_transaction(time, project, channel=''):
-	msg = frames.types.Message.from_string_v1(
-		"transaction-stopped[<-]: " + project.information.identifier,
-		protocol=frames_protocol
-	)
-	msg.msg_parameters['data'] = frames.types.Parameters.from_pairs_v1([
-		('time-offset', time),
-	])
-
-	return channel + '/' + str(project.factor), msg
-
-def open_process_transaction(time, factor, pid, synopsis, focus, command, logfile):
-	env, xpath, xargs = command
-	msg = frames.types.Message.from_string_v1(
-		"transaction-started[->]: " + synopsis + ' ' + focus,
-		protocol=frames.protocol
-	)
-	msg.msg_parameters['data'] = frames.types.Parameters.from_pairs_v1([
-		('time-offset', time),
-		('factor', str(factor)),
-		('command', [xpath]),
-		('focus', str(focus)),
-		('log', str(logfile)),
-	])
-	msg.msg_parameters['data'].specify([
-		('value', 'string', 'executable', xpath),
-		('v-sequence', 'string', 'argv', xargs),
-	])
-	return msg
-
-def close_process_transaction(time, pid, synopsis, status, rusage):
-	msg = frames.types.Message.from_string_v1(
-		"transaction-stopped[<-]: " + synopsis,
-		protocol=frames_protocol
-	)
-	msg.msg_parameters['data'] = frames.types.Parameters.from_pairs_v1([
-		('time-offset', time),
-		('status', status),
-	])
-	return msg
-
-def process_metrics_signal(time, exit_type, rusage):
-	counts = {exit_type: 1}
-	r = frames.metrics(time, {'usage': rusage.ru_stime + rusage.ru_utime}, counts)
-	msg = frames.types.Message.from_string_v1(
-		"transaction-event[--]: METRICS: system process",
-		protocol=frames_protocol
-	)
-	msg.msg_parameters['data'] = r
-	return msg
-
-def cached_operation_signal(time, skipped):
-	counts = {'cached': skipped}
-	r = frames.metrics(time, {}, counts)
-	msg = frames.types.Message.from_string_v1(
-		"transaction-event[--]: METRICS: cached operation count",
-		protocol=frames_protocol
-	)
-	msg.msg_parameters['data'] = r
-	return msg
-
 class Construction(kcore.Context):
 	"""
 	# Construction process manager. Maintains the set of targets to construct and
 	# dispatches the work to be performed for completion in the appropriate order.
 	"""
 
-	def warn(self, target, text):
-		msg = frames.types.Message.from_string_v1(
-			"message-application[!#]: WARNING: " + text,
-			protocol=frames_protocol
-		)
-		msg.msg_parameters['data'] = frames.types.Parameters.from_pairs_v1([
-			('time-offset', int(self.time())),
-			('factor', str(target.route)),
-		])
-		return self.log.emit(self._channel, msg)
-
 	def __init__(self,
 			executor,
-			channel,
 			time,
 			log,
 			intentions,
@@ -325,7 +237,6 @@ class Construction(kcore.Context):
 		):
 		super().__init__()
 
-		self._channel = channel
 		self._etime = time
 		self._rusage = {}
 		self._mcache = {}
@@ -543,10 +454,15 @@ class Construction(kcore.Context):
 
 			tracks.append(('render', ops))
 
-			# Communicate skip count.
-			channel = self._channel + '/' + str(factor.name)
-			skipped += nsources - len(translations)
-			self.log.emit(channel, cached_operation_signal(0, skipped))
+			# Communicate the changes to pending work. Skips and remainder.
+			skip = (nsources - len(translations)) + (1 if len(ops) == 0 else 0)
+			skipped += skip
+			ext = {
+				'@metrics': [f'%0+{skip}-0/{skip}'],
+			}
+			self.log.xact_status('<cached>',
+				f"{factor.name}: {skip} procssing instructions skipped", ext
+			)
 
 		if tracks:
 			self.progress[factor] = -1
@@ -584,15 +500,22 @@ class Construction(kcore.Context):
 					})
 			xact = kcore.Transaction.create(sp)
 
-		# Emit status frames.
-		open_msg = open_process_transaction(
-			start_time, factor.route, pid,
-			opid, phase, cmd, cerr
-		)
-		channel = "{0}/{1}/{2}/{3}".format(
-			self._channel, str(factor.name), 'system', str(pid),
-		)
-		self.log.emit(channel, open_msg)
+		env = [
+			('@STDERR', str(cerr)),
+			('@STDOUT', str(cout)),
+			('@STDIN', str(cin)),
+		]
+		env.extend(cmd[0])
+		plan = ''.join(libexec.serialize_sx_plan((env, cmd[1], cmd[2])))
+
+		ext = {
+			'@metrics': ['%0+0-0/1'],
+			'@type': ['system'],
+			'@operation': ['#!/usr/bin/env px'] + plan.split('\n'),
+			'factor': [str(factor.route)],
+		}
+		synop = ' '.join(("FPI:", str(factor), str(tfile)))
+		self.log.xact_open(str(pid), synop, ext)
 
 		self.xact_dispatch(xact)
 		return xact
@@ -604,8 +527,10 @@ class Construction(kcore.Context):
 			self.process_exit(pid, status, None, *params)
 
 	def process_exit(self, pid, delta, rusage,
-			start_time, factor, log, cmd, tfile,
+			start_time, factor, log, cmd, tfile
 		):
+		ext = {}
+		stop_time = self.time()
 		rusage = self._rusage.pop(pid, None)
 		self.progress[factor] += 1
 		self.process_count -= 1
@@ -614,34 +539,44 @@ class Construction(kcore.Context):
 		exit_code = delta.status
 		if exit_code is None:
 			# Bad exit event connected.
-			self.warn(factor, "process exit event did not have status")
+			self.log.warning("process exit event did not have status")
 
 		self.exits += 1
-		# Build synopsis.
-		exitstr = cmd + '[' + str(exit_code) + ']'
+
+		# Build exit synopsis.
+		synopsis = str(factor.absolute_path_string) + ': '
+		synopsis += cmd + ' -> ' + str(exit_code)
+
+		# Force modification of directories for (persistent) cache checks.
 		if exit_code == 0:
 			if tfile.fs_type() == 'directory':
-				# Force modification of directories for (persistent) cache checks.
 				tfile.fs_modified()
 		else:
 			self.failures += 1
 
-		synopsis = ' '.join([exitstr, str(log),])
-		stop_time = self.time()
-
 		if exit_code is None:
 			exit_type = 'cached'
+			work = metrics.Work(0, 0, 1, 0)
 		elif exit_code == 0:
 			exit_type = 'processed'
+			work = metrics.Work(0, 1, 0, 0)
 		else:
 			exit_type = 'failed'
+			with log.fs_open('r') as f:
+				ext['@failure-image'] = ['system-command-error']
+				ext['@failure-image'].extend(f.read().split('\n'))
+			work = metrics.Work(0, 0, 0, 1)
 
-		close_msg = close_process_transaction(stop_time, pid, synopsis, exit_code, rusage)
-		channel = "{0}/{1}/{2}/{3}".format(
-			self._channel, str(factor.name), 'system', str(pid),
+		usage = metrics.Resource(
+			1, int(rusage.ru_maxrss),
+			# Nanosecond precision.
+			int((rusage.ru_stime + rusage.ru_utime) * (10**9)),
+			stop_time - start_time,
 		)
-		self.log.emit(channel, process_metrics_signal(stop_time - start_time, exit_type, rusage))
-		self.log.emit(channel, close_msg)
+
+		xact_metrics = metrics.Procedure(work=work, msg=metrics.Advisory(), usage=usage)
+		ext['@metrics'] = [xact_metrics.sequence()]
+		self.log.xact_close(str(pid), synopsis, ext)
 
 		if self.continued is False:
 			# Consolidate loading of the next set of processors.
